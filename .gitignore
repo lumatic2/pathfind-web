@@ -1,1 +1,11 @@
+# 대회 교육 자료 로컬 보관 (외부 배포물 — 공개 레포에 올리지 않는다)
 .materials/
+
+# Hermes 개인 오버라이드 (커밋하지 않는 로컬 메모)
+AGENTS.override.md
+
+# 의존성·빌드 산출물
+node_modules/
+.vercel/
+.env
+.env.*
