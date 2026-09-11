@@ -69,6 +69,51 @@ function parseSolarJson(content) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callSolarWithRetry(messages, maxRetries = 3) {
+  if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const solarRes = await fetch(SOLAR_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SOLAR_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: SOLAR_MODEL,
+        messages,
+        temperature: 0.7,
+        max_tokens: 2048,
+      }),
+    });
+
+    if (solarRes.ok) {
+      const solarData = await solarRes.json();
+      const content = solarData.choices?.[0]?.message?.content;
+      if (!content) throw new Error('Solar 응답이 비어 있습니다');
+      return content;
+    }
+
+    const errBody = await solarRes.text().catch(() => '');
+    const status = solarRes.status;
+
+    // 429 Rate Limit - exponential backoff with retry
+    if (status === 429 && attempt < maxRetries) {
+      console.warn(`Solar 429 rate limit (시도 ${attempt + 1}/${maxRetries}), ${Math.pow(2, attempt)}초 대기 후 재시도...`);
+      await sleep(Math.pow(2, attempt) * 1000);
+      continue;
+    }
+
+    throw new Error(`Solar API 오류 (${status}): ${errBody.slice(0, 300)}`);
+  }
+
+  throw new Error('Solar API 호출 최대 재시연 횟수 초과');
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -110,29 +155,7 @@ export default async function handler(req) {
       messages.push({ role: 'user', content: `[예시 버튼 선택] ${question || '(버튼 선택)'}` });
     }
 
-    const solarRes = await fetch(SOLAR_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SOLAR_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: SOLAR_MODEL,
-        messages,
-        temperature: 0.7,
-        max_tokens: 2048,
-      }),
-    });
-
-    if (!solarRes.ok) {
-      const errBody = await solarRes.text().catch(() => '');
-      throw new Error(`Solar API 오류 (${solarRes.status}): ${errBody.slice(0, 300)}`);
-    }
-
-    const solarData = await solarRes.json();
-    const content = solarData.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Solar 응답이 비어 있습니다');
-
+    const content = await callSolarWithRetry(messages);
     const parsed = parseSolarJson(content);
 
     // 필수 필드 검증
