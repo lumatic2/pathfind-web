@@ -94,29 +94,47 @@ function parseSolarJsonOrText(content, expectJson) {
   return trimmed;
 }
 
-async function callSolar(messages, temperature = 0.7) {
+async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
   if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
-  const res = await fetch(SOLAR_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${SOLAR_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: SOLAR_MODEL,
-      messages,
-      temperature,
-      max_tokens: 4096,
-    }),
-  });
-  if (!res.ok) {
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(SOLAR_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SOLAR_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: SOLAR_MODEL,
+        messages,
+        temperature,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error('Solar 응답이 비어 있습니다');
+      return content;
+    }
+
     const errBody = await res.text().catch(() => '');
-    throw new Error(`Solar API 오류 (${res.status}): ${errBody.slice(0, 300)}`);
+    const status = res.status;
+
+    // 429 Rate Limit - exponential backoff with retry
+    if (status === 429 && attempt < maxRetries) {
+      console.warn(`Solar 429 rate limit (시도 ${attempt + 1}/${maxRetries}), 재시연 대기...`);
+      // 지수 백오프: 1초, 2초, 4초
+      const delay = Math.pow(2, attempt) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      continue;
+    }
+
+    throw new Error(`Solar API 오류 (${status}): ${errBody.slice(0, 300)}`);
   }
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Solar 응답이 비어 있습니다');
-  return content;
+
+  throw new Error('Solar API 호출 최대 재시연 횟수 초과');
 }
 
 function validateBigPicture(data) {
