@@ -1,8 +1,1 @@
-{
-  "functions": {
-    "api/*.js": {
-      "runtime": "node",
-      "includeFiles": "api/**/*.js"
-    }
-  }
-}
+{}
