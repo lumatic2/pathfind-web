@@ -84,6 +84,7 @@ async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTok
       messages,
       ...(tools ? { tools: [WEB_SEARCH_TOOL], tool_choice } : {}),
       max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
     }),
   });
 
@@ -231,7 +232,7 @@ ${stage.tasks?.map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '�
     // Solar가 한 응답에 여러 tool_call을 주거나, follow-up 응답에 다시 tool_call을 주는
     // 경우 모두 처리. 상한 2회면 중단.
     const toolMessages = messages.slice(); // 도구 응답을 누적할 메시지 버퍼
-    let toolResult = result; // 현재 Solar 응답
+    let toolResult = await callSolar(messages, { tools: true, tool_choice: 'auto', maxTokens: 4096 }); // 첫 Solar 호출
     let toolCallCount = 0;
     const searchedQueries = [];
 

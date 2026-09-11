@@ -12,11 +12,9 @@ const BIG_PICTURE_SYSTEM = `당신은 무언가를 만들려는 사람을 위한
    - 출시 (배포·공개)
    - 운영·개선 (피드백·반복)
 2. 각 단계마다 할 일 2-4개를 나열합니다.
-3. 각 단계마다 "이미 있는 것(오픈소스·무료 에셋·튜토리얼·유사 사례)"과 "직접 해야 하는 것"을 구분해 제시합니다.
-4. 각 단계마다 참고 링크(URL)를 1-3개 포함시킵니다. URL은 유효해 보이는 실제 주소를 제시하되, 확인된 것만 확실하다고 하지 말고 "참고 후보"로 제시합니다.
-5. 병렬 가능한 리서치(예: 에셋 탐색 + 기술 대안 조사)는 함께 표시하고, 순서 의존이 있는 것(예: 기획이 먼저돼야 설계를 함)은 단계로 순서를 둡니다.
-6. prototype → playtest → 수정 루프에 대한 언급을 포함합니다.
-7. JSON만 출력합니다. 다른 텍스트 금지.
+3. 병렬 가능한 리서치(예: 에셋 탐색 + 기술 대안 조사)는 함께 표시하고, 순서 의존이 있는 것(예: 기획이 먼저돼야 설계를 함)은 단계로 순서를 둡니다.
+4. prototype → playtest → 수정 루프에 대한 언급을 포함합니다.
+5. JSON만 출력합니다. 다른 텍스트 금지.
 
 출력 형식 (JSON만):
 {
@@ -32,19 +30,7 @@ const BIG_PICTURE_SYSTEM = `당신은 무언가를 만들려는 사람을 위한
         "tasks": [
           { "order": 1, "task": "할 일", "why": "이유" }
         ],
-        "verdict": "가져다 써도 됨 | 직접 해야 함 | 섞어야 함 | 선례를 못 찾음",
-        "verdictReason": "판정 근거 한 줄",
-        "findings": [
-          {
-            "kind": "오픈소스 | 무료 에셋 | 튜토리얼·블로그 | 참고 사례",
-            "name": "자료 이름",
-            "query": "이 자료를 찾는 데 쓴 검색어",
-            "evidence": "근거 문장 한 줄",
-            "note": "한 줄 메모",
-            "url": "URL (빈 문자열 금지)"
-          }
-        ],
-        "choices": ["선택지1", "선택지2"]  // 이 단계에서 갈 수 있는 선택 branch
+        "choices": ["선택지1", "선택지2"]
       }
     ],
     "prototypeLoop": "prototype → playtest → 수정 루프에 대한 한 줄 설명"
@@ -108,7 +94,8 @@ async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
         model: SOLAR_MODEL,
         messages,
         temperature,
-        max_tokens: 4096,
+        max_tokens: 8192,
+        response_format: { type: 'json_object' },
       }),
     });
 
@@ -146,7 +133,9 @@ function validateBigPicture(data) {
   for (const s of bp.stages) {
     if (!s.title) throw new Error('stage.title 없음');
     if (!Array.isArray(s.tasks)) throw new Error('stage.tasks 배열 아님: ' + s.title);
-    if (!s.verdict) throw new Error('stage.verdict 없음: ' + s.title);
+    if (!Array.isArray(s.choices)) throw new Error('stage.choices 배열 아님: ' + s.title);
+    if (typeof s.no !== 'number') throw new Error('stage.no 없음: ' + s.title);
+    if (typeof s.icon !== 'string') throw new Error('stage.icon 없음: ' + s.title);
   }
   return bp;
 }
