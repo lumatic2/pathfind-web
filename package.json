@@ -1,0 +1,6 @@
+{
+  "name": "pathfind-web",
+  "version": "0.1.0",
+  "description": "pathfind 웹 서비스 MVP",
+  "private": true
+}
