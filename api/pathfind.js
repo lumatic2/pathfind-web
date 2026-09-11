@@ -90,10 +90,10 @@ function parseSolarJsonOrText(content, expectJson) {
   return trimmed;
 }
 
-async function callSolar(messages, env, temperature = 0.7, maxRetries = 3) {
-  const SOLAR_API_KEY = env?.SOLAR_API_KEY;
-  const SOLAR_API_URL = env?.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
-  const SOLAR_MODEL = env?.SOLAR_MODEL || 'solar-pro4';
+async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
+  const SOLAR_API_KEY = process.env.SOLAR_API_KEY;
+  const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
+  const SOLAR_MODEL = process.env.SOLAR_MODEL || 'solar-pro4';
 
   if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
 
@@ -151,7 +151,7 @@ function validateBigPicture(data) {
   return bp;
 }
 
-export async function handle(request, env) {
+export default async function handler(request) {
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -159,7 +159,7 @@ export async function handle(request, env) {
     });
   }
 
-  if (!env?.SOLAR_API_KEY) {
+  if (!process.env.SOLAR_API_KEY) {
     return new Response(JSON.stringify({ error: 'Solar API key not configured' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -185,7 +185,7 @@ export async function handle(request, env) {
       },
     ];
 
-    const bpContent = await callSolar(bigPictureMessages, env, 0.6);
+    const bpContent = await callSolar(bigPictureMessages, 0.6);
     const bpData = parseSolarJsonOrText(bpContent, true);
     const bigPicture = validateBigPicture(bpData);
 
@@ -195,7 +195,7 @@ export async function handle(request, env) {
       { role: 'system', content: HANDOFF_SYSTEM },
       { role: 'user', content: handoffPrompt },
     ];
-    const handoffContent = await callSolar(handoffMessages, env, 0.6);
+    const handoffContent = await callSolar(handoffMessages, 0.6);
 
     // 3단계: handoff 텍스트를 마크다운으로 정리 (Solar가 준 그대로)
     const handoffMarkdown = handoffContent.replace(/^```(?:markdown)?\s*/i, '').replace(/\s*```$/, '').trim();

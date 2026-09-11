@@ -1,0 +1,27 @@
+# secrets — 절대 배포 금지
+.env.local
+.env
+.env.*
+*.env*
+
+# 임시 파일 (오늘 사고의 원인)
+*.tmp
+
+# 로컬 자료 — 공개 불가
+.materials/
+AGENTS.override.md
+
+# 작업용·대회 참고 자료 — 배포 불필요
+docs/
+research/
+work/
+pathfind-src/
+glide-captures/
+HERMES.md
+PRD.md
+README.md
+orca.md
+SESSION_LOG_*.md
+
+# 제출용 아닌 문서
+DESIGN.md

@@ -69,10 +69,10 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function callSolarWithRetry(messages, env, maxRetries = 3) {
-  const SOLAR_API_KEY = env?.SOLAR_API_KEY;
-  const SOLAR_API_URL = env?.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
-  const SOLAR_MODEL = env?.SOLAR_MODEL || 'solar-pro4';
+async function callSolarWithRetry(messages, maxRetries = 3) {
+  const SOLAR_API_KEY = process.env.SOLAR_API_KEY;
+  const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
+  const SOLAR_MODEL = process.env.SOLAR_MODEL || 'solar-pro4';
 
   if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
 
@@ -114,7 +114,7 @@ async function callSolarWithRetry(messages, env, maxRetries = 3) {
   throw new Error('Solar API 호출 최대 재시연 횟수 초과');
 }
 
-export async function handle(request, env) {
+export default async function handler(request) {
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -122,7 +122,7 @@ export async function handle(request, env) {
     });
   }
 
-  if (!env?.SOLAR_API_KEY) {
+  if (!process.env.SOLAR_API_KEY) {
     return new Response(JSON.stringify({ error: 'Solar API key not configured' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -156,7 +156,7 @@ export async function handle(request, env) {
       messages.push({ role: 'user', content: `[예시 버튼 선택] ${question || '(버튼 선택)'}` });
     }
 
-    const content = await callSolarWithRetry(messages, env);
+    const content = await callSolarWithRetry(messages);
     const parsed = parseSolarJson(content);
 
     // 필수 필드 검증
