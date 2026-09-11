@@ -78,8 +78,9 @@ api/*.js            Vercel 서버리스. pathfind 의 데이터 경로를 그대
 
 이 레포의 작업 모델은 **Solar Pro 4**, 개발 도구는 **Hermes Agent**뿐이다.
 
-- 새 세션은 **이 HERMES.md → handoff.md → MVP_WORK.md** 순서로 먼저 읽는다.
+- 새 세션은 **이 HERMES.md → SESSION_LOG_20260911.md(해당 세션의 handoff면) → MVP_WORK.md → PRD.md** 순서로 먼저 읽는다.
 - 레포 루트의 `HERMES.md`가 이 레포의 CLAUDE.md 역할이다. 글로벌 `~/.claude.md`는 없다(만들지 않는다).
+- 세션 로그 파일(`SESSION_LOG_*.md`)이 있으면 그 세션의 작업 내역·미해결 문제·다음 시작점이 적혀 있으니 먼저 읽는다.
 - Hermes 글로벌 설정(`~/.hermes/config.yaml`, `skills/`, `hooks/`, `SOUL.md`, `memories/`)은 건드리지 않는다.
 - 이 레포 전용 스킬이 필요하면 루트에 `skills/` 폴더를 두고, Hermes가 읽을 수 있게 별도 스킬 파일(SKILL.md)로 둔다. 지금은 별도 스킬 없이 HERMES.md만으로 작업한다.
 - Hooks(pre-commit 등)는 이 레포에 두지 않는다. 커밋 검증은 이 HERMES.md의 체크리스트로 사람이 확인한다.
@@ -89,6 +90,18 @@ api/*.js            Vercel 서버리스. pathfind 의 데이터 경로를 그대
 - **산출물(공개·제출용)**: `index.html`, `api/*.js`, `PRD.md`, 포스터·발표자료·데모 영상(추후)
 - **작업용(커밋 대상 아님 또는 별도 관리)**: `work/`(handoff·연구노트·테스트 입력), `pathfind-src/`(pathfind 원본 4개: SKILL.md, scripts/render.py, assets/steps-flow-template.html, assets/lucide-icons.json)
 - **비밀**: `.env.local` (gitignore). 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 적지 않는다.
+
+## 9) 새 세션용 핸드오프 (Orca로 새 세션 띄울 경우 참고)
+
+새 세션을 레포 루트로 띄울 때, 첫 프롬프트를 **프로세스 인자(argv)로** 넣어 TUI 준비 전 주입 사고를 피한다. 정본은 `terminal create --command "hermes-agent ... '<프롬프트>'"`(모델·프로필 옵션 포함). 프롬프트 핵심만 이 문서로 남긴다.
+
+- 이 레포(C:\Users\yusun\projects\pathfind-web)는 MABC 2026 결선 산출물 전용. 모델은 Solar Pro 4, 개발 도구는 Hermes Agent뿐.
+- 먼저 이 HERMES.md → SESSION_LOG_20260911.md → MVP_WORK.md → PRD.md 순서로 읽는다.
+- SESSION_LOG_20260911.md에 이번 세션 작업 내역·미해결 문제·다음 시작점이 적혀 있으니 그걸 따라 작업한다.
+- 작업 원칙: 실데이터만, 답을 대신 정하지 않는다, 키·토큰·프록시 주소는 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 넣지 않는다.
+- 현재 blocker: 프로덕션 /api/grill 404 — Vercel Functions 미배포 상태로 보임. 대시보드 확인부터 한다.
+
+Orca 주의사항(§0 요약): 터미널 핸들은 `result.terminal.handle`로 받고 빈 handle이면 abort, `terminal send`는 입력창 draft 뒤에 붙을 수 있으니 argv 경로 우선, worktree 셀렉터는 `path:<절대경로>` 정본, 폴더 옮기기 전에 terminal list 재조회.
 
 작업 폴더를 만들 때 이 위계를 지킨다.
 
