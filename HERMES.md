@@ -17,6 +17,11 @@ MABC 2026 결선 산출물 레포. 예선 당선 스킬 **`pathfind`** 를 누�
 
 이것을 **계정 없이 URL로 접속해 쓰는 공개 웹 서비스**로 만든다.
 
+이 서비스의 룩·타입·간격·컴포넌트 방향은 루트의 **DESIGN.md**가 소유한다(레포 루트 `DESIGN.md`).
+레퍼런스: Glide(https://www.glide.com/) 접근일 2026-09-11, 캡처 `glide-captures/` 14장.
+라이트 기본 + 다크 변종(prefers-color-scheme/토글). 서체는 Noto Sans KR 유지, 위계 진폭만 Glide 식으로 조정.
+기존 `#4f9eff`는 버리고 accent `#4f4bcb`(Glide와 통일)로.
+
 ## 하드 제약 (어기면 실격)
 
 1. **LLM 은 Solar Pro 4 만.** 외부 LLM(Claude·GPT·Gemini 등) 호출 금지. 플랫폼 자체 fallback 은 예외.
@@ -49,7 +54,7 @@ api/*.js            Vercel 서버리스. pathfind 의 데이터 경로를 그대
 - `files[].data` 에는 **파일 원문 텍스트를 그대로** 넣는다. **base64 로 인코딩하지 않는다.**
 - 파일 내용을 **터미널 출력에서 복사하지 않는다.** args 에 직접 작성하고, 워크스페이스에도 같은 내용으로 저장한다.
 - **매 배포는 전체 파일 세트를 다시 올린다.** 일부만 올리면 기존 파일이 사라진다.
-- 공개 URL 은 배포 해시 URL 이 아니라 **프로젝트 프로덕션 도메인(`프로젝트명.vercel.app`)** 으로 보고한다. 해시 URL 이 302 인 것은 정상이다.
+- 공개 URL 은 배포 해시 URL 이 아니라 **프로젝트 프로덕션 도메인(`pathfind-web-five.vercel.app`)** 으로 보고한다. 해시 URL 이 302 인 것은 정상이다.
 
 ## 완료 판정
 
@@ -106,7 +111,7 @@ api/*.js            Vercel 서버리스. pathfind 의 데이터 경로를 그대
 
 **지금 붙잡고 갈 상태 포인트** (정본: `docs/finals-status-2026-09-11.md`):
 - 결선 크레딧은 들어와 있다(미지급 대기 해소). 잔액은 미조회.
-- 로컬 구현 파일(`index.html`, `api/`, `package.json`, `MVP_WORK.md`, `handoff.md` 등)은 있지만 **공개 Git·Vercel 배포까지 올라갔다는 뜻은 아니다**. `api/debug-env.js`에 키 일부·전방 문자 코드를 응답/로그에 담는 코드가 존재 → Hermes가 처리해야 할 노출 우려 항목.
+- 로컬 구현 파일(`index.html`, `api/`, `frontend/`, `package.json`, `MVP_WORK.md`, `handoff.md` 등)은 있지만 **공개 Git·Vercel 배포까지 올라갔다는 뜻은 아니다**. `api/debug-env.js`에 키 일부·전방 문자 코드를 응답/로그에 담는 코드가 존재 → Hermes가 처리해야 할 노출 우려 항목.
 - 이전 핸드오프에 남은 것: Solar 401 이후 429, API 호출 타임아웃, 공개 도메인 별칭 미확정. `api/grill.js`는 `SOLAR_API_KEY` 하나로 직접 fetch라, Hermes 크리덴셜 풀 변경만으로 배포 서비스의 429가 해결되지 않는다(키별/계정별 한도는 미확인).
 - 2026-09-11에 추가 Upstage 키를 발급해 Hermes Upstage 풀에 `mabc-hermes-backup` 등록 완료(값은 노출하지 않음). 실제 인증 성공·429 전환·한도 증가는 미검증.
 
@@ -133,7 +138,7 @@ Orca로 워크트리·터미널·에이전트 세션을 다룰 때 먼저 읽는
 
 ## 작업 하네스 (무엇을 어디에 두는지)
 
-- **산출물(공개·제출용)**: `index.html`, `api/*.js`, `PRD.md`, 포스터·발표자료·데모 영상(추후)
+- **산출물(공개·제출용)**: `index.html`, `api/*.js`, `frontend/`, `PRD.md`, 포스터·발표자료·데모 영상(추후)
 - **작업용(커밋 대상 아님 또는 별도 관리)**: `work/`(handoff·연구노트·테스트 입력), `pathfind-src/`(pathfind 원본 4개: SKILL.md, scripts/render.py, assets/steps-flow-template.html, assets/lucide-icons.json)
 - **비밀**: `.env.local` (gitignore). 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 적지 않는다.
 
