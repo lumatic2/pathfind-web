@@ -1,7 +1,3 @@
-const SOLAR_API_KEY = process.env.SOLAR_API_KEY;
-const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
-const SOLAR_MODEL = process.env.SOLAR_MODEL || 'solar-pro4';
-
 // 긴 프롬프트는 별도 상수로 분리 (가독성)
 const BIG_PICTURE_SYSTEM = `당신은 무언가를 만들려는 사람을 위한 "큰 그림 설계자"입니다.
 사용자가 pathfind 정렬 인터뷰를 마친 후, 그 아이디어를 실제로 구현하기 위한 큰 단계와 각 단계의 할 일을 설계합니다.
@@ -94,7 +90,11 @@ function parseSolarJsonOrText(content, expectJson) {
   return trimmed;
 }
 
-async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
+async function callSolar(messages, env, temperature = 0.7, maxRetries = 3) {
+  const SOLAR_API_KEY = env?.SOLAR_API_KEY;
+  const SOLAR_API_URL = env?.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
+  const SOLAR_MODEL = env?.SOLAR_MODEL || 'solar-pro4';
+
   if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -151,15 +151,15 @@ function validateBigPicture(data) {
   return bp;
 }
 
-export default async function handler(req) {
-  if (req.method !== 'POST') {
+export async function handle(request, env) {
+  if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  if (!SOLAR_API_KEY) {
+  if (!env?.SOLAR_API_KEY) {
     return new Response(JSON.stringify({ error: 'Solar API key not configured' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -167,7 +167,8 @@ export default async function handler(req) {
   }
 
   try {
-    const { summary, initialQuestion } = req.body || {};
+    const body = await request.json().catch(() => ({}));
+    const { summary, initialQuestion } = body || {};
     if (!summary && !initialQuestion) {
       return new Response(JSON.stringify({ error: 'summary 또는 initialQuestion 필요' }), {
         status: 400,
@@ -184,7 +185,7 @@ export default async function handler(req) {
       },
     ];
 
-    const bpContent = await callSolar(bigPictureMessages, 0.6);
+    const bpContent = await callSolar(bigPictureMessages, env, 0.6);
     const bpData = parseSolarJsonOrText(bpContent, true);
     const bigPicture = validateBigPicture(bpData);
 
@@ -194,7 +195,7 @@ export default async function handler(req) {
       { role: 'system', content: HANDOFF_SYSTEM },
       { role: 'user', content: handoffPrompt },
     ];
-    const handoffContent = await callSolar(handoffMessages, 0.6);
+    const handoffContent = await callSolar(handoffMessages, env, 0.6);
 
     // 3단계: handoff 텍스트를 마크다운으로 정리 (Solar가 준 그대로)
     const handoffMarkdown = handoffContent.replace(/^```(?:markdown)?\s*/i, '').replace(/\s*```$/, '').trim();

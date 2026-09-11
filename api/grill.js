@@ -1,7 +1,3 @@
-const SOLAR_API_KEY = process.env.SOLAR_API_KEY;
-const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
-const SOLAR_MODEL = process.env.SOLAR_MODEL || 'solar-pro4';
-
 const SYSTEM_PROMPT = `당신은 사용자의 아이디어를 명료화하는 인터뷰어입니다.
 사용자가 "무엇을 만들고 싶다"는 막연한 생각을 구체적인 계획으로 정리하도록 돕습니다.
 
@@ -73,7 +69,11 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function callSolarWithRetry(messages, maxRetries = 3) {
+async function callSolarWithRetry(messages, env, maxRetries = 3) {
+  const SOLAR_API_KEY = env?.SOLAR_API_KEY;
+  const SOLAR_API_URL = env?.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
+  const SOLAR_MODEL = env?.SOLAR_MODEL || 'solar-pro4';
+
   if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -114,15 +114,15 @@ async function callSolarWithRetry(messages, maxRetries = 3) {
   throw new Error('Solar API 호출 최대 재시연 횟수 초과');
 }
 
-export default async function handler(req) {
-  if (req.method !== 'POST') {
+export async function handle(request, env) {
+  if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  if (!SOLAR_API_KEY) {
+  if (!env?.SOLAR_API_KEY) {
     return new Response(JSON.stringify({ error: 'Solar API key not configured' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -130,7 +130,8 @@ export default async function handler(req) {
   }
 
   try {
-    const { question, answer, history = [], turnCount = 0 } = req.body || {};
+    const body = await request.json().catch(() => ({}));
+    const { question, answer, history = [], turnCount = 0 } = body || {};
 
     if (!question && !answer && turnCount === 0) {
       return new Response(JSON.stringify({ error: 'Initial question required' }), {
@@ -155,7 +156,7 @@ export default async function handler(req) {
       messages.push({ role: 'user', content: `[예시 버튼 선택] ${question || '(버튼 선택)'}` });
     }
 
-    const content = await callSolarWithRetry(messages);
+    const content = await callSolarWithRetry(messages, env);
     const parsed = parseSolarJson(content);
 
     // 필수 필드 검증
