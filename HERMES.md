@@ -83,25 +83,16 @@ api/*.js            Vercel 서버리스. pathfind 의 데이터 경로를 그대
 
 이 레포의 작업 모델은 **Solar Pro 4**, 개발 도구는 **Hermes Agent**뿐이다.
 
-- 새 세션은 **이 HERMES.md → SESSION_LOG_20260911.md(해당 세션의 handoff면) → MVP_WORK.md → PRD.md** 순서로 먼저 읽는다.
+새 세션은 **이 HERMES.md → `docs/JD/JD-1-orchestrator.md`(세션 역할 부여 문서) → 작업 세션이면 해당 JD(예: `docs/JD/JD-2-backend.md`) → 작업 세션 로그(`work/SESSION_LOG_*.md`, 있으면) → `PRD.md`** 순서로 먼저 읽는다.
 
-### 결선별 참고 문서 (이 레포 `docs/`·`research/`로 가져옴)
+### 세션 역할 부여 문서 (docs/JD/)
 
-정본은 여전히 `../mabc-2026`(`C:/Users/yusun/projects/mabc-2026`)이 소유한다. 아래는 작업 편의를 위해 이 레포로 복사한 사본이다. 원본과 충돌하면 원본이 우선.
+새 세션을 띄울 때 이 폴더의 JD를 먼저 읽어서 역할과 소유 파일·절대 규칙을 받는다. JD가 없으면 만들지 말고 오케스트레이터에게 말한다.
 
-| 용도 | 사본 위치 | 원본 |
-| --- | --- | --- |
-| 결선 규정·제출물·일정 요약 | `docs/finals-guide.md` | `../mabc-2026/docs/finals-guide.md` |
-| 9/11 기준 결선 상태 | `docs/finals-status-2026-09-11.md` | `../mabc-2026/docs/finals-status-2026-09-11.md` |
-| 9/12 멘토링 지참 문서 | `docs/mentoring-2026-09-12.md` | `../mabc-2026/docs/mentoring-2026-09-12.md` |
-| 제출 실무 절차(runbook) | `docs/submission-runbook.md` | `../mabc-2026/docs/submission-runbook.md` |
-| pathfind 스킬 정본(대조용) | `docs/skills/pathfind.md` | `../mabc-2026/docs/skills/pathfind.md` |
-| skill-to-service 킷(원본) | `docs/skill-to-service-kit.md` | `../mabc-2026/docs/skill-to-service-kit.md` |
-| Hermes 운용 정본(설정·차단값·검증) | `docs/hermes-operations.md` | `../mabc-2026/docs/hermes-operations.md` |
-| Hermes Agent 리서치 | `research/2026-09-07-hermes-agent.md` | `../mabc-2026/research/2026-09-07-hermes-agent.md` |
-| Hermes + Solar 운용 리서치 | `research/2026-09-11-hermes-solar-operation.md` | `../mabc-2026/research/2026-09-11-hermes-solar-operation.md` |
-
-**지금 읽기 우선순위(1순위)**: `docs/finals-guide.md` → `docs/finals-status-2026-09-11.md` → `docs/mentoring-2026-09-12.md` → `docs/submission-runbook.md`. 설정·차단값을 건드릴 때만 `docs/hermes-operations.md`를 본다.
+- `docs/JD/JD-1-orchestrator.md` — 오케스트레이터: 코드 작성 없음, git·배포·문서·레인 조율 담당
+- `docs/JD/JD-2-backend.md` — 백엔드: `api/`, package.json, vercel.json. Solar 호출·서버 함수 담당. git 금지
+- `docs/JD/JD-3-frontend.md` — 프론트: `index.html`, `app.html`, `frontend/js/**`. 화면·API 연결 담당. api/·git 금지
+- `docs/JD/JD-4-design.md` — 디자인: `DESIGN.md`, `frontend/css/**`, 자산. 룩·타입·간격 담당. HTML/JS 직접 수정 금지
 
 **읽기 전 바로 쓸 정보**:
 - 결선 마감 **9/16(수) 18:00 KST**, 현장 발표 **9/19(토) 11:00~17:00** @ 한국과학기술회관(B1 ST Center 대회의실 1). 강남역 12번 출구 도보 약 7분, 주차 불가. (출처: `docs/finals-guide.md` §2·§8)
@@ -150,7 +141,7 @@ Orca로 워크트리·터미널·에이전트 세션을 다룰 때 먼저 읽는
 - 먼저 이 HERMES.md → SESSION_LOG_20260911.md → MVP_WORK.md → PRD.md 순서로 읽는다.
 - SESSION_LOG_20260911.md에 이번 세션 작업 내역·미해결 문제·다음 시작점이 적혀 있으니 그걸 따라 작업한다.
 - 작업 원칙: 실데이터만, 답을 대신 정하지 않는다, 키·토큰·프록시 주소는 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 넣지 않는다.
-- 현재 blocker: 프로덕션 /api/grill 404 — Vercel Functions 미배포 상태로 보임. 대시보드 확인부터 한다.
+- blockers: 정적 배포본은 응답함(`/` 200 확인). `/api/grill` POST는 현재 시점 curl에서 함수 응답으로 이어지지 않음(정확한 상태 코드/메시지 재확인 필요). 다음 판정은 Vercel 대시보드·빌드 로그가 근거다. 키·프록시 주소는 어디에도 적지 않는다.
 
 Orca 주의사항(§0 요약): 터미널 핸들은 `result.terminal.handle`로 받고 빈 handle이면 abort, `terminal send`는 입력창 draft 뒤에 붙을 수 있으니 argv 경로 우선, worktree 셀렉터는 `path:<절대경로>` 정본, 폴더 옮기기 전에 terminal list 재조회.
 
