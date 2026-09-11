@@ -9,7 +9,7 @@
 - 모든 요청은 `POST`, `Content-Type: application/json`.
 - 응답도 `Content-Type: application/json`.
 - 인증·사용자 입력은 없다. 사용자 프로필은 클라이언트 localStorage에만.
-- 모든 `/api/*.js`는 Vercel 서버리스 기본 시그니처: `export async function handle(request, env)`.
+- 모든 `/api/*.js`는 Vercel Functions 핸들러: `export default async function handler(request)`. 환경변수·비밀은 `process.env`로 읽는다.
 - 본문은 `request.json()`으로 읽는다. 읽을 수 없으면 400.
 - 비밀은 `process.env`(Vercel env)에만. 클라이언트 소스·응답 JSON·PRD·커밋에 키·토큰·프록시 주소 0.
 - 모델 ID: `solar-pro4`(하이픈 없음). `max_tokens` 명시.
@@ -136,6 +136,7 @@ pathfind 스킬의 "생각 명료화 인터뷰"를 한 턴씩 돌려준다. 좌 
     "no": "number",
     "title": "string",
     "desc": "string",
+    "icon": "string",
     "tasks": [{ "order": "number", "task": "string", "why": "string" }],
     "choices": ["string"]
   },
