@@ -114,7 +114,7 @@ async function callSolarWithRetry(messages, maxRetries = 3) {
   throw new Error('Solar API 호출 최대 재시연 횟수 초과');
 }
 
-export default async function handler(request) {
+export async function POST(request) {
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,

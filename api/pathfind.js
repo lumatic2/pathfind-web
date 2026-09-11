@@ -151,7 +151,7 @@ function validateBigPicture(data) {
   return bp;
 }
 
-export default async function handler(request) {
+export async function POST(request) {
   if (request.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
