@@ -1,0 +1,54 @@
+/* === 결과 화면 전용 === */
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.result-header .title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.stage-cards-section {
+  margin-top: 10px;
+}
+
+.handoff-section {
+  margin-top: 18px;
+}
+
+.handoff-box {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.handoff-box .handoff-toprow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.handoff-box pre {
+  background: #0a0c10;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 420px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.result-msg {
+  margin-top: 10px;
+}

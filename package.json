@@ -1,6 +1,13 @@
 {
   "name": "pathfind-web",
   "version": "0.1.0",
-  "description": "pathfind 웹 서비스 MVP",
-  "private": true
+  "description": "pathfind 웹 서비스 MVP (계정 없이 URL로 쓰는 공개 웹 서비스)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod",
+    "deploy-preview": "vercel",
+    "verify": "node scripts/verify.js"
+  }
 }

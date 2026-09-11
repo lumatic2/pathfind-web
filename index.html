@@ -7,243 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0d0f12;
-      --card: #161922;
-      --card-border: #232a35;
-      --text: #e6e9ef;
-      --muted: #8b95a5;
-      --accent: #4f9eff;
-      --accent-dim: #2a4a7a;
-      --ok: #2ecc71;
-      --warn: #f1c40f;
-      --danger: #e74c3c;
-      --pick: #8e44ad;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Noto Sans KR', sans-serif;
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
-    }
-    .wrap {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 24px 20px 60px;
-    }
-    header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--card-border);
-      margin-bottom: 24px;
-    }
-    h1 {
-      font-size: 26px;
-      font-weight: 700;
-      margin: 0;
-      letter-spacing: -0.3px;
-    }
-    .sub {
-      color: var(--muted);
-      font-size: 13.5px;
-    }
-    .btn {
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 13.5px;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background .15s, border-color .15s, opacity .15s;
-    }
-    .btn:hover { background: #1c2230; border-color: #3a4453; }
-    .btn:active { opacity: .85; }
-    .btn.primary {
-      background: var(--accent-dim);
-      border-color: var(--accent);
-      color: #fff;
-    }
-    .btn.primary:hover { background: var(--accent); }
-    .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
-    .btn.ghost:hover { color: var(--text); background: transparent; }
-    .btn.sm { padding: 5px 10px; font-size: 12.5px; }
-    .btn[disabled] { opacity: .45; cursor: default; }
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 100%;
-    }
-    label { font-size: 13px; color: var(--muted); }
-    textarea, input[type="text"], select {
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-family: inherit;
-      font-size: 14px;
-      resize: vertical;
-    }
-    textarea:focus, input:focus, select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    .examples { display: flex; gap: 8px; flex-wrap: wrap; }
-    .example-btn {
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--card-border);
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 13px;
-      cursor: pointer;
-      transition: background .15s, border-color .15s;
-    }
-    .example-btn:hover { background: #1c2230; border-color: var(--accent); }
-    .example-btn.sel { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
-    .cards {
-      display: flex;
-      gap: 14px;
-      overflow-x: auto;
-      padding: 6px 2px 14px;
-      scrollbar-width: thin;
-      scrollbar-color: var(--card-border) transparent;
-    }
-    .cards::-webkit-scrollbar { height: 8px; }
-    .cards::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 8px; }
-    .card {
-      flex: 0 0 280px;
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card-num {
-      background: var(--accent-dim);
-      color: #fff;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .card h3 { margin: 0; font-size: 14.5px; font-weight: 500; }
-    .card .desc { color: var(--muted); font-size: 13px; margin: 0; }
-    .badge {
-      display: inline-block;
-      font-size: 11.5px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--card-border);
-      background: var(--card);
-      color: var(--muted);
-    }
-    .badge.ok { color: var(--ok); border-color: var(--ok); }
-    .badge.need { color: var(--warn); border-color: var(--warn); }
-    .badge.mix { color: var(--pick); border-color: var(--pick); }
-    .badge.none { color: var(--danger); border-color: var(--danger); }
-    .card-section { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin: 2px 0 4px; }
-    .findings { list-style: none; padding: 0; margin: 0; font-size: 12.5px; }
-    .findings li { color: var(--muted); padding: 4px 0; border-bottom: 1px solid #1d2330; }
-    .findings li:last-child { border-bottom: none; }
-    .findings a { color: var(--accent); text-decoration: none; }
-    .findings a:hover { text-decoration: underline; }
-    .choices { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; }
-    .choices .choice {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      padding: 4px 8px;
-      border-radius: 6px;
-      color: var(--text);
-      cursor: pointer;
-    }
-    .choices .choice:hover { border-color: var(--accent); }
-    .handoff-box {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-top: 18px;
-    }
-    .handoff-box pre {
-      background: #0a0c10;
-      color: var(--text);
-      border-radius: 8px;
-      padding: 14px;
-      font-size: 12.5px;
-      line-height: 1.5;
-      overflow: auto;
-      max-height: 420px;
-      margin: 10px 0 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    @media (min-width: 720px) {
-      .grid { grid-template-columns: 1fr 1fr; }
-    }
-    .msg {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 13.5px;
-      color: var(--warn);
-      margin-top: 10px;
-    }
-    .msg.ok { color: var(--ok); }
-    .spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid var(--card-border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .section-title {
-      font-size: 15px;
-      font-weight: 500;
-      color: var(--text);
-      margin: 22px 0 8px;
-    }
-    .hint { color: var(--muted); font-size: 12.5px; }
-    .toprow { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .hidden { display: none; }
-    .status-pill {
-      font-size: 12px;
-      color: var(--muted);
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      padding: 3px 8px;
-      border-radius: 999px;
-    }
-  </style>
+  <link rel="stylesheet" href="frontend/css/variables.css">
+  <link rel="stylesheet" href="frontend/css/common.css">
+  <link rel="stylesheet" href="frontend/css/interview.css">
+  <link rel="stylesheet" href="frontend/css/result.css">
 </head>
 <body>
   <header>
@@ -330,485 +97,91 @@
 
   <!-- lucide 아이콘 (웹컴포넌트) -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>
-    (function () {
-      const $ = (sel) => document.querySelector(sel);
-      const q = (sel) => document.querySelectorAll(sel);
+  <script type="module">
+import { dom, state, setMsg, q } from './frontend/js/state.js';
+import { showQuestion, showResult, renderCards } from './frontend/js/render.js';
+import {
+  startInterview,
+  submitAnswer,
+  handleExampleClick,
+  resetAll,
+  copyHandoff,
+  downloadHandoff,
+  askGrill,
+  askPathfind,
+  setInitialQuestion,
+} from './frontend/js/actions.js';
+import './frontend/js/events.js';
 
-      const state = {
-        mode: 'input',
-        initialQuestion: '',
-        turnCount: 0,
-        history: [], // {questionTitle, questionBody, suggestion, exampleButtons, answer}
-        currentQuestion: null,
-        summary: '',
-        bigPicture: null,
-        handoff: '',
-      };
+function loadState() {
+  try {
+    const saved = localStorage.getItem('pathfind_state');
+    if (!saved) return;
+    const s = JSON.parse(saved);
+    if (s.mode === 'result' && s.bigPicture && s.handoff) {
+      state.mode = 'result';
+      state.initialQuestion = s.initialQuestion || '';
+      state.bigPicture = s.bigPicture;
+      state.handoff = s.handoff;
+      state.summary = s.summary || '';
+      renderCards(state.bigPicture);
+      dom.handoffPre.textContent = state.handoff;
+      dom.resultHint.textContent = '총 ' + state.bigPicture.stages.length + '개 단계 · handoff.md 다운로드 가능';
+      dom.resultSection.classList.remove('hidden');
+      dom.inputSection.classList.add('hidden');
+      dom.interviewSection.classList.add('hidden');
+      dom.statusPill.textContent = '완료 (이어서)';
+      dom.questionInput.value = state.initialQuestion;
+    } else if (s.mode === 'interview' && s.currentQuestion) {
+      state.mode = 'interview';
+      state.initialQuestion = s.initialQuestion || '';
+      state.turnCount = s.turnCount || 0;
+      state.history = s.history || [];
+      state.currentQuestion = s.currentQuestion;
+      showQuestion(state.currentQuestion);
+    } else {
+      dom.questionInput.value = s.initialQuestion || '';
+    }
+  } catch (e) {
+    localStorage.removeItem('pathfind_state');
+  }
+}
 
-      // ---- DOM refs ----
-      const inputSection = $('#inputSection');
-      const interviewSection = $('#interviewSection');
-      const resultSection = $('#resultSection');
-      const questionInput = $('#questionInput');
-      const startBtn = $('#startBtn');
-      const resetBtn = $('#resetBtn');
-      const inputMsg = $('#inputMsg');
-      const turnDisplay = $('#turnDisplay');
-      const interviewHint = $('#interviewHint');
-      const qTitle = $('#qTitle');
-      const qBody = $('#qBody');
-      const suggestion = $('#suggestion');
-      const exampleButtons = $('#exampleButtons');
-      const answerInput = $('#answerInput');
-      const answerBtn = $('#answerBtn');
-      const skipBtn = $('#skipBtn');
-      const interviewMsg = $('#interviewMsg');
-      const statusPill = $('#statusPill');
-      const stageCards = $('#stageCards');
-      const resultHint = $('#resultHint');
-      const handoffPre = $('#handoffPre');
-      const copyHandoffBtn = $('#copyHandoffBtn');
-      const downloadHandoffBtn = $('#downloadHandoffBtn');
-      const resultMsg = $('#resultMsg');
+function boot() {
+  dom.startBtn.addEventListener('click', startInterview);
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.example-btn');
+    if (!btn) return;
+    handleExampleClick(e);
+  });
+  dom.answerBtn.addEventListener('click', () => {
+    const text = dom.answerInput.value.trim();
+    if (!text) {
+      setMsg(dom.interviewMsg, '답변을 적거나 예시 버튼을 눌러 주세요.', false);
+      return;
+    }
+    submitAnswer(text);
+  });
+  dom.skipBtn.addEventListener('click', () => {
+    submitAnswer('(건너뜀 — 다음 질문으로)');
+  });
+  dom.answerInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      dom.answerBtn.click();
+    }
+  });
+  dom.copyHandoffBtn.addEventListener('click', copyHandoff);
+  dom.downloadHandoffBtn.addEventListener('click', downloadHandoff);
+  dom.resetBtn.addEventListener('click', resetAll);
 
-      // ---- helpers ----
-      function show(el) { el.classList.remove('hidden'); }
-      function hide(el) { el.classList.add('hidden'); }
-      function setMsg(el, text, ok) {
-        el.textContent = text || '';
-        el.classList.toggle('hidden', !text);
-        el.classList.toggle('ok', !!ok);
-      }
+  loadState();
+  if (state.mode === 'input') {
+    dom.questionInput.value = state.initialQuestion || '';
+  }
+}
 
-      function exampleBtnHTML(btn) {
-        return `<button class="example-btn" type="button">${btn}</button>`;
-      }
-
-      async function askGrill(question, answer, history, turnCount) {
-        statusPill.textContent = '대기 중…';
-        try {
-          const res = await fetch('/api/grill', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question, answer, history, turnCount }),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: '서버 응답 오류' }));
-            throw new Error(err.error || `HTTP ${res.status}`);
-          }
-          const data = await res.json();
-          if (data.error) throw new Error(data.error);
-          return data;
-        } catch (e) {
-          setMsg(interviewMsg, '인터뷰 질문 생성에 실패했습니다: ' + e.message, false);
-          throw e;
-        } finally {
-          statusPill.textContent = '준비';
-        }
-      }
-
-      async function askPathfind(summary) {
-        statusPill.textContent = '큰 그림 생성 중…';
-        try {
-          const res = await fetch('/api/pathfind', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ summary }),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: '서버 응답 오류' }));
-            throw new Error(err.error || `HTTP ${res.status}`);
-          }
-          const data = await res.json();
-          if (data.error) throw new Error(data.error);
-          return data;
-        } catch (e) {
-          setMsg(resultMsg, '큰 그림·핸드오프 생성에 실패했습니다: ' + e.message, false);
-          throw e;
-        } finally {
-          statusPill.textContent = '준비';
-        }
-      }
-
-      function renderCards(bp) {
-        stageCards.innerHTML = '';
-        const iconMap = {
-          compass: 'compass', target: 'target', 'pencil-ruler': 'pencil-ruler',
-          'layout-dashboard': 'layout-dashboard', 'code-xml': 'code-xml',
-          database: 'database', server: 'server', cpu: 'cpu', wifi: 'wifi',
-          smartphone: 'smartphone', 'gamepad-2': 'gamepad-2', palette: 'palette',
-          image: 'image', video: 'video', film: 'film', mic: 'mic', headphones: 'headphones',
-          'pen-line': 'pen-line', 'file-text': 'file-text', 'book-open': 'book-open',
-          users: 'users', 'message-square': 'message-square', bot: 'bot',
-          bell: 'bell', calendar: 'calendar', 'credit-card': 'credit-card',
-          'shopping-cart': 'shopping-cart', map: 'map', globe: 'globe',
-          shield: 'shield', 'flask-conical': 'flask-conical', 'search-check': 'search-check',
-          rocket: 'rocket', package: 'package', settings: 'settings', wrench: 'wrench',
-          'chart-bar': 'chart-bar',
-        };
-        bp.stages.forEach((s, i) => {
-          const icon = s.icon && iconMap[s.icon] ? s.icon : 'circle-dot';
-          const card = document.createElement('div');
-          card.className = 'card';
-          card.innerHTML = `
-            <div class="card-header">
-              <span class="card-num">${i + 1}</span>
-              <i data-lucide="${icon}" style="width:16px;height:16px;color:var(--accent);"></i>
-              <h3></h3>
-            </div>
-            <p class="desc"></p>
-            <div><span class="badge"></span></div>
-          `;
-          const h3 = card.querySelector('h3');
-          const desc = card.querySelector('.desc');
-          const badge = card.querySelector('.badge');
-          h3.textContent = s.title;
-          desc.textContent = s.desc;
-          if (s.verdict === '가져다 써도 됨') { badge.textContent = '가져다 써도 됨'; badge.classList.add('ok'); }
-          else if (s.verdict === '직접 해야 함') { badge.textContent = '직접 해야 함'; badge.classList.add('need'); }
-          else if (s.verdict === '섞어야 함') { badge.textContent = '섞어야 함'; badge.classList.add('mix'); }
-          else if (s.verdict === '선례를 못 찾음') { badge.textContent = '선례를 못 찾음'; badge.classList.add('none'); }
-          else { badge.textContent = s.verdict; }
-
-          if (s.findings && s.findings.length) {
-            const section = document.createElement('div');
-            section.className = 'card-section';
-            section.textContent = '찾은 자료';
-            card.appendChild(section);
-            const ul = document.createElement('ul');
-            ul.className = 'findings';
-            s.findings.forEach((f) => {
-              const li = document.createElement('li');
-              const a = document.createElement('a');
-              a.href = f.url;
-              a.target = '_blank';
-              a.textContent = f.name;
-              li.appendChild(a);
-              const meta = document.createElement('div');
-              meta.style.cssText = 'color:#6b7686;font-size:11.5px;margin-top:2px;';
-              meta.textContent = `[${f.kind}] ${f.note || ''}`;
-              li.appendChild(meta);
-              ul.appendChild(li);
-            });
-            card.appendChild(ul);
-          }
-
-          if (s.choices && s.choices.length) {
-            const section = document.createElement('div');
-            section.className = 'card-section';
-            section.textContent = '선택지';
-            card.appendChild(section);
-            const choices = document.createElement('div');
-            choices.className = 'choices';
-            s.choices.forEach((c) => {
-              const b = document.createElement('span');
-              b.className = 'choice';
-              b.textContent = c;
-              choices.appendChild(b);
-            });
-            card.appendChild(choices);
-          }
-
-          if (s.tasks && s.tasks.length) {
-            const section = document.createElement('div');
-            section.className = 'card-section';
-            section.textContent = '이 단계의 할 일';
-            card.appendChild(section);
-            const ul = document.createElement('ul');
-            ul.style.cssText = 'list-style:none;padding:0;margin:0;font-size:12.5px;';
-            s.tasks.forEach((t) => {
-              const li = document.createElement('li');
-              li.style.cssText = 'color:#cfd4dd;padding:3px 0;border-bottom:1px solid #1d2330;';
-              li.textContent = `${t.order}. ${t.task} — ${t.why || ''}`;
-              ul.appendChild(li);
-            });
-            card.appendChild(ul);
-          }
-
-          stageCards.appendChild(card);
-        });
-        if (typeof lucide !== 'undefined') {
-          lucide.createIcons();
-        }
-      }
-
-      function showQuestion(data) {
-        state.currentQuestion = data;
-        qTitle.textContent = data.questionTitle || '';
-        qBody.textContent = data.questionBody || '';
-        suggestion.textContent = data.suggestion || '';
-        exampleButtons.innerHTML = '';
-        if (data.exampleButtons && data.exampleButtons.length) {
-          data.exampleButtons.forEach((b) => {
-            exampleButtons.innerHTML += exampleBtnHTML(b);
-          });
-          q sa();
-          if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
-        answerInput.value = '';
-        turnDisplay.textContent = state.turnCount + 1;
-        interviewHint.textContent = '예시 버튼을 누르거나 답변을 적고 제출하세요.';
-        show(interviewSection);
-        hide(inputSection);
-        hide(resultSection);
-        setMsg(interviewMsg, '', false);
-        answerBtn.disabled = false;
-        answerInput.focus();
-      }
-
-      function showResult(summary) {
-        state.summary = summary || '';
-        show(resultSection);
-        hide(inputSection);
-        hide(interviewSection);
-        statusPill.textContent = '완료';
-        setMsg(interviewMsg, '', false);
-        setMsg(inputMsg, '', false);
-      }
-
-      // ---- actions ----
-      function setInitialQuestion() {
-        const val = questionInput.value.trim();
-        const sel = q('.example-btn.sel');
-        if (sel.length) {
-          state.initialQuestion = sel[0].textContent.replace(/^\d+\.\s*/, '').trim() || val;
-        } else {
-          state.initialQuestion = val;
-        }
-        if (!state.initialQuestion) {
-          setMsg(inputMsg, '무엇을 만들고 싶은지 한 줄이라도 적어 주세요.', false);
-          return false;
-        }
-        return true;
-      }
-
-      async function startInterview() {
-        if (!setInitialQuestion()) return;
-        startBtn.disabled = true;
-        statusPill.textContent = '인터뷰 시작 중…';
-        try {
-          const data = await askGrill(state.initialQuestion, null, [], 0);
-          state.turnCount = data.turnCount;
-          state.history = [];
-          state.currentQuestion = data;
-          showQuestion(data);
-        } catch (e) {
-          setMsg(inputMsg, '인터뷰를 시작하지 못했습니다: ' + e.message, false);
-          startBtn.disabled = false;
-          statusPill.textContent = '준비';
-        }
-      }
-
-      async function submitAnswer(answerText) {
-        if (!state.currentQuestion) return;
-        answerBtn.disabled = true;
-        statusPill.textContent = '답변 처리 중…';
-        try {
-          const data = await askGrill(
-            state.currentQuestion.questionTitle,
-            answerText,
-            state.history,
-            state.turnCount
-          );
-          // 이번 턴의 질문을 history에 추가
-          state.history.push({
-            questionTitle: state.currentQuestion.questionTitle,
-            questionBody: state.currentQuestion.questionBody,
-            suggestion: state.currentQuestion.suggestion,
-            exampleButtons: state.currentQuestion.exampleButtons || [],
-            answer: answerText,
-          });
-          state.turnCount = data.turnCount;
-          if (data.done) {
-            // 큰 그림 생성
-            const bpData = await askPathfind(data.summary || state.initialQuestion);
-            state.bigPicture = bpData.bigPicture;
-            state.handoff = bpData.handoffMarkdown || '';
-            renderCards(state.bigPicture);
-            handoffPre.textContent = state.handoff;
-            resultHint.textContent = '총 ' + state.bigPicture.stages.length + '개 단계 · handoff.md 다운로드 가능';
-            showResult(data.summary);
-          } else {
-            showQuestion(data);
-          }
-        } catch (e) {
-          setMsg(interviewMsg, '답변을 제출하지 못했습니다: ' + e.message, false);
-          answerBtn.disabled = false;
-          statusPill.textContent = '준비';
-        }
-      }
-
-      function handleExampleClick(e) {
-        const btn = e.target.closest('.example-btn');
-        if (!btn) return;
-        if (btn === startBtn) return; // start button
-        // 예시 버튼 클릭 시 해당 텍스트를 answer로 제출
-        const text = btn.textContent.replace(/^\d+\.\s*/, '').trim();
-        answerInput.value = text;
-        submitAnswer(text);
-      }
-
-      // ---- init ----
-      function loadState() {
-        try {
-          const saved = localStorage.getItem('pathfind_state');
-          if (!saved) return;
-          const s = JSON.parse(saved);
-          if (s.mode === 'result' && s.bigPicture && s.handoff) {
-            state.mode = 'result';
-            state.initialQuestion = s.initialQuestion || '';
-            state.bigPicture = s.bigPicture;
-            state.handoff = s.handoff;
-            state.summary = s.summary || '';
-            renderCards(state.bigPicture);
-            handoffPre.textContent = state.handoff;
-            resultHint.textContent = '총 ' + state.bigPicture.stages.length + '개 단계 · handoff.md 다운로드 가능';
-            show(resultSection);
-            hide(inputSection);
-            hide(interviewSection);
-            statusPill.textContent = '완료 (이어서)';
-            questionInput.value = state.initialQuestion;
-          } else if (s.mode === 'interview' && s.currentQuestion) {
-            state.mode = 'interview';
-            state.initialQuestion = s.initialQuestion || '';
-            state.turnCount = s.turnCount || 0;
-            state.history = s.history || [];
-            state.currentQuestion = s.currentQuestion;
-            showQuestion(state.currentQuestion);
-          } else {
-            questionInput.value = s.initialQuestion || '';
-          }
-        } catch (e) {
-          localStorage.removeItem('pathfind_state');
-        }
-      }
-
-      function saveState() {
-        try {
-          const s = {
-            mode: state.mode === 'result' ? 'result' : (state.mode === 'interview' ? 'interview' : 'input'),
-            initialQuestion: state.initialQuestion,
-            turnCount: state.turnCount,
-            history: state.history,
-            currentQuestion: state.currentQuestion,
-            summary: state.summary,
-            bigPicture: state.bigPicture,
-            handoff: state.handoff,
-          };
-          localStorage.setItem('pathfind_state', JSON.stringify(s));
-        } catch (e) { /* 무시 */ }
-      }
-
-      function resetAll() {
-        localStorage.removeItem('pathfind_state');
-        state.mode = 'input';
-        state.initialQuestion = '';
-        state.turnCount = 0;
-        state.history = [];
-        state.currentQuestion = null;
-        state.summary = '';
-        state.bigPicture = null;
-        state.handoff = '';
-        questionInput.value = '';
-        hide(interviewSection);
-        hide(resultSection);
-        show(inputSection);
-        statusPill.textContent = '준비';
-        setMsg(inputMsg, '', false);
-        setMsg(interviewMsg, '', false);
-        setMsg(resultMsg, '', false);
-        answerBtn.disabled = false;
-        startBtn.disabled = false;
-        answerInput.value = '';
-        exampleButtons.innerHTML = '';
-        qTitle.textContent = '';
-        qBody.textContent = '';
-        suggestion.textContent = '';
-        turnDisplay.textContent = '1';
-      }
-
-      // ---- events ----
-      startBtn.addEventListener('click', startInterview);
-
-      document.addEventListener('click', (e) => {
-        // 예시 버튼 클릭 (interview 화면 또는 input 화면 둘 다)
-        const btn = e.target.closest('.example-btn');
-        if (!btn) return;
-        // input 화면의 예시 버튼: 선택 표시만 하고, 시작 시 사용
-        if (!interviewSection.classList.contains('hidden')) {
-          // interview 화면의 예시 버튼: 답변 제출
-          const text = btn.textContent.replace(/^\d+\.\s*/, '').trim();
-          answerInput.value = text;
-          submitAnswer(text);
-        } else {
-          q('.example-btn.sel').forEach((b) => b.classList.remove('sel'));
-          btn.classList.add('sel');
-        }
-      });
-
-      answerBtn.addEventListener('click', () => {
-        const text = answerInput.value.trim();
-        if (!text) {
-          setMsg(interviewMsg, '답변을 적거나 예시 버튼을 눌러 주세요.', false);
-          return;
-        }
-        submitAnswer(text);
-      });
-
-      skipBtn.addEventListener('click', () => {
-        submitAnswer('(건너뜀 — 다음 질문으로)');
-      });
-
-      answerInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          answerBtn.click();
-        }
-      });
-
-      copyHandoffBtn.addEventListener('click', () => {
-        const text = handoffPre.textContent;
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-          setMsg(resultMsg, '핸드오프 문서를 복사했습니다.', true);
-        }).catch(() => {
-          // 폴백
-          const ta = document.createElement('textarea');
-          ta.value = text;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          ta.remove();
-          setMsg(resultMsg, '핸드오프 문서를 복사했습니다.', true);
-        });
-      });
-
-      downloadHandoffBtn.addEventListener('click', () => {
-        const text = handoffPre.textContent;
-        if (!text) return;
-        const title = state.bigPicture && state.bigPicture.title ? state.bigPicture.title : 'handoff';
-        const safe = title.replace(/[^a-zA-Z0-9가-힣_\- ]/g, '_').slice(0, 40);
-        const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `handoff-${safe}.md`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        setMsg(resultMsg, 'handoff.md 다운로드 완료', true);
-      });
-
-      resetBtn.addEventListener('click', resetAll);
-
-      // ---- boot ----
-      loadState();
-      if (state.mode === 'input') {
-        questionInput.value = state.initialQuestion || '';
-      }
-    })();
+boot();
   </script>
 </body>
 </html>

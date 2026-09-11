@@ -1,5 +1,8 @@
 # pathfind-web
 
+> **새 세션은 이 문서를 먼저 읽는다.** 그다음 `handoff.md`와 `MVP_WORK.md`를 읽으면 현재 상태를 이어서 파악할 수 있다.
+> 이 레포는 MABC 2026 결선 산출물 전용이며, 작업에 쓰는 모델은 **Solar Pro 4**, 개발 도구는 **Hermes Agent**뿐이다.
+
 MABC 2026 결선 산출물 레포. 예선 당선 스킬 **`pathfind`** 를 누구나 URL로 쓰는 웹 서비스 MVP로 확장한다.
 
 ## 이 레포가 무엇인가
@@ -71,9 +74,28 @@ api/*.js            Vercel 서버리스. pathfind 의 데이터 경로를 그대
 
 제출 이후 배포본을 변경하지 않는다. **심사 종료까지 URL 이 살아 있어야 한다.**
 
-## 작업 원칙
+## Hermes 세팅 (이 레포에서 Hermes Agent가 일하기 위한 최소 환경)
 
-- **실데이터만.** 스킬은 실제 호출 결과로만 설명한다. 추정 금지. 못 가져온 값은 `확인 불가` 로 둔다.
-- **답을 대신 정하지 않는다.** 방향·범위 판단은 사용자가 한다.
-- 완성도는 심미성이 아니라 **사용성** 기준이다 — 핵심 기능의 명확한 동작, 이해 가능한 화면 구성.
-- 한 번에 완성되지 않는 것이 정상이다. 만들고 → 확인하고 → 고치는 반복까지가 구현이다.
+이 레포의 작업 모델은 **Solar Pro 4**, 개발 도구는 **Hermes Agent**뿐이다.
+
+- 새 세션은 **이 HERMES.md → handoff.md → MVP_WORK.md** 순서로 먼저 읽는다.
+- 레포 루트의 `HERMES.md`가 이 레포의 CLAUDE.md 역할이다. 글로벌 `~/.claude.md`는 없다(만들지 않는다).
+- Hermes 글로벌 설정(`~/.hermes/config.yaml`, `skills/`, `hooks/`, `SOUL.md`, `memories/`)은 건드리지 않는다.
+- 이 레포 전용 스킬이 필요하면 루트에 `skills/` 폴더를 두고, Hermes가 읽을 수 있게 별도 스킬 파일(SKILL.md)로 둔다. 지금은 별도 스킬 없이 HERMES.md만으로 작업한다.
+- Hooks(pre-commit 등)는 이 레포에 두지 않는다. 커밋 검증은 이 HERMES.md의 체크리스트로 사람이 확인한다.
+
+## 작업 하네스 (무엇을 어디에 두는지)
+
+- **산출물(공개·제출용)**: `index.html`, `api/*.js`, `PRD.md`, 포스터·발표자료·데모 영상(추후)
+- **작업용(커밋 대상 아님 또는 별도 관리)**: `work/`(handoff·연구노트·테스트 입력), `pathfind-src/`(pathfind 원본 4개: SKILL.md, scripts/render.py, assets/steps-flow-template.html, assets/lucide-icons.json)
+- **비밀**: `.env.local` (gitignore). 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 적지 않는다.
+
+작업 폴더를 만들 때 이 위계를 지킨다.
+
+## 시작 전 확인 (새 세션)
+
+1. `git status`로 dirty·untracked 확인
+2. `.gitignore`가 `.env*`·`*.tmp`·`node_modules/`·`.vercel/`·`AGENTS.override.md`·`.materials/`를 막는지 확인
+3. `api/*.js`에 `solar-pro4`(하이픈 없음) 모델 ID가 있는지 확인
+4. `pathfind-src/` 4개 파일 무결성 확인(필요 시)
+5. 비밀(`.env.local`)이 존재하면 값 말고 **존재 여부만** 확인
