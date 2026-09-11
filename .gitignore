@@ -14,7 +14,5 @@ node_modules/
 
 # 작업용(공개 커밋 대상 아님)
 work/
-docs/
-research/
 
 # 레퍼런스 캡처 공개용 예외 (디자인 스펙 근거로 커밋)
