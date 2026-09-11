@@ -105,8 +105,6 @@ function renderCards(bp) {
   }
 }
 
-export { renderCards, showQuestion, showResult };
-
 function showQuestion(data) {
   state.currentQuestion = data;
   dom.qTitle.textContent = data.questionTitle || '';
@@ -139,3 +137,5 @@ function showResult(summary) {
   setMsg(dom.interviewMsg, '', false);
   setMsg(dom.inputMsg, '', false);
 }
+
+export { renderCards, showQuestion, showResult };
