@@ -16,3 +16,5 @@ node_modules/
 work/
 docs/
 research/
+
+# 레퍼런스 캡처 공개용 예외 (디자인 스펙 근거로 커밋)
