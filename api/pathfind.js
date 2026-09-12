@@ -83,7 +83,8 @@ async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
 
   if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  let effectiveMaxRetries = maxRetries;
+  for (let attempt = 0; attempt <= effectiveMaxRetries; attempt++) {
     const res = await fetch(SOLAR_API_URL, {
       method: 'POST',
       headers: {
@@ -101,7 +102,12 @@ async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
 
     if (res.ok) {
       const data = await res.json();
-      const content = data.choices?.[0]?.message?.content;
+      const msg = data.choices?.[0]?.message || {};
+      // finish_reason이 length면 첫 시도에서만 재시도를 1회로 제한
+      if (msg.finish_reason === 'length' && attempt === 0) {
+        effectiveMaxRetries = 1;
+      }
+      const content = msg.content;
       if (!content) throw new Error('Solar 응답이 비어 있습니다');
       return content;
     }
@@ -110,9 +116,8 @@ async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
     const status = res.status;
 
     // 429 Rate Limit - exponential backoff with retry
-    if (status === 429 && attempt < maxRetries) {
-      console.warn(`Solar 429 rate limit (시도 ${attempt + 1}/${maxRetries}), 재시연 대기...`);
-      // 지수 백오프: 1초, 2초, 4초
+    if (status === 429 && attempt < effectiveMaxRetries) {
+      console.warn(`Solar 429 rate limit (시도 ${attempt + 1}/${effectiveMaxRetries}), 재시연 대기...`);
       const delay = Math.pow(2, attempt) * 1000;
       await new Promise(resolve => setTimeout(resolve, delay));
       continue;

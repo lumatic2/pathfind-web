@@ -134,11 +134,20 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const { question, answer, history = [], turnCount = 0 } = body || {};
 
-    if (!question && !answer && turnCount === 0) {
-      return new Response(JSON.stringify({ error: 'Initial question required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    if (turnCount >= 4) {
+      // 최대 턴(5턴) 도달: Solar 호출 없이 종료 + 요약 강제
+      return new Response(
+        JSON.stringify({
+          questionTitle: '',
+          questionBody: '',
+          suggestion: '',
+          exampleButtons: [],
+          done: true,
+          summary: '인터뷰 상한 턴(5턴)에 도달했습니다. 지금까지의 답변을 바탕으로 정리된 아이디어를 요약해 주세요.',
+          turnCount: turnCount + 1,
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     // messages 구성
