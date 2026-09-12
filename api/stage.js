@@ -228,13 +228,33 @@ ${stage.tasks?.map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '�
     ];
 
     // --- 도구 호출 처리 (상한 2회) ---
-    // messages를 누적하면서 도구 호출 → 결과 피드백 → 다음 Solar 호출을 반복한다.
-    // Solar가 한 응답에 여러 tool_call을 주거나, follow-up 응답에 다시 tool_call을 주는
-    // 경우 모두 처리. 상한 2회면 중단.
-    const toolMessages = messages.slice(); // 도구 응답을 누적할 메시지 버퍼
-    let toolResult = await callSolar(messages, { tools: true, tool_choice: 'auto', maxTokens: 4096 }); // 첫 Solar 호출
-    let toolCallCount = 0;
-    const searchedQueries = [];
+    // 첫 Solar 호출이 실패하면 검색 상한 내 유효한 선례를 못 찾은 것으로 간주하고
+    // 500 대신 200 + verdict "선례를 못 찾음"으로 내려 전체를 죽이지 않는다(킷 규칙 "전체 실패 금지").
+    let toolResult;
+    try {
+      toolResult = await callSolar(messages, { tools: true, tool_choice: 'auto', maxTokens: 4096 }); // 첫 Solar 호출
+    } catch (e) {
+      console.warn('첫 Solar 호출 실패 — 선례를 못 찾음으로 폴백:', e.message);
+      return new Response(
+        JSON.stringify({
+          stage: {
+            no: stage.no,
+            title: stage.title,
+            desc: stage.desc,
+            icon: stage.icon || '',
+            tasks: stage.tasks,
+            verdict: '선례를 못 찾음',
+            verdictReason: 'Solar 호출 단계에서 오류가 발생해 검색 상한 내 유효한 선례를 못 찾음',
+            findings: [],
+            choices: stage.choices || [],
+            options: stage.choices || [],
+            todos: (stage.tasks || []).map((t) => ({ task: t.task, owner: '직접 함', note: t.why || '' })),
+            searched: false,
+          },
+        }),
+        { headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     while (toolCallCount < 2) {
       const tcs = toolResult.toolCalls;

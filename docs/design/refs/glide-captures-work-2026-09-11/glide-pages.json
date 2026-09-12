@@ -1,0 +1,421 @@
+{
+  "https://www.glide.com/": {
+    "url": "https://www.glide.com/",
+    "fullshot": "C:\\Users\\yusun\\.config\\browser-harness\\tmp\\shot.png",
+    "typography": {
+      "h1": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "60px",
+        "fontWeight": "700",
+        "lineHeight": "72px",
+        "letterSpacing": "-1.8px"
+      },
+      "h2": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "65px",
+        "letterSpacing": "-1.5px"
+      },
+      "h3": null,
+      "p": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "22px",
+        "fontWeight": "400",
+        "lineHeight": "26.4px",
+        "letterSpacing": "normal"
+      },
+      "a-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "button": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "filled-btn": null,
+      "nav-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "footer": null
+    },
+    "surfaces": {
+      "body": {},
+      "header": {},
+      "main": null,
+      "footer, .footer": null,
+      "section": {},
+      "[class*=\"card\"], [class*=\"Card\"], .card": null,
+      "[class*=\"hero\"], [class*=\"Hero\"]": {},
+      "[class*=\"bg-white\"], [class*=\"bg-light\"], [class*=\"bg\"], [class*=\"surface\"]": {},
+      "button": {},
+      "a.button, a.btn": null
+    },
+    "ctas": [],
+    "shadows": [
+      "rgba(40, 38, 74, 0.05) 0px 4px 50px 0px",
+      "rgba(79, 75, 203, 0.03) 0px 50px 150px 0px"
+    ],
+    "link_colors": []
+  },
+  "https://www.glide.com/platform/forms/": {
+    "url": "https://www.glide.com/platform/forms/",
+    "fullshot": "C:\\Users\\yusun\\.config\\browser-harness\\tmp\\shot.png",
+    "typography": {
+      "h1": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "60px",
+        "letterSpacing": "-1.5px"
+      },
+      "h2": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "65px",
+        "letterSpacing": "-1.5px"
+      },
+      "h3": null,
+      "p": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "22px",
+        "fontWeight": "400",
+        "lineHeight": "26.4px",
+        "letterSpacing": "normal"
+      },
+      "a-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "button": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "filled-btn": null,
+      "nav-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "footer": null
+    },
+    "surfaces": {
+      "body": {},
+      "header": {},
+      "main": null,
+      "footer, .footer": null,
+      "section": {},
+      "[class*=\"card\"], [class*=\"Card\"], .card": null,
+      "[class*=\"hero\"], [class*=\"Hero\"]": null,
+      "[class*=\"bg-white\"], [class*=\"bg-light\"], [class*=\"bg\"], [class*=\"surface\"]": null,
+      "button": {},
+      "a.button, a.btn": null
+    },
+    "ctas": [],
+    "shadows": [
+      "rgba(40, 38, 74, 0.05) 0px 4px 50px 0px"
+    ],
+    "link_colors": []
+  },
+  "https://www.glide.com/platform/collaboration/": {
+    "url": "https://www.glide.com/platform/collaboration/",
+    "fullshot": "C:\\Users\\yusun\\.config\\browser-harness\\tmp\\shot.png",
+    "typography": {
+      "h1": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "60px",
+        "letterSpacing": "-1.5px"
+      },
+      "h2": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "35px",
+        "fontWeight": "700",
+        "lineHeight": "42px",
+        "letterSpacing": "-1.05px"
+      },
+      "h3": null,
+      "p": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "30px",
+        "fontWeight": "700",
+        "lineHeight": "42px",
+        "letterSpacing": "normal"
+      },
+      "a-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "button": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "filled-btn": null,
+      "nav-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "footer": null
+    },
+    "surfaces": {
+      "body": {},
+      "header": {},
+      "main": null,
+      "footer, .footer": null,
+      "section": {},
+      "[class*=\"card\"], [class*=\"Card\"], .card": null,
+      "[class*=\"hero\"], [class*=\"Hero\"]": null,
+      "[class*=\"bg-white\"], [class*=\"bg-light\"], [class*=\"bg\"], [class*=\"surface\"]": {},
+      "button": {},
+      "a.button, a.btn": null
+    },
+    "ctas": [],
+    "shadows": [
+      "rgba(40, 38, 74, 0.05) 0px 4px 50px 0px"
+    ],
+    "link_colors": []
+  },
+  "https://www.glide.com/platform/esignature/": {
+    "url": "https://www.glide.com/platform/esignature/",
+    "fullshot": "C:\\Users\\yusun\\.config\\browser-harness\\tmp\\shot.png",
+    "typography": {
+      "h1": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "60px",
+        "letterSpacing": "-1.5px"
+      },
+      "h2": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "35px",
+        "fontWeight": "700",
+        "lineHeight": "42px",
+        "letterSpacing": "-1.05px"
+      },
+      "h3": null,
+      "p": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "30px",
+        "fontWeight": "700",
+        "lineHeight": "42px",
+        "letterSpacing": "normal"
+      },
+      "a-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "button": {
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "filled-btn": null,
+      "nav-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "footer": null
+    },
+    "surfaces": {
+      "body": {},
+      "header": {},
+      "main": null,
+      "footer, .footer": null,
+      "section": {},
+      "[class*=\"card\"], [class*=\"Card\"], .card": null,
+      "[class*=\"hero\"], [class*=\"Hero\"]": null,
+      "[class*=\"bg-white\"], [class*=\"bg-light\"], [class*=\"bg\"], [class*=\"surface\"]": {},
+      "button": {},
+      "a.button, a.btn": null
+    },
+    "ctas": [],
+    "shadows": [
+      "rgba(0, 56, 255, 0.22) 0px 0px 0px 4px",
+      "rgba(66, 73, 96, 0.4) 0px 0px 15px 0px",
+      "rgba(40, 38, 74, 0.05) 0px 4px 50px 0px"
+    ],
+    "link_colors": []
+  },
+  "https://www.glide.com/platform/compliance/": {
+    "url": "https://www.glide.com/platform/compliance/",
+    "fullshot": "C:\\Users\\yusun\\.config\\browser-harness\\tmp\\shot.png",
+    "typography": {
+      "h1": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "60px",
+        "letterSpacing": "-1.5px"
+      },
+      "h2": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "35px",
+        "fontWeight": "700",
+        "lineHeight": "42px",
+        "letterSpacing": "-1.05px"
+      },
+      "h3": null,
+      "p": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "30px",
+        "fontWeight": "700",
+        "lineHeight": "42px",
+        "letterSpacing": "normal"
+      },
+      "a-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "button": {
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "filled-btn": null,
+      "nav-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "footer": null
+    },
+    "surfaces": {
+      "body": {},
+      "header": {},
+      "main": null,
+      "footer, .footer": null,
+      "section": {},
+      "[class*=\"card\"], [class*=\"Card\"], .card": null,
+      "[class*=\"hero\"], [class*=\"Hero\"]": null,
+      "[class*=\"bg-white\"], [class*=\"bg-light\"], [class*=\"bg\"], [class*=\"surface\"]": {},
+      "button": {},
+      "a.button, a.btn": null
+    },
+    "ctas": [],
+    "shadows": [
+      "rgba(0, 56, 255, 0.22) 0px 0px 0px 4px",
+      "rgba(66, 73, 96, 0.4) 0px 0px 15px 0px",
+      "rgba(40, 38, 74, 0.05) 0px 4px 50px 0px"
+    ],
+    "link_colors": []
+  },
+  "https://www.glide.com/plans/": {
+    "url": "https://www.glide.com/plans/",
+    "fullshot": "C:\\Users\\yusun\\.config\\browser-harness\\tmp\\shot.png",
+    "typography": {
+      "h1": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "60px",
+        "fontWeight": "700",
+        "lineHeight": "72px",
+        "letterSpacing": "-1.8px"
+      },
+      "h2": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "65px",
+        "letterSpacing": "-1.5px"
+      },
+      "h3": {
+        "fontFamily": "GothamPro, sans-serif",
+        "fontSize": "50px",
+        "fontWeight": "700",
+        "lineHeight": "65px",
+        "letterSpacing": "-1.5px"
+      },
+      "p": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "30px",
+        "fontWeight": "700",
+        "lineHeight": "42px",
+        "letterSpacing": "normal"
+      },
+      "a-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "button": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "filled-btn": null,
+      "nav-link": {
+        "fontFamily": "Mulish, sans-serif",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "normal",
+        "letterSpacing": "normal"
+      },
+      "footer": null
+    },
+    "surfaces": {
+      "body": {},
+      "header": null,
+      "main": null,
+      "footer, .footer": null,
+      "section": {},
+      "[class*=\"card\"], [class*=\"Card\"], .card": null,
+      "[class*=\"hero\"], [class*=\"Hero\"]": null,
+      "[class*=\"bg-white\"], [class*=\"bg-light\"], [class*=\"bg\"], [class*=\"surface\"]": null,
+      "button": {},
+      "a.button, a.btn": null
+    },
+    "ctas": [],
+    "shadows": [
+      "rgba(40, 38, 74, 0.05) 0px 4px 50px 0px"
+    ],
+    "link_colors": []
+  }
+}

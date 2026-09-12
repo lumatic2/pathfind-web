@@ -1,13 +1,12 @@
 {
   "name": "pathfind-web",
   "version": "0.1.0",
-  "description": "pathfind \uc6f9 \uc11c\ube44\uc2a4 MVP (\uacc4\uc815 \uc5c6\uc774 URL\ub85c \uc4f0\ub294 \uacf5\uac1c \uc6f9 \uc11c\ube44\uc2a4)",
+  "description": "pathfind 웹 서비스 MVP (계정 없이도 URL로 쓰는 공개 웹 서비스)",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod",
-    "deploy-preview": "vercel",
-    "verify": "node scripts/verify.js"
+    "deploy-preview": "vercel"
   }
 }
