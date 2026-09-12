@@ -1,6 +1,6 @@
 /* === 액션 함수 === */
 import { dom, state, setMsg, q } from './state.js';
-import { showQuestion, showResult, renderCards, showInputUI } from './render.js';
+import { showQuestion, showResult, renderCards, showInputUI, markLoading, markError, enrichCard } from './render.js';
 
 async function askGrill(question, answer, history, turnCount) {
   dom.statusPill.textContent = '대기 중…';
@@ -26,7 +26,7 @@ async function askGrill(question, answer, history, turnCount) {
 }
 
 async function askPathfind(summary) {
-  dom.statusPill.textContent = '큰 그림 생성 중…';
+  dom.statusPill.textContent = '로드맵 생성 중…';
   try {
     const res = await fetch('/api/pathfind', {
       method: 'POST',
@@ -41,10 +41,53 @@ async function askPathfind(summary) {
     if (data.error) throw new Error(data.error);
     return data;
   } catch (e) {
-    setMsg(dom.resultMsg, '큰 그림·핸드오프 생성에 실패했습니다: ' + e.message, false);
+    setMsg(dom.resultMsg, '큰 그림 생성에 실패했습니다: ' + e.message, false);
     throw e;
   } finally {
     dom.statusPill.textContent = '준비';
+  }
+}
+
+async function askStage(request) {
+  dom.statusPill.textContent = '검색 중…';
+  try {
+    const res = await fetch('/api/stage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: '서버 응답 오류' }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (e) {
+    dom.statusPill.textContent = '준비';
+    throw e;
+  } finally {
+    dom.statusPill.textContent = '준비';
+  }
+}
+
+async function askHandoff(bigPicture, stages, summary) {
+  try {
+    const res = await fetch('/api/handoff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bigPicture, stages, summary }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: '서버 응답 오류' }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (e) {
+    setMsg(dom.resultMsg, 'handoff 생성에 실패했습니다: ' + e.message, false);
+    throw e;
   }
 }
 
@@ -73,6 +116,7 @@ async function startInterview() {
     state.history = [];
     state.currentQuestion = data;
     showQuestion(data);
+    saveState();
   } catch (e) {
     setMsg(dom.inputMsg, '인터뷰를 시작하지 못했습니다: ' + e.message, false);
     dom.startBtn.disabled = false;
@@ -102,18 +146,66 @@ async function submitAnswer(answerText) {
     if (data.done) {
       const bpData = await askPathfind(data.summary || state.initialQuestion);
       state.bigPicture = bpData.bigPicture;
-      state.handoff = bpData.handoffMarkdown || '';
+      state.stageIndex = 0;
+      state.stageResults = [];
       renderCards(state.bigPicture);
+      for (let i = 0; i < state.bigPicture.stages.length; i++) {
+        const stage = state.bigPicture.stages[i];
+        const card = dom.stageCards.querySelector(`.card[data-stage-index="${i}"]`);
+        if (card) markLoading(card);
+        try {
+          const stageRes = await askStage({
+            stageIndex: i,
+            stage,
+            summary: data.summary || state.initialQuestion,
+          });
+          state.stageResults.push(stageRes);
+          if (card) enrichCard(card, stageRes.stage);
+        } catch (e) {
+          if (card) markError(card, e.message);
+          state.stageResults.push(null);
+        }
+      }
+      state.handoff = '';
+      dom.handoffPre.textContent = '';
+      dom.copyHandoffBtn.disabled = true;
+      dom.downloadHandoffBtn.disabled = true;
+      dom.resultHint.textContent = '총 ' + state.bigPicture.stages.length + '개 단계 · handoff.md 생성 준비 중';
+      const handoffData = await askHandoff(state.bigPicture, state.stageResults, data.summary || state.initialQuestion);
+      state.handoff = handoffData.handoffMarkdown || '';
       dom.handoffPre.textContent = state.handoff;
+      dom.copyHandoffBtn.disabled = false;
+      dom.downloadHandoffBtn.disabled = false;
       dom.resultHint.textContent = '총 ' + state.bigPicture.stages.length + '개 단계 · handoff.md 다운로드 가능';
       showResult(data.summary);
+      saveState();
     } else {
       showQuestion(data);
+      saveState();
     }
   } catch (e) {
     setMsg(dom.interviewMsg, '답변을 제출하지 못했습니다: ' + e.message, false);
     dom.answerBtn.disabled = false;
     dom.statusPill.textContent = '준비';
+  }
+}
+
+async function retryStage(index) {
+  if (!state.bigPicture || !state.bigPicture.stages[index]) return;
+  const card = dom.stageCards.querySelector(`.card[data-stage-index="${index}"]`);
+  if (!card) return;
+  markLoading(card);
+  try {
+    const stageRes = await askStage({
+      stageIndex: index,
+      stage: state.bigPicture.stages[index],
+      summary: state.initialQuestion,
+    });
+    state.stageResults[index] = stageRes;
+    enrichCard(card, stageRes.stage);
+  } catch (e) {
+    markError(card, e.message);
+    state.stageResults[index] = null;
   }
 }
 
@@ -176,6 +268,8 @@ function resetAll() {
   state.summary = '';
   state.bigPicture = null;
   state.handoff = '';
+  state.stageResults = [];
+  state.stageIndex = 0;
   showInputUI();
   dom.questionInput.value = '';
   dom.statusPill.textContent = '준비';
@@ -192,5 +286,26 @@ function resetAll() {
   dom.turnDisplay.textContent = '1';
 }
 
-export { askGrill, askPathfind, setInitialQuestion, startInterview, submitAnswer, handleExampleClick, copyHandoff, downloadHandoff, resetAll };
+function saveState() {
+  try {
+    const s = {
+      mode: state.mode,
+      initialQuestion: state.initialQuestion,
+      turnCount: state.turnCount,
+      history: state.history,
+      currentQuestion: state.currentQuestion,
+      summary: state.summary,
+      bigPicture: state.bigPicture,
+      handoff: state.handoff,
+      stageResults: state.stageResults,
+      stageIndex: state.stageIndex,
+      inInterview: state.inInterview,
+    };
+    localStorage.setItem('pathfind_state', JSON.stringify(s));
+  } catch (e) {
+    localStorage.removeItem('pathfind_state');
+  }
+}
+
+export { askGrill, askPathfind, askStage, askHandoff, setInitialQuestion, startInterview, submitAnswer, retryStage, handleExampleClick, copyHandoff, downloadHandoff, resetAll, saveState };
 export { setMsg } from './state.js';

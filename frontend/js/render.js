@@ -9,10 +9,7 @@ function showInterviewUI() {
   hide(dom.inputArea);
   hide(dom.askArea);
   hide(dom.resultSection);
-  if (dom.panelLeft) {
-    show(dom.panelLeft);
-    hide(dom.panelRight);
-  }
+  if (dom.panelLeft) { show(dom.panelLeft); hide(dom.panelRight); }
   if (dom.interviewSummary) hide(dom.interviewSummary);
 }
 
@@ -24,9 +21,7 @@ function showResultUI() {
   show(dom.resultSection);
   hide(dom.inputArea);
   hide(dom.askArea);
-  if (dom.panelLeft) {
-    show(dom.panelLeft);
-  }
+  if (dom.panelLeft) show(dom.panelLeft);
   if (dom.panelRight) show(dom.panelRight);
   if (dom.interviewSummary) {
     show(dom.interviewSummary);
@@ -40,13 +35,183 @@ function showInputUI() {
   hide(dom.askArea);
   hide(dom.resultSection);
   hide(dom.interviewSummary);
-  if (dom.panelLeft) {
-    show(dom.panelLeft);
-    hide(dom.panelRight);
+  if (dom.panelLeft) { show(dom.panelLeft); hide(dom.panelRight); }
+}
+
+function markLoading(card) {
+  card.classList.add('card-loading');
+  const badge = card.querySelector('.badge');
+  if (badge) { badge.textContent = '검색 중…'; badge.classList.add('loading'); }
+  const desc = card.querySelector('.desc');
+  if (desc) desc.textContent = '검색 중…';
+  if (!card.querySelector('.card-footer')) {
+    const footer = document.createElement('div');
+    footer.className = 'card-footer';
+    footer.style.cssText = 'margin-top:8px;display:flex;gap:8px;align-items:center;';
+    const status = document.createElement('span');
+    status.className = 'card-status';
+    status.style.cssText = 'color:var(--muted);font-size:12px;';
+    status.textContent = '로드맵 생성 중…';
+    footer.appendChild(status);
+    card.appendChild(footer);
   }
 }
 
-function renderCards(bp) {
+function markError(card, message) {
+  card.classList.add('card-error');
+  const badge = card.querySelector('.badge');
+  if (badge) { badge.textContent = '선례를 못 찾음'; badge.classList.remove('loading'); badge.classList.add('none'); }
+  const desc = card.querySelector('.desc');
+  if (desc) desc.textContent = message || '이 단계의 검색 결과를 가져오지 못했습니다.';
+  if (!card.querySelector('.card-footer')) {
+    const footer = document.createElement('div');
+    footer.className = 'card-footer';
+    footer.style.cssText = 'margin-top:10px;display:flex;gap:8px;align-items:center;';
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.className = 'btn btn.sm';
+    retryBtn.textContent = '다시 시도';
+    retryBtn.addEventListener('click', () => {
+      card.dispatchEvent(new CustomEvent('retry-stage', { detail: true }));
+    });
+    footer.appendChild(retryBtn);
+    const note = document.createElement('span');
+    note.className = 'card-status';
+    note.style.cssText = 'color:var(--warn);font-size:12px;';
+    note.textContent = message || '이 단계의 검색 결과를 가져오지 못했습니다.';
+    footer.appendChild(note);
+    card.appendChild(footer);
+  }
+}
+
+function enrichCard(card, stage) {
+  const h3 = card.querySelector('h3');
+  const desc = card.querySelector('.desc');
+  const badge = card.querySelector('.badge');
+  if (h3 && stage.title) h3.textContent = stage.title;
+  if (desc && stage.desc) desc.textContent = stage.desc;
+  if (badge) {
+    badge.classList.remove('loading');
+    if (stage.verdict === '가져다 써도 됨') { badge.textContent = '가져다 써도 됨'; badge.classList.add('ok'); }
+    else if (stage.verdict === '직접 해야 함') { badge.textContent = '직접 해야 함'; badge.classList.add('need'); }
+    else if (stage.verdict === '섞어야 함') { badge.textContent = '섞어야 함'; badge.classList.add('mix'); }
+    else if (stage.verdict === '선례를 못 찾음') { badge.textContent = '선례를 못 찾음'; badge.classList.add('none'); }
+    else { badge.textContent = stage.verdict || ''; }
+  }
+  card.classList.remove('card-loading', 'card-error');
+  const footer = card.querySelector('.card-footer');
+  if (footer) footer.remove();
+
+  if (stage.findings && stage.findings.length) {
+    let section = card.querySelector('.card-section.findings-section');
+    if (!section) {
+      section = document.createElement('div');
+      section.className = 'card-section findings-section';
+      section.textContent = '찾은 자료';
+      card.appendChild(section);
+      const ul = document.createElement('ul');
+      ul.className = 'findings';
+      section.appendChild(ul);
+    }
+    const ul = section.querySelector('ul');
+    ul.innerHTML = '';
+    stage.findings.forEach((f) => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = f.url || '';
+      a.target = '_blank';
+      a.textContent = f.name || '';
+      li.appendChild(a);
+      const meta = document.createElement('div');
+      meta.style.cssText = 'color:#6b7686;font-size:11.5px;margin-top:2px;';
+      meta.textContent = `[${f.kind || ''}] ${f.note || ''}`;
+      li.appendChild(meta);
+      ul.appendChild(li);
+    });
+  } else {
+    const section = card.querySelector('.card-section.findings-section');
+    if (section) section.remove();
+  }
+
+  if (stage.choices && stage.choices.length) {
+    let section = card.querySelector('.card-section.choices-section');
+    if (!section) {
+      section = document.createElement('div');
+      section.className = 'card-section choices-section';
+      section.textContent = '선택지';
+      card.appendChild(section);
+      const choices = document.createElement('div');
+      choices.className = 'choices';
+      section.appendChild(choices);
+    }
+    const choices = section.querySelector('.choices');
+    choices.innerHTML = '';
+    stage.choices.forEach((c) => {
+      const b = document.createElement('span');
+      b.className = 'choice';
+      b.textContent = c;
+      choices.appendChild(b);
+    });
+    const todoSection = card.querySelector('.card-section.todos-section');
+    if (todoSection) todoSection.remove();
+  } else {
+    const section = card.querySelector('.card-section.choices-section');
+    if (section) section.remove();
+  }
+
+  if (stage.tasks && stage.tasks.length) {
+    let section = card.querySelector('.card-section.tasks-section');
+    if (!section) {
+      section = document.createElement('div');
+      section.className = 'card-section tasks-section';
+      section.textContent = '이 단계의 할 일';
+      card.appendChild(section);
+      const ul = document.createElement('ul');
+      ul.style.cssText = 'list-style:none;padding:0;margin:0;font-size:12.5px;';
+      section.appendChild(ul);
+    }
+    const ul = section.querySelector('ul');
+    ul.innerHTML = '';
+    stage.tasks.forEach((t) => {
+      const li = document.createElement('li');
+      li.style.cssText = 'color:#cfd4dd;padding:3px 0;border-bottom:1px solid #1d2330;';
+      li.textContent = `${t.order}. ${t.task} — ${t.why || ''}`;
+      ul.appendChild(li);
+    });
+  } else {
+    const section = card.querySelector('.card-section.tasks-section');
+    if (section) section.remove();
+  }
+
+  if (stage.todos && stage.todos.length) {
+    let section = card.querySelector('.card-section.todos-section');
+    if (!section) {
+      section = document.createElement('div');
+      section.className = 'card-section todos-section';
+      section.textContent = '실행 항목';
+      card.appendChild(section);
+      const ul = document.createElement('ul');
+      ul.style.cssText = 'list-style:none;padding:0;margin:0;font-size:12.5px;';
+      section.appendChild(ul);
+    }
+    const ul = section.querySelector('ul');
+    ul.innerHTML = '';
+    stage.todos.forEach((t) => {
+      const li = document.createElement('li');
+      li.style.cssText = 'color:#cfd4dd;padding:3px 0;border-bottom:1px solid #1d2330;';
+      const owner = document.createElement('span');
+      owner.style.cssText = 'color:var(--accent);font-weight:600;';
+      owner.textContent = `[${t.owner || ''}] `;
+      li.appendChild(owner);
+      li.appendChild(document.createTextNode(`${t.task} — ${t.note || ''}`));
+      ul.appendChild(li);
+    });
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function renderCards(bp, stages) {
   dom.stageCards.innerHTML = '';
   const iconMap = {
     compass: 'compass', target: 'target', 'pencil-ruler': 'pencil-ruler',
@@ -62,11 +227,12 @@ function renderCards(bp) {
     rocket: 'rocket', package: 'package', settings: 'settings', wrench: 'wrench',
     'chart-bar': 'chart-bar',
   };
-
-  bp.stages.forEach((s, i) => {
+  const arr = bp && bp.stages ? bp.stages : [];
+  arr.forEach((s, i) => {
     const icon = (s.icon && iconMap[s.icon]) ? s.icon : 'circle-dot';
     const card = document.createElement('div');
     card.className = 'card';
+    card.dataset.stageIndex = i;
     card.innerHTML = `
       <div class="card-header">
         <span class="card-num">${i + 1}</span>
@@ -79,75 +245,16 @@ function renderCards(bp) {
     const h3 = card.querySelector('h3');
     const desc = card.querySelector('.desc');
     const badge = card.querySelector('.badge');
-    h3.textContent = s.title;
-    desc.textContent = s.desc;
+    h3.textContent = s.title || '';
+    desc.textContent = s.desc || '';
     if (s.verdict === '가져다 써도 됨') { badge.textContent = '가져다 써도 됨'; badge.classList.add('ok'); }
     else if (s.verdict === '직접 해야 함') { badge.textContent = '직접 해야 함'; badge.classList.add('need'); }
     else if (s.verdict === '섞어야 함') { badge.textContent = '섞어야 함'; badge.classList.add('mix'); }
     else if (s.verdict === '선례를 못 찾음') { badge.textContent = '선례를 못 찾음'; badge.classList.add('none'); }
-    else { badge.textContent = s.verdict; }
-
-    if (s.findings && s.findings.length) {
-      const section = document.createElement('div');
-      section.className = 'card-section';
-      section.textContent = '찾은 자료';
-      card.appendChild(section);
-      const ul = document.createElement('ul');
-      ul.className = 'findings';
-      s.findings.forEach((f) => {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = f.url;
-        a.target = '_blank';
-        a.textContent = f.name;
-        li.appendChild(a);
-        const meta = document.createElement('div');
-        meta.style.cssText = 'color:#6b7686;font-size:11.5px;margin-top:2px;';
-        meta.textContent = `[${f.kind}] ${f.note || ''}`;
-        li.appendChild(meta);
-        ul.appendChild(li);
-      });
-      card.appendChild(ul);
-    }
-
-    if (s.choices && s.choices.length) {
-      const section = document.createElement('div');
-      section.className = 'card-section';
-      section.textContent = '선택지';
-      card.appendChild(section);
-      const choices = document.createElement('div');
-      choices.className = 'choices';
-      s.choices.forEach((c) => {
-        const b = document.createElement('span');
-        b.className = 'choice';
-        b.textContent = c;
-        choices.appendChild(b);
-      });
-      card.appendChild(choices);
-    }
-
-    if (s.tasks && s.tasks.length) {
-      const section = document.createElement('div');
-      section.className = 'card-section';
-      section.textContent = '이 단계의 할 일';
-      card.appendChild(section);
-      const ul = document.createElement('ul');
-      ul.style.cssText = 'list-style:none;padding:0;margin:0;font-size:12.5px;';
-      s.tasks.forEach((t) => {
-        const li = document.createElement('li');
-        li.style.cssText = 'color:#cfd4dd;padding:3px 0;border-bottom:1px solid #1d2330;';
-        li.textContent = `${t.order}. ${t.task} — ${t.why || ''}`;
-        ul.appendChild(li);
-      });
-      card.appendChild(ul);
-    }
-
+    else if (s.verdict) { badge.textContent = s.verdict; }
     dom.stageCards.appendChild(card);
   });
-
-  if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function showQuestion(data) {
@@ -179,4 +286,4 @@ function showResult(summary) {
   setMsg(dom.inputMsg, '', false);
 }
 
-export { renderCards, showQuestion, showResult, showInputUI };
+export { renderCards, showQuestion, showResult, showInputUI, markLoading, markError, enrichCard };

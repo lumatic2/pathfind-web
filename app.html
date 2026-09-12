@@ -111,7 +111,7 @@
 
   <script type="module">
     import { dom, state, show, hide, setMsg, exampleBtnHTML, q, $ } from './frontend/js/state.js';
-    import { renderCards, showQuestion, showResult, showInputUI } from './frontend/js/render.js';
+    import { renderCards, showQuestion, showResult, showInputUI, enrichCard } from './frontend/js/render.js';
     import {
       startInterview,
       submitAnswer,
@@ -122,6 +122,7 @@
       askGrill,
       askPathfind,
       setInitialQuestion,
+      saveState,
     } from './frontend/js/actions.js';
     import './frontend/js/events.js';
 
@@ -150,8 +151,16 @@
           state.bigPicture = data.bigPicture || null;
           state.handoff = data.handoffMarkdown || '';
           renderCards(state.bigPicture);
-          dom.handoffPre.textContent = state.handoff;
+          if (data.stages) {
+            data.stages.forEach((en, i) => {
+              const card = dom.stageCards.querySelector(`.card[data-stage-index="${i}"]`);
+              if (card) enrichCard(card, en.stage);
+            });
+          }
+          dom.copyHandoffBtn.disabled = false;
+          dom.downloadHandoffBtn.disabled = false;
           dom.resultHint.textContent = '총 ' + (state.bigPicture ? state.bigPicture.stages.length : 0) + '개 단계 · handoff.md 다운로드 가능 (mock)';
+          dom.handoffPre.textContent = state.handoff;
           showResult(state.summary);
           return;
         }
@@ -191,11 +200,21 @@
           state.bigPicture = s.bigPicture;
           state.handoff = s.handoff;
           state.summary = s.summary || '';
+          state.stageResults = s.stageResults || [];
+          state.stageIndex = s.stageIndex || 0;
+          state.inInterview = false;
           renderCards(state.bigPicture);
           dom.handoffPre.textContent = state.handoff;
           dom.resultHint.textContent = '총 ' + state.bigPicture.stages.length + '개 단계 · handoff.md 다운로드 가능';
-          show(dom.panelRight);
-          hide(dom.panelLeft);
+          dom.copyHandoffBtn.disabled = !state.handoff;
+          dom.downloadHandoffBtn.disabled = !state.handoff;
+          if (state.stageResults.length === state.bigPicture.stages.length) {
+            state.stageResults.forEach((res, i) => {
+              const card = dom.stageCards.querySelector(`.card[data-stage-index="${i}"]`);
+              if (card && res && res.stage) enrichCard(card, res.stage);
+            });
+          }
+          showResult(state.summary);
           dom.questionInput.value = state.initialQuestion;
         } else if (s.mode === 'interview' && s.currentQuestion) {
           state.mode = 'interview';
