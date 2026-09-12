@@ -256,6 +256,10 @@ ${stage.tasks?.map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || 'ì
       );
     }
 
+    const toolMessages = messages.slice();
+    let toolCallCount = 0;
+    const searchedQueries = [];
+
     while (toolCallCount < 2) {
       const tcs = toolResult.toolCalls;
       if (!tcs?.length) break;
