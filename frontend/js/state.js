@@ -11,6 +11,7 @@ const state = {
   summary: '',
   bigPicture: null,
   handoff: '',
+  inInterview: false,
 };
 
 // DOM refs
@@ -18,6 +19,7 @@ const dom = {
   inputSection: $('#inputSection'),
   interviewSection: $('#interviewSection'),
   resultSection: $('#resultSection'),
+  // index.html 전용
   questionInput: $('#questionInput'),
   startBtn: $('#startBtn'),
   resetBtn: $('#resetBtn'),
@@ -39,11 +41,20 @@ const dom = {
   copyHandoffBtn: $('#copyHandoffBtn'),
   downloadHandoffBtn: $('#downloadHandoffBtn'),
   resultMsg: $('#resultMsg'),
+  // app.html 전용
+  inputArea: $('#inputArea'),
+  askArea: $('#askArea'),
+  questionCard: $('#questionCard'),
+  suggestionCard: $('#suggestionCard'),
+  panelLeft: $('#panelLeft'),
+  panelRight: $('#panelRight'),
+  interviewSummary: $('#interviewSummary'),
+  summaryText: $('#summaryText'),
 };
 
 // 헬퍼
-function show(el) { el.classList.remove('hidden'); }
-function hide(el) { el.classList.add('hidden'); }
+function show(el) { if (!el) return; el.classList.remove('hidden'); }
+function hide(el) { if (!el) return; el.classList.add('hidden'); }
 function setMsg(el, text, ok) {
   el.textContent = text || '';
   el.classList.toggle('hidden', !text);

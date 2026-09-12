@@ -1,6 +1,6 @@
 /* === 액션 함수 === */
 import { dom, state, setMsg, q } from './state.js';
-import { showQuestion, showResult, renderCards } from './render.js';
+import { showQuestion, showResult, renderCards, showInputUI } from './render.js';
 
 async function askGrill(question, answer, history, turnCount) {
   dom.statusPill.textContent = '대기 중…';
@@ -123,7 +123,8 @@ function handleExampleClick(e) {
   if (btn === dom.startBtn) return;
   const text = btn.textContent.replace(/^\d+\.\s*/, '').trim();
   dom.answerInput.value = text;
-  if (!dom.interviewSection.classList.contains('hidden')) {
+  dom.questionInput.value = text;
+  if (state.inInterview) {
     submitAnswer(text);
   } else {
     q('.example-btn.sel').forEach((b) => b.classList.remove('sel'));
@@ -175,10 +176,8 @@ function resetAll() {
   state.summary = '';
   state.bigPicture = null;
   state.handoff = '';
+  showInputUI();
   dom.questionInput.value = '';
-  hide(dom.interviewSection);
-  hide(dom.resultSection);
-  show(dom.inputSection);
   dom.statusPill.textContent = '준비';
   setMsg(dom.inputMsg, '', false);
   setMsg(dom.interviewMsg, '', false);

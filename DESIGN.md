@@ -32,6 +32,10 @@ AI 시대, 하려는 일을 한 문단 받아 → 기존 해결책·사례를 �
 | text-secondary | `#5a5a5a` | 보조 텍스트 |
 | border | `#e5e7eb` | 카드·입력창 테두리 |
 | on-accent | `#ffffff` | accent 위 텍스트 |
+| verdict-existing | `#10b981` | 소면적 뱃지 — 이미 있는 것 |
+| verdict-need | `#f59e0b` | 소면적 뱃지 — 직접 해야 하는 것 |
+| verdict-mix | `#7c3aed` | 소면적 뱃지 — 섞여 있음 |
+| verdict-none | `#6b7280` | 소면적 뱃지 — 해당 없음/미정 |
 
 쓰지 않는 색: `#4f9eff` 계열 블루. 상태 색(danger/success 등)은 텍스트·아이콘·소면적 뱃지에만. 큰 면적 배경색은 surface / accent-soft 두 종으로 제한.
 
@@ -46,6 +50,10 @@ AI 시대, 하려는 일을 한 문단 받아 → 기존 해결책·사례를 �
 | border | `#232a35` | 카드·입력창 테두리 |
 | accent | `#4f4bcb` | **변경됨** — 기존 `#4f9eff` 대신 Glide와 통일 |
 | accent-dim | `#2a4a7a` | accent의 어두운 변종(호버 등) |
+| verdict-existing | `#2ecc71` | 소면적 뱃지 — 이미 있는 것 |
+| verdict-need | `#f1c40f` | 소면적 뱃지 — 직접 해야 하는 것 |
+| verdict-mix | `#8e44ad` | 소면적 뱃지 — 섞여 있음 |
+| verdict-none | `#9ca3af` | 소면적 뱃지 — 해당 없음/미정 |
 
 전환: `prefers-color-scheme` 또는 상단 토글. 전환 시 색상만 바뀌고 간격·위계·형태는 동일.
 

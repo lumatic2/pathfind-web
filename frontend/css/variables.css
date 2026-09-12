@@ -1,26 +1,48 @@
-/* === 공통 변수·리셋 === */
+/* === 공통 변수·리셋 (정본: DESIGN.md §Light + §Dark 변종) === */
 :root {
-  --bg: #0d0f12;
-  --card: #161922;
-  --card-border: #232a35;
-  --text: #e6e9ef;
-  --muted: #8b95a5;
-  --accent: #4f9eff;
-  --accent-dim: #2a4a7a;
-  --ok: #2ecc71;
-  --warn: #f1c40f;
-  --danger: #e74c3c;
-  --pick: #8e44ad;
+  --surface: #ffffff;
+  --accent: #4f4bcb;
+  --accent-soft: #f3f5ff;
+  --text: #0a0a0a;
+  --text-secondary: #5a5a5a;
+  --border: #e5e7eb;
+  --on-accent: #ffffff;
+  --bg: #ffffff;
+  --card: #ffffff;
+  --card-border: #e5e7eb;
+  --muted: #5a5a5a;
+  --accent-dim: #4f4bcb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #161922;
+    --bg: #0d0f12;
+    --card: #161922;
+    --card-border: #232a35;
+    --text: #e6e9ef;
+    --muted: #8b95a5;
+    --accent: #4f4bcb;
+    --accent-dim: #2a4a7a;
+    --accent-soft: #1b1f2b;
+    --text-secondary: #b9c1d0;
+    --border: #232a35;
+    --on-accent: #ffffff;
+    --verdict-existing: #2ecc71;
+    --verdict-need: #f1c40f;
+    --verdict-mix: #8e44ad;
+    --verdict-none: #9ca3af;
+  }
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--bg, var(--surface));
   color: var(--text);
   font-family: 'Noto Sans KR', sans-serif;
-  line-height: 1.55;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -37,20 +59,20 @@ body {
   gap: 16px;
   flex-wrap: wrap;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--card-border);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 24px;
 }
 
 h1 {
-  font-size: 26px;
+  font-size: 2.5rem;
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.02em;
 }
 
 .sub {
-  color: var(--muted);
-  font-size: 13.5px;
+  color: var(--text-secondary);
+  font-size: 1rem;
 }
 
 .toprow {

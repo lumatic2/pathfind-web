@@ -1,6 +1,51 @@
 /* === 렌더링 함수 === */
 import { dom, state, exampleBtnHTML, setMsg, show, hide } from './state.js';
 
+function showInterviewUI() {
+  state.inInterview = true;
+  show(dom.questionCard);
+  show(dom.suggestionCard);
+  show(dom.exampleButtons);
+  hide(dom.inputArea);
+  hide(dom.askArea);
+  hide(dom.resultSection);
+  if (dom.panelLeft) {
+    show(dom.panelLeft);
+    hide(dom.panelRight);
+  }
+  if (dom.interviewSummary) hide(dom.interviewSummary);
+}
+
+function showResultUI() {
+  state.inInterview = false;
+  hide(dom.questionCard);
+  hide(dom.suggestionCard);
+  hide(dom.exampleButtons);
+  show(dom.resultSection);
+  hide(dom.inputArea);
+  hide(dom.askArea);
+  if (dom.panelLeft) {
+    show(dom.panelLeft);
+  }
+  if (dom.panelRight) show(dom.panelRight);
+  if (dom.interviewSummary) {
+    show(dom.interviewSummary);
+    dom.summaryText.textContent = state.summary || '';
+  }
+}
+
+function showInputUI() {
+  state.inInterview = false;
+  show(dom.inputArea);
+  hide(dom.askArea);
+  hide(dom.resultSection);
+  hide(dom.interviewSummary);
+  if (dom.panelLeft) {
+    show(dom.panelLeft);
+    hide(dom.panelRight);
+  }
+}
+
 function renderCards(bp) {
   dom.stageCards.innerHTML = '';
   const iconMap = {
@@ -120,9 +165,7 @@ function showQuestion(data) {
   dom.answerInput.value = '';
   dom.turnDisplay.textContent = state.turnCount + 1;
   dom.interviewHint.textContent = '예시 버튼을 누르거나 답변을 적고 제출하세요.';
-  show(dom.interviewSection);
-  hide(dom.inputSection);
-  hide(dom.resultSection);
+  showInterviewUI();
   setMsg(dom.interviewMsg, '', false);
   dom.answerBtn.disabled = false;
   dom.answerInput.focus();
@@ -130,12 +173,10 @@ function showQuestion(data) {
 
 function showResult(summary) {
   state.summary = summary || '';
-  show(dom.resultSection);
-  hide(dom.inputSection);
-  hide(dom.interviewSection);
+  showResultUI();
   dom.statusPill.textContent = '완료';
   setMsg(dom.interviewMsg, '', false);
   setMsg(dom.inputMsg, '', false);
 }
 
-export { renderCards, showQuestion, showResult };
+export { renderCards, showQuestion, showResult, showInputUI };

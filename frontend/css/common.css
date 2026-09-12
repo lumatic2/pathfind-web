@@ -1,4 +1,9 @@
 /* === 공통 UI 요소 === */
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
 .btn {
   background: var(--card);
   color: var(--text);
@@ -11,7 +16,7 @@
   transition: background .15s, border-color .15s, opacity .15s;
 }
 
-.btn:hover { background: #1c2230; border-color: #3a4453; }
+.btn:hover { background: var(--accent-soft); border-color: var(--accent); }
 .btn:active { opacity: .85; }
 
 .btn.primary {
@@ -78,7 +83,7 @@ textarea:focus, input:focus, select:focus {
   transition: background .15s, border-color .15s;
 }
 
-.example-btn:hover { background: #1c2230; border-color: var(--accent); }
+.example-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
 .example-btn.sel { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
 
 .cards {
