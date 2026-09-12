@@ -7,6 +7,10 @@
   --text-secondary: #5a5a5a;
   --border: #e5e7eb;
   --on-accent: #ffffff;
+  --verdict-existing: #10b981;
+  --verdict-need: #f59e0b;
+  --verdict-mix: #7c3aed;
+  --verdict-none: #6b7280;
   --bg: #ffffff;
   --card: #ffffff;
   --card-border: #e5e7eb;

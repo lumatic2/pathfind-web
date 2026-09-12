@@ -9,179 +9,26 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="frontend/css/variables.css">
   <link rel="stylesheet" href="frontend/css/common.css">
-  <link rel="stylesheet" href="frontend/css/interview.css">
-  <link rel="stylesheet" href="frontend/css/result.css">
 </head>
 <body>
-  <header>
-    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+  <header class="app-header">
+    <div class="brand">
       <h1>pathfind</h1>
       <span class="sub">만들려는 것의 단계를 찾고, 이미 있는 것부터 챙기기</span>
     </div>
-    <div class="toprow">
-      <span class="status-pill" id="statusPill">준비</span>
-      <button class="btn btn.ghost btn.sm" id="resetBtn" type="button">다시 시작</button>
-    </div>
   </header>
 
-  <div class="wrap">
-    <!-- 입력 화면 -->
-    <section id="inputSection">
-      <div class="field" style="max-width:620px;">
-        <label for="questionInput">만들려는 것을 한 문단으로 적어 주세요 (예: "풋볼매니저 같은 야구 매니지먼트 게임을 만들고 싶어")</label>
-        <textarea id="questionInput" rows="4" style="min-height:90px;" placeholder="예: Godot으로 2D 플랫폼 게임을 만들고 싶은데, 무료 타일 에셋이나 비슷한 구현 사례가 있는지 먼저 찾아보고 싶다."></textarea>
-      </div>
-      <div class="examples" style="margin-top:14px;">
-        <button class="example-btn" data-example="게임 만들고 싶어 — Godot으로 2D 플랫폼 게임을 만들고 싶은데, 무료 에셋이나 튜토리얼이 있는지 먼저 알고 싶어.">게임 만들고 싶어</button>
-        <button class="example-btn" data-example="업무 도구를 자동화하고 싶어 — 엑셀 증감분석을 자동으로 비교하는 스크립트를 만들고 싶은데, 비슷한 오픈소스나 파이썬 라이브러리가 있는지 찾아줘.">업무 도구 자동화</button>
-        <button class="example-btn" data-example="앱/서비스를 만들고 싶어 — 개인용 메모 앱을 하나 만들고 싶은데, 오픈소스 참고 사례나 무료 컴포넌트부터 찾아보고 싶어.">앱/서비스</button>
-        <button class="example-btn" data-example="영상·문서를 만들고 싶어 — 강의용 영상 자료를 만들고 싶은데, 무료 영상 에셋이나 편집 튜토리얼을 단계별로 찾고 싶어.">영상·문서</button>
-      </div>
-      <div class="toprow" style="margin-top:16px;">
-        <button class="btn primary" id="startBtn" type="button">시작 — 정렬 인터뷰</button>
-        <span class="hint">예시 버튼을 누르거나 직접 적고 시작하세요.</span>
-      </div>
-      <div id="inputMsg" class="msg hidden"></div>
-    </section>
+  <main class="landing">
+    <div class="landing-inner">
+      <h1 class="headline">만들려는 것을 한 문단으로 적어 주세요</h1>
+      <p class="desc">만들고 싶은 것의 단계를 찾고, 이미 있는 자료·선례부터 챙겨 시작할 수 있게 정리합니다.</p>
+      <a class="btn primary cta" href="app.html">시작하기</a>
+      <p class="hint">계정 없이 바로 쓸 수 있습니다.</p>
+    </div>
+  </main>
 
-    <!-- 인터뷰 화면 -->
-    <section id="interviewSection" class="hidden">
-      <div class="toprow">
-        <span style="font-size:13px;color:var(--muted)">정렬 인터뷰 — <span id="turnDisplay">1</span>/5</span>
-        <span class="hint" id="interviewHint">답변을 적거나 예시 버튼을 누르세요.</span>
-      </div>
-      <div style="margin-top:14px;max-width:720px;">
-        <div class="card" style="padding:14px;">
-          <h3><span id="qTitle"></span></h3>
-          <p class="desc" id="qBody"></p>
-        </div>
-        <div class="section-title">추천 방향</div>
-        <div class="card" style="padding:12px;background:#10131a;">
-          <p id="suggestion" style="margin:0;color:var(--text);font-size:13.5px;"></p>
-        </div>
-        <div class="section-title">예시 답변 (눌러도 제출됩니다)</div>
-        <div id="exampleButtons" class="examples"></div>
-        <div class="field" style="margin-top:14px;">
-          <label for="answerInput">직접 답변 (예시 버튼과 다르게 적고 싶으면)</label>
-          <textarea id="answerInput" rows="3" style="min-height:60px;" placeholder="예시 버튼 대신 직접 답변을 적으세요…"></textarea>
-        </div>
-        <div class="toprow">
-          <button class="btn primary" id="answerBtn" type="button">답변 제출</button>
-          <button class="btn ghost" id="skipBtn" type="button">건너뛰고 다음</button>
-        </div>
-        <div id="interviewMsg" class="msg hidden"></div>
-      </div>
-    </section>
-
-    <!-- 결과 화면 -->
-    <section id="resultSection" class="hidden">
-      <div class="toprow">
-        <span style="font-size:14px;font-weight:500;">큰 그림 · 단계별 경로</span>
-        <span class="hint" id="resultHint"></span>
-      </div>
-
-      <div class="cards" id="stageCards"></div>
-
-      <div class="section-title">구현 핸드오프 문서</div>
-      <div class="handoff-box">
-        <div class="toprow">
-          <button class="btn btn.sm" id="copyHandoffBtn" type="button">복사</button>
-          <button class="btn btn.sm" id="downloadHandoffBtn" type="button">다운로드 (handoff.md)</button>
-          <span class="hint">구현을 이어갈 코딩 에이전트에 넣으세요.</span>
-        </div>
-        <pre id="handoffPre"></pre>
-      </div>
-      <div id="resultMsg" class="msg hidden"></div>
-    </section>
-  </div>
-
-  <!-- lucide 아이콘 (웹컴포넌트) -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script type="module">
-import { dom, state, setMsg, q } from './frontend/js/state.js';
-import { showQuestion, showResult, renderCards } from './frontend/js/render.js';
-import {
-  startInterview,
-  submitAnswer,
-  handleExampleClick,
-  resetAll,
-  copyHandoff,
-  downloadHandoff,
-  askGrill,
-  askPathfind,
-  setInitialQuestion,
-} from './frontend/js/actions.js';
-import './frontend/js/events.js';
-
-function loadState() {
-  try {
-    const saved = localStorage.getItem('pathfind_state');
-    if (!saved) return;
-    const s = JSON.parse(saved);
-    if (s.mode === 'result' && s.bigPicture && s.handoff) {
-      state.mode = 'result';
-      state.initialQuestion = s.initialQuestion || '';
-      state.bigPicture = s.bigPicture;
-      state.handoff = s.handoff;
-      state.summary = s.summary || '';
-      renderCards(state.bigPicture);
-      dom.handoffPre.textContent = state.handoff;
-      dom.resultHint.textContent = '총 ' + state.bigPicture.stages.length + '개 단계 · handoff.md 다운로드 가능';
-      dom.resultSection.classList.remove('hidden');
-      dom.inputSection.classList.add('hidden');
-      dom.interviewSection.classList.add('hidden');
-      dom.statusPill.textContent = '완료 (이어서)';
-      dom.questionInput.value = state.initialQuestion;
-    } else if (s.mode === 'interview' && s.currentQuestion) {
-      state.mode = 'interview';
-      state.initialQuestion = s.initialQuestion || '';
-      state.turnCount = s.turnCount || 0;
-      state.history = s.history || [];
-      state.currentQuestion = s.currentQuestion;
-      showQuestion(state.currentQuestion);
-    } else {
-      dom.questionInput.value = s.initialQuestion || '';
-    }
-  } catch (e) {
-    localStorage.removeItem('pathfind_state');
-  }
-}
-
-function boot() {
-  dom.startBtn.addEventListener('click', startInterview);
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.example-btn');
-    if (!btn) return;
-    handleExampleClick(e);
-  });
-  dom.answerBtn.addEventListener('click', () => {
-    const text = dom.answerInput.value.trim();
-    if (!text) {
-      setMsg(dom.interviewMsg, '답변을 적거나 예시 버튼을 눌러 주세요.', false);
-      return;
-    }
-    submitAnswer(text);
-  });
-  dom.skipBtn.addEventListener('click', () => {
-    submitAnswer('(건너뜀 — 다음 질문으로)');
-  });
-  dom.answerInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      dom.answerBtn.click();
-    }
-  });
-  dom.copyHandoffBtn.addEventListener('click', copyHandoff);
-  dom.downloadHandoffBtn.addEventListener('click', downloadHandoff);
-  dom.resetBtn.addEventListener('click', resetAll);
-
-  loadState();
-  if (state.mode === 'input') {
-    dom.questionInput.value = state.initialQuestion || '';
-  }
-}
-
-boot();
-  </script>
+  <footer>
+    <p class="hint">pathfind — AI 시대의 작업 계획 도우미</p>
+  </footer>
 </body>
 </html>

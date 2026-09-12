@@ -305,36 +305,6 @@ select:focus {
   }
 }
 
-/* === 판정 배지 (정본 검증: 소면적 뱃지에만, 반경 1종) === */
-.verdict {
-  display: inline-block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 999px;
-  line-height: 1.4;
-}
-
-.verdict-existing {
-  color: var(--verdict-existing);
-  background: color-mix(in srgb, var(--verdict-existing) 12%, transparent);
-}
-
-.verdict-need {
-  color: var(--verdict-need);
-  background: color-mix(in srgb, var(--verdict-need) 12%, transparent);
-}
-
-.verdict-mix {
-  color: var(--verdict-mix);
-  background: color-mix(in srgb, var(--verdict-mix) 12%, transparent);
-}
-
-.verdict-none {
-  color: var(--verdict-none);
-  background: color-mix(in srgb, var(--verdict-none) 12%, transparent);
-}
-
 /* === 로드맵 카드 (펼침/접힘) === */
 .roadmap-card {
   background: var(--surface);
@@ -433,4 +403,65 @@ select:focus {
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.9; }
+}
+
+/* === 결과 뒤 좌 패널 인터뷰 요약 (정본: DESIGN.md §결과 화면) === */
+.interview-summary {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.interview-summary p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* === 결과 뒤 좌 패널 요약 (정본: DESIGN.md §결과 화면) === */
+.summary-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.summary-card .summary-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.summary-card .summary-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-card .summary-turn {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.summary-card .summary-body {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+/* === 단계별 카드 라벨 대비 (정본: DESIGN.md §본문/보조 본문) === */
+.card-section.tasks-section {
+  color: var(--text-secondary);
+  font-weight: 500;
+  letter-spacing: 0;
+  margin: 10px 0 4px;
 }

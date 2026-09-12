@@ -1,6 +1,23 @@
 /* === 렌더링 함수 === */
 import { dom, state, exampleBtnHTML, setMsg, show, hide } from './state.js';
 
+const ALLOWED_VERDICTS = ['가져다 써도 됨', '직접 해야 함', '섞어야 함', '선례를 못 찾음'];
+
+const VERDICT_KEYS = new Map();
+ALLOWED_VERDICTS.forEach((v) => {
+  const key = v.replace(/[.｡。、・･]/g, '').replace(/\s+/g, '').replace(/『|»|»|「|『|’|”|\"|'|=/g, '').toLowerCase();
+  VERDICT_KEYS.set(key, v);
+});
+
+function normalizeVerdict(raw) {
+  if (!raw) return '선례를 못 찾음';
+  const cleaned = String(raw).trim();
+  if (ALLOWED_VERDICTS.includes(cleaned)) return cleaned;
+  const key = cleaned.replace(/[.｡。、・･]/g, '').replace(/\s+/g, '').replace(/『|»|「|’|”|\"|'|=/g, '').toLowerCase();
+  if (VERDICT_KEYS.has(key)) return VERDICT_KEYS.get(key);
+  return '선례를 못 찾음';
+}
+
 function showInterviewUI() {
   state.inInterview = true;
   show(dom.questionCard);
@@ -92,11 +109,13 @@ function enrichCard(card, stage) {
   if (desc && stage.desc) desc.textContent = stage.desc;
   if (badge) {
     badge.classList.remove('loading');
-    if (stage.verdict === '가져다 써도 됨') { badge.textContent = '가져다 써도 됨'; badge.classList.add('ok'); }
-    else if (stage.verdict === '직접 해야 함') { badge.textContent = '직접 해야 함'; badge.classList.add('need'); }
-    else if (stage.verdict === '섞어야 함') { badge.textContent = '섞어야 함'; badge.classList.add('mix'); }
-    else if (stage.verdict === '선례를 못 찾음') { badge.textContent = '선례를 못 찾음'; badge.classList.add('none'); }
-    else { badge.textContent = stage.verdict || ''; }
+    const v = normalizeVerdict(stage.verdict);
+    badge.textContent = v;
+    badge.classList.remove('ok', 'need', 'mix', 'none');
+    if (v === '가져다 써도 됨') badge.classList.add('ok');
+    else if (v === '직접 해야 함') badge.classList.add('need');
+    else if (v === '섞어야 함') badge.classList.add('mix');
+    else if (v === '선례를 못 찾음') badge.classList.add('none');
   }
   card.classList.remove('card-loading', 'card-error');
   const footer = card.querySelector('.card-footer');
@@ -247,11 +266,15 @@ function renderCards(bp, stages) {
     const badge = card.querySelector('.badge');
     h3.textContent = s.title || '';
     desc.textContent = s.desc || '';
-    if (s.verdict === '가져다 써도 됨') { badge.textContent = '가져다 써도 됨'; badge.classList.add('ok'); }
-    else if (s.verdict === '직접 해야 함') { badge.textContent = '직접 해야 함'; badge.classList.add('need'); }
-    else if (s.verdict === '섞어야 함') { badge.textContent = '섞어야 함'; badge.classList.add('mix'); }
-    else if (s.verdict === '선례를 못 찾음') { badge.textContent = '선례를 못 찾음'; badge.classList.add('none'); }
-    else if (s.verdict) { badge.textContent = s.verdict; }
+    if (s.verdict) {
+      const v = normalizeVerdict(s.verdict);
+      badge.textContent = v;
+      badge.classList.remove('ok', 'need', 'mix', 'none');
+      if (v === '가져다 써도 됨') badge.classList.add('ok');
+      else if (v === '직접 해야 함') badge.classList.add('need');
+      else if (v === '섞어야 함') badge.classList.add('mix');
+      else if (v === '선례를 못 찾음') badge.classList.add('none');
+    }
     dom.stageCards.appendChild(card);
   });
   if (typeof lucide !== 'undefined') lucide.createIcons();

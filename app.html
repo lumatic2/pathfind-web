@@ -185,13 +185,12 @@
       console.log('BOOT boot() entered, useMock=', window.__useMock, 'mockData=', !!(window.__mockData));
 
       if (window.__useMock && window.__mockData) {
-        showInputUI();
         loadMock();
         return;
       }
 
       const saved = localStorage.getItem('pathfind_state');
-      if (!saved) return;
+      if (!saved) { showInputUI(); return; }
       try {
         const s = JSON.parse(saved);
         if (s.mode === 'result' && s.bigPicture && s.handoff) {
@@ -215,8 +214,8 @@
             });
           }
           showResult(state.summary);
-          dom.questionInput.value = state.initialQuestion;
         } else if (s.mode === 'interview' && s.currentQuestion) {
+          showInputUI();
           state.mode = 'interview';
           state.initialQuestion = s.initialQuestion || '';
           state.turnCount = s.turnCount || 0;
