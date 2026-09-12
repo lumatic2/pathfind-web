@@ -1,6 +1,6 @@
 # pathfind-web
 
-> **새 세션은 이 문서를 먼저 읽는다.** 그다음 `handoff.md`와 `MVP_WORK.md`를 읽으면 현재 상태를 이어서 파악할 수 있다.
+> **새 세션은 이 문서를 먼저 읽는다.** 그다음 `docs/jd/planboard.md`를 읽으면 현재 상태·할 일을 이어서 파악할 수 있다.
 > 이 레포는 MABC 2026 결선 산출물 전용이며, 작업에 쓰는 모델은 **Solar Pro 4**, 개발 도구는 **Hermes Agent**뿐이다.
 
 MABC 2026 결선 산출물 레포. 예선 당선 스킬 **`pathfind`** 를 누구나 URL로 쓰는 웹 서비스 MVP로 확장한다.
@@ -33,6 +33,10 @@ MABC 2026 결선 산출물 레포. 예선 당선 스킬 **`pathfind`** 를 누�
 `.gitignore`가 `.env*`·`*.tmp`·`node_modules/`·`.vercel/`·`AGENTS.override.md`·`.materials/`를 막는지, `api/*.js`에 `solar-pro4`(하이픈 없음) 모델 ID가 있는지 확인한다.
 
 레포 루트의 `HERMES.md`가 이 레포의 CLAUDE.md 역할이다. 글로벌 `~/.claude.md`는 없다(만들지 않는다).
+
+## 계획판
+
+큰 그림·할 일·상태판은 `docs/jd/planboard.md` 가 정본이다. 새 세션은 HERMES.md → `docs/jd/` 의 JD → `docs/jd/planboard.md` 순서로 읽는다.
 
 ## 커밋 게이트
 
