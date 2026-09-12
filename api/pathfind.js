@@ -1,6 +1,21 @@
 // 긴 프롬프트는 별도 상수로 분리 (가독성)
+// pathfind 원본 스킬 이식: SKILL.md §단계 분해 (서비스화 수정 포함, 2026-09-12)
+
 const BIG_PICTURE_SYSTEM = `당신은 무언가를 만들려는 사람을 위한 "큰 그림 설계자"입니다.
 사용자가 pathfind 정렬 인터뷰를 마친 후, 그 아이디어를 실제로 구현하기 위한 큰 단계와 각 단계의 할 일을 설계합니다.
+
+[원문: pathfind 스킬 SKILL.md §단계 분해]
+- 단계 수는 주제에 맞게 4~7개 사이에서 정한다. 작은 일은 4개, 큰 일은 7개까지.
+- 단계 제목은 카드 한 줄에 들어가도록 한글 기준 24자 이내로 적는다.
+- 단계 분해는 만드는 일을 실제로 하는 일 순서대로 나눈다. 예를 들어 "방향 정하기 → 설계 → 구현 → 검증 → 배포"처럼, 각 단계가 실제로는 손이 가는 작업 단위가 되도록 나눈다.
+
+[서비스화 수정 — pathfind-web 서비스에 맞춘 변경]
+- 이 서비스의 /api/pathfind는 큰 그림(bigPicture.title·intro·stages[])과 prototypeLoop만 반환하고, 각 단계의 verdict·findings·choices·tasks 상세는 이후 /api/stage 호출에서 채운다(§2 계약). 따라서 bigPicture.stages[]에는 verdict/findings를 넣지 않고, no·title·desc·icon·tasks·choices만 담는다.
+- stages[] 각 원소는 §2 계약의 bigPicture.stages 스키마를 정확히 따른다: no(number), title(string 24자 이내), desc(string 2-3문장), icon(string, 단계에 맞는 아이콘 이름), tasks([{order, task, why}]), choices([string]).
+- tasks는 단계당 2~4개로 채운다(원문 "2~3개"보다 서비스 밀도에 맞춰 2~4개로 운용). 각 task는 order(number, 1부터), task(string 한 줄), why(string 한 줄)로 구성한다.
+- desc는 그 단계에서 하는 일의 핵심 문장 2~3개로 쓴다. 각 문장은 짧고 독립적으로 쓴다.
+- 큰 그림 생성 후에는 "prototype → playtest → 수정 루프" 언급을 prototypeLoop 한 줄(또는 intro/공정 설명)에 포함한다.
+- JSON만 출력한다. 다른 텍스트 금지.
 
 규칙:
 1. 큰 단계는 일반적으로 다음으로 구성됩니다 (상황에 따라 가감 가능):
@@ -156,7 +171,7 @@ export async function POST(request) {
       { role: 'system', content: BIG_PICTURE_SYSTEM },
       {
         role: 'user',
-        content: `사용자는 다음 아이디어를 구현하려고 합니다.\n\n[정렬 인터뷰 요약]\n${summary || initialQuestion}\n\n위 아이디어를 바탕으로 큰 그림(stages)과 각 단계의 할 일, 리서치 결과(findings), 선택지를 설계해 주세요. JSON만 출력하세요.`,
+        content: `사용자는 다음 아이디어를 구현하려고 합니다.\n\n[정렬 인터뷰 요약]\n${summary || initialQuestion}\n\n위 아이디어를 바탕으로 큰 그림(stages)과 각 단계의 할 일, 선택지(골격)를 설계해 주세요. bigPicture.stages[]에는 verdict·findings를 넣지 말고, 각 단계는 no·title·desc·icon·tasks·choices만 담으세요. JSON만 출력하세요.`,
       },
     ];
 
