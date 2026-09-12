@@ -135,19 +135,42 @@ export async function POST(request) {
     const { question, answer, history = [], turnCount = 0 } = body || {};
 
     if (turnCount >= 4) {
-      // 최대 턴(5턴) 도달: Solar 호출 없이 종료 + 요약 강제
-      return new Response(
-        JSON.stringify({
-          questionTitle: '',
-          questionBody: '',
-          suggestion: '',
-          exampleButtons: [],
-          done: true,
-          summary: '인터뷰 상한 턴(5턴)에 도달했습니다. 지금까지의 답변을 바탕으로 정리된 아이디어를 요약해 주세요.',
-          turnCount: turnCount + 1,
-        }),
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      // 최대 턴(5턴) 도달: Solar를 호출해 history 기반 실제 요약 생성
+      try {
+        const summaryMessages = [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...buildHistoryMessages(history),
+          { role: 'user', content: '인터뷰가 5턴으로 끝났습니다. 지금까지의 대화를 바탕으로 사용자의 아이디어를 3-5문장으로 요약해 주세요. JSON 형식({ "done": true, "summary": "..." })으로만 출력하세요. 다른 텍스트 금지.' },
+        ];
+        const summaryContent = await callSolarWithRetry(summaryMessages);
+        const parsed = parseSolarJson(summaryContent);
+        return new Response(
+          JSON.stringify({
+            questionTitle: '',
+            questionBody: '',
+            suggestion: '',
+            exampleButtons: [],
+            done: true,
+            summary: parsed.summary || '인터뷰 상한 턴(5턴)에 도달했습니다. 지금까지의 답변을 바탕으로 정리된 아이디어를 요약해 주세요.',
+            turnCount: turnCount + 1,
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      } catch (e) {
+        // Solar 호출 실패 시에도 인터뷰 종료 처리 — 고정 요약 반환
+        return new Response(
+          JSON.stringify({
+            questionTitle: '',
+            questionBody: '',
+            suggestion: '',
+            exampleButtons: [],
+            done: true,
+            summary: '인터뷰 상한 턴(5턴)에 도달했습니다. 지금까지의 답변을 바탕으로 정리된 아이디어를 요약해 주세요.',
+            turnCount: turnCount + 1,
+          }),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // messages 구성

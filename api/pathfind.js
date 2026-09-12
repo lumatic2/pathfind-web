@@ -37,25 +37,6 @@ const BIG_PICTURE_SYSTEM = `당신은 무언가를 만들려는 사람을 위한
   }
 }`;
 
-const HANDOFF_SYSTEM = `당신은 구현 에이전트로 넘길 "핸드오프 문서"를 작성하는 작성자입니다.
-사용자가 pathfind 정렬 인터뷰 + 큰 그림·단계 리서치를 마친 후, 그 결과를 구현 에이전트(다른 코딩 에이전트)가 이어받을 수 있는 마크다운 문서로 만듭니다.
-
-규칙:
-1. 문서는 한국어로 작성합니다.
-2. 다음 섹션을 포함합니다:
-   - "# 핸드오프 — [프로젝트 제목]"
-   - "## 1. 아이디어 요약" (사용자의 정리된 아이디어)
-   - "## 2. 큰 그림" (단계 목록 + 각 단계의 핵심 할 일)
-   - "## 3. 단계별 리서치 결과" (각 단계의 verdict, 찾은 자료, 선택지)
-   - "## 4. prototype 루프 조언"
-   - "## 5. 다음 액션" (가장 먼저 할 일 1-3개)
-   - "## 6. 참고 링크" (전체 자료 링크 모음)
-3. 각 자료의 출처 URL은 정확히 옮깁니다.
-4. 없는 정보는 "확인 불가"로 표기합니다.
-5. 추정하지 않습니다.
-
-출력 형식: 마크다운 문자열만. 다른 텍스트 금지.`;
-
 function parseSolarJsonOrText(content, expectJson) {
   const trimmed = content.trim();
   if (expectJson) {
@@ -183,20 +164,8 @@ export async function POST(request) {
     const bpData = parseSolarJsonOrText(bpContent, true);
     const bigPicture = validateBigPicture(bpData);
 
-    // 2단계: handoff.md 생성 (Solar)
-    const handoffPrompt = `# 핸드오프 문서 생성\n\n아래 큰 그림 데이터를 바탕으로 구현 에이전트가 이어받을 수 있는 마크다운 핸드오프 문서를 작성해 주세요.\n\n[큰 그림 데이터]\n${JSON.stringify(bigPicture, null, 2)}\n\n마크다운만 출력하세요. 다른 텍스트 금지.`;
-    const handoffMessages = [
-      { role: 'system', content: HANDOFF_SYSTEM },
-      { role: 'user', content: handoffPrompt },
-    ];
-    const handoffContent = await callSolar(handoffMessages, 0.6);
-
-    // 3단계: handoff 텍스트를 마크다운으로 정리 (Solar가 준 그대로)
-    const handoffMarkdown = handoffContent.replace(/^```(?:markdown)?\s*/i, '').replace(/\s*```$/, '').trim();
-
     return new Response(JSON.stringify({
       bigPicture,
-      handoffMarkdown,
     }), {
       headers: { 'Content-Type': 'application/json' },
     });
