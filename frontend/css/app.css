@@ -458,6 +458,11 @@ select:focus {
   color: var(--text);
 }
 
+/* === 우 패널 마인드맵/목록 토글 (정본: DESIGN.md 룩 유지) === */
+.view-toggle { display:inline-flex; gap:6px; }
+.view-toggle-btn.active { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.mindmap-view { min-height: 280px; }
+
 /* === 단계별 카드 라벨 대비 (정본: DESIGN.md §본문/보조 본문) === */
 .card-section.tasks-section {
   color: var(--text-secondary);

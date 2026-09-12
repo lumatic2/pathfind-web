@@ -36,6 +36,7 @@
 
 ## 최근 커밋 (요약)
 
+- `c2e31fe` docs(jd): JD-worker 계약 문서 처리 경계 정정  ← HEAD
 - `373ddf5` feat: mindmap 패널 (우측) CSS+JS 초기 커밋
 - `cada646` docs(prd): 스킬 매핑 표·3분할 다음단계·SEARCH_API_KEY; feat(api): stage + pathfind 오케스트레이션
 - `6c32606` feat: batch 1 — frontend(index.html, app.html), styles, render.js, api/stage.js, DESIGN.md
@@ -43,25 +44,44 @@
 
 ## 현재 상태
 
-- HEAD: `cada646`. mindmap 커밋 `373ddf5` 추가됨.
-- dirty 11 / untracked 2 (mindmap 커밋 후). untracked 내역 확인 필요.
-- docs/jd/JD-orchestrator.md·JD-worker.md·planboard.md 생성됨. 기존 JD-1~4 삭제됨.
-- docs/api-contract.md 읽음 (4개 엔드포인트: grill·pathfind·stage·handoff).
+- HEAD: `c2e31fe`.
+- dirty 0 / untracked 6. dirty 없음(worker2 커밋, 프론트 전환 파일 생성 완료). untracked: 산출 md 3개(ROADMAP·mindmap·연구노트-테스트, UTF-8 cp949 파일명 루트 레벨) + skills/ 디렉터리 + smoke-api.mjs(스모크 테스트, 워커C 산출물, 커밋 대상 아님).
+- 워커스: 워커1 완료·커밋됨. 워커2 완료·검증 통과·커밋 완료(`c2e31fe`). 워커3(프론트 전환 하위 태스크) 위임 중 — B(셸 컴포넌트 이식, deleg_a1961855 task-0) + C(API 순수 함수 모듈, deleg_a1961855 task-1) 병렬 진행 중. 위임 테스트(subagent test ok) 성공 확인.
+- 프론트 전환 과제 분해: A(빌드 기반 + Tailwind v4 플러그인 + 자산 설치 진입 확인) → B(앱 React 셸 컴포넌트) ∥ C(actions.js 로직 이관) → D(상태·훅 교체) → E(PRD 자산 출처 행 + 산출 md 경로 정리). 현재 A 완료, B∥C 진행 중.
 
 ## 할 일
 
 - [x] mindmap.js·mindmap.css 커밋 (`373ddf5`)
 - [x] docs/api-contract.md·planboard·JD-orchestrator 확인
-- [ ] git status 재확인 + dirty/untracked 내역 파악 (지금 상태: dirty 11, untracked 2)
-- [ ] 경로 산출물 관계·게이트웨이·MVP 범위 정리 반영 완료 (planboard 정체성 + 메모리 반영 완료)
-- [ ] 다음 과제 도출: pathfind v2 → 새 폴더 구조 + 산출 스펙부터. 그 전에 계약 문서와 현재 api/*.js 내역이 이 새 방향과 어디서 부딪히는지 확인.
-- [ ] 워커스 세션에 줄 과제 문안 작성·dispatch
-- [ ] 워커 결과 검증 → 통과 시 커밋
+- [x] git status 재확인 + dirty/untracked 내역 파악
+- [x] 경로 산출물 관계·게이트웨이·MVP 범위 정리 반영 완료
+- [x] 워커2 결과 검증 → 통과 (app.html 첫 화면·PRD §2/§3 톤 정렬, 예시 버튼 4개 새 일 시작 맥락 전환 확인)
+- [x] 워커2 산출 커밋 (`c2e31fe`)
+- [x] 프론트 전환 과제 분해·스폰: A(빌드 기반 + Tailwind v4 + 자산 설치 진입 확인) / B(앱 React 셸 컴포넌트) / C(actions.js 로직 이관) / D(상태·훅 교체) / E(PRD 자산 출처 행 + 산출 md 경로 정리)
+- [x] A 직접 처리 완료: package.json 의존성·스크립트, vite.config.ts(멀티 엔트리 + outDir + Tailwind v4 플러그인), vercel.json(buildCommand/outputDirectory), frontend/src/app/index.css(Tailwind v4 @import + @theme + verdict 4색), frontend/src/app/main.tsx(React 19 진입점), app.html 빈 껍데기화. `npm run build` 성공(dist/index.html + dist/app.html + assets).
+- [x] 서브에이전트 위임 테스트: 위임 호출 자체가 실행·반환되는지 확인(subagent test ok → 파일 생성·내용 확인 후 보고). 위임 정상 작동 확인.
+- [ ] 위임 결과 수신 → 확인: B(셸 콘텐츠 이식·import 조정·var() 확인·dialog/cn 제공), C(API 순수 함수 모듈·타입 정의·node 스모크).
+- [ ] 기계 검사: `npx @askewly/design verify` 실행 및 결과 확인(B 산출물 대상).
+- [ ] 사람 확인(라이브 페이지): B 산출물로 실제 앱에서 React 마운트·3패널 레이아웃 렌더링 확인.
+- [ ] B∥C 통과 시 커밋.
+- [ ] D(상태·훅 교체: useDemoNotebook → 실제 상태 훅, 세션ID localStorage·md 목록·마인드맵 JSON·중앙 대화 상태 타입) 스폰·검증.
+- [ ] E(PRD 자산 출처 행 + 산출 md 루트 레벨 낙하 정리) 수행.
 
 ## 비고
 
-- 경로 산출물 관계(메모리에 넣음): 한 번 리서치에서 단계별 md·ROADMAP 색인·마인드맵 JSON 셋이 같이 나오고 md가 원본, 둘은 파생. 좌 출처 카드=단계별 md 원본, ROADMAP.md=그 md의 색인·요약(다운로드용), 마인드맵 JSON=우 패널 구조 데이터.
-- 게이트웨이·세션 지속·저장소 없음·cron 우선순위는 planboard 정체성에 이미 반영됨.
+- 진입 프로토콜(entry-protocol.md) fetch 완료: 자산은 `https://ui.askewly.com/r/<name>.json` 로 받고, 코드 자산 있으면 코드 우선(이식 → 프로젝트 토큰 재스타일). 기계 검사 `npx @askewly/design verify`, 최종 게이트는 사람 확인. 우리 앱은 본인 디자인 시스템(ui-dictionary)이 룩 소유 → Askewly 토큰 주입 아님, 코드 자산 이식 + 재스타일.
+- ui-dictionary 레포 `~/projects/ui-dictionary` 존재 확인. NotebookMindmapShellDemo = notebook-workspace-shell.tsx 안 함수 + useDemoNotebook 훅, 레지스트리로 받으면 파일 통째로.
+- api-contract.md 변경 없음(SPA로 바꿔도 `/api/*` fetch 기반 그대로). 계약 변경 없으면 프론트 과제는 계약과 독립.
+- 위임 방식: delegate_task `tasks`는 JSON 배열이어야 함(문자열 전달 시 파싱 오류). 각 태스크에 goal + context + output_schema + 완료 조건을 명시하면 서브에이전트가 수행하고 결과가 이 세션으로 돌아옴. 실행 후 오케스트레이터가 diff + 실행 출력 + 계약 일치로 직접 검증 후 커밋.
+- untracked 산출 md 3개 + skills/ 위치 정리 필요 — 과제 E에서 처리.
+
+## 참고 자료 경로
+
+- 결선 기록 레포: `../mabc-2026/docs/` (계획·설계·조사 문서 — 읽기는 여기서, 갱신은 그쪽 세션 몫)
+- 지식 조회: `kg` 스킬
+- 도구 검색: `ts` 스킬
+- 화면 스펙: `askewly-design` 스킬 (원문은 curl)
+- untracked 산출 md 3개 + skills/ 위치 정리 필요 — 과제 E에서 처리.
 
 ## 참고 자료 경로
 

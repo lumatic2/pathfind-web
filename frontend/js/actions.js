@@ -149,6 +149,28 @@ async function submitAnswer(answerText) {
       state.stageIndex = 0;
       state.stageResults = [];
       renderCards(state.bigPicture);
+      // 마인드맵 최초 렌더: 모든 단계 searching 상태
+      state.stageStatus = state.bigPicture.stages.map(() => 'searching');
+      state.stageChildren = state.bigPicture.stages.map(() => null);
+      state.mindmapInst = renderRoadmapMindmap(
+        'mindmapView',
+        state.bigPicture.stages,
+        state.stageStatus,
+        state.stageChildren,
+        () => {}
+      );
+      if (state.mindmapInst) {
+        state.mindmapInst.setOnNodeDoubleClick((n) => {
+          if (n.nodeType !== 'l0' || n.stageIdx == null || !dom.stageCards) return;
+          const card = dom.stageCards.querySelector(`.card[data-stage-index="${n.stageIdx}"]`);
+          if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('selected');
+            setTimeout(() => card.classList.remove('selected'), 1600);
+          }
+        });
+        state.mindmapInst.fitToView();
+      }
       for (let i = 0; i < state.bigPicture.stages.length; i++) {
         const stage = state.bigPicture.stages[i];
         const card = dom.stageCards.querySelector(`.card[data-stage-index="${i}"]`);
@@ -161,9 +183,20 @@ async function submitAnswer(answerText) {
           });
           state.stageResults.push(stageRes);
           if (card) enrichCard(card, stageRes.stage);
+          // 마인드맵 갱신: 해당 단계 done + 자식 붙이기
+          state.stageStatus[i] = 'done';
+          state.stageChildren[i] = {
+            _stageNo: stage.no,
+            findings: stageRes.stage.findings || [],
+            choices: stageRes.stage.choices || [],
+            todos: stageRes.stage.todos || [],
+          };
+          if (state.mindmapInst) state.mindmapInst.updateStage(i, 'done', state.stageChildren[i]);
         } catch (e) {
           if (card) markError(card, e.message);
           state.stageResults.push(null);
+          state.stageStatus[i] = 'error';
+          if (state.mindmapInst) state.mindmapInst.updateStage(i, 'error', null);
         }
       }
       state.handoff = '';
@@ -284,6 +317,11 @@ function resetAll() {
   dom.qBody.textContent = '';
   dom.suggestion.textContent = '';
   dom.turnDisplay.textContent = '1';
+  if (state.mindmapInst) {
+    const mv = dom.mindmapView;
+    if (mv) mv.innerHTML = '';
+    state.mindmapInst = null;
+  }
 }
 
 function saveState() {

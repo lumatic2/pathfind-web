@@ -12,6 +12,10 @@ const state = {
   bigPicture: null,
   handoff: '',
   inInterview: false,
+  // 마인드맵 상태 (과제3)
+  mindmapInst: null,
+  stageStatus: [],       // stageIdx -> 'searching' | 'done' | 'error'
+  stageChildren: [],     // stageIdx -> {findings, choices, todos}
 };
 
 // DOM refs
