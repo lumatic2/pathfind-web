@@ -310,7 +310,7 @@ ${stage.tasks?.map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '�
       parsed?.verdictReason || (findings.length ? '검색 자료 확인' : '검색 상한 내 유효한 선례를 못 찾음');
 
     // options / todos
-    const options = parsed?.options || stage.choices || [];
+    let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
       task: t.task,
       owner: t.owner === '직접 함' ? '직접 함' : '가져다 씀',
