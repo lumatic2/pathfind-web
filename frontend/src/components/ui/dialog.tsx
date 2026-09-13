@@ -19,14 +19,14 @@ export function Dialog({
   const controlled = open !== undefined;
   const [internalOpen, setInternalOpen] = React.useState(false);
   const openState = controlled ? open : internalOpen;
-  const onOpenChange = React.useCallback(
+  const onOpenChangeImpl = React.useCallback(
     (next: boolean) => {
       if (!controlled) setInternalOpen(next);
       onOpenChange?.(next);
     },
     [controlled, onOpenChange]
   );
-  const value = context ?? { open: openState, onOpenChange };
+  const value = context ?? { open: openState, onOpenChange: onOpenChangeImpl };
   return (
     <DialogContext.Provider value={value}>
       {React.Children.only(children)}
@@ -46,6 +46,12 @@ export function DialogContent({
   [key: string]: unknown;
 }) {
   const { open, onOpenChange } = React.useContext(DialogContext)!;
+  if (!open) return null;
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onOpenChange(false) }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onOpenChange])
   return (
     <div
       role="dialog"
