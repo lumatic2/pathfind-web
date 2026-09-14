@@ -23,6 +23,7 @@ import { GroundedSourcePanel, groundedSourceDemoFilters, groundedSourceDemoSourc
 import { ChatConversationPanel, chatGroundedDemoReasoningSteps, chatGroundedDemoSuggestions, chatGroundedDemoZero, type ChatMessage, type ChatStatus } from "@/components/chat-conversation-panel"
 import { StudioArtifactPanel, StudioDemoBanner, studioDemoArtifacts, studioDemoKinds } from "@/components/studio-artifact-panel"
 import { MindmapSpineTree, mindmapRoadmapTree, mindmapSampleTree, type MindmapLayout, type MindmapNode } from "@/components/mindmap-spine-tree"
+import { useQuota, consumeQuota } from "@/state/quota"
 
 export type NotebookWorkspaceShellProps = {
   /** 64h 슬롯 — 바탕 투명(무대색). 브랜드·액션은 소비자 몫 */
@@ -304,10 +305,11 @@ const demoMessages: ChatMessage[] = [
 let demoId = 100
 
 // 원본 §1-2 상단 바 — outlined pill 32h(아이콘 + 라벨 14/20 500, 패딩 0 12 0 8, 간격 12) · CTA 검은 pill(`+` + 라벨, 패딩 0 16 0 12)
-function TopbarButton({ children, icon, primary }: { children: ReactNode; icon: ReactNode; primary?: boolean }) {
+function TopbarButton({ children, icon, primary, onClick }: { children: ReactNode; icon: ReactNode; primary?: boolean; onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={cn(
         "inline-flex h-8 items-center gap-1.5 rounded-full text-sm outline-none ring-ring ring-offset-2 ring-offset-background motion-safe:transition-[background-color,transform] active:scale-[0.98] focus-visible:ring-2 [&>svg]:size-4",
         primary ? "bg-foreground pl-3 pr-4 font-normal text-background hover:bg-foreground/90" : "border border-border pl-2 pr-3 font-medium text-foreground hover:bg-foreground/8",
@@ -339,12 +341,17 @@ export type DemoUser = { name: string }
  * 상단 바 데모 — 제목(제자리 편집) · 검은 CTA · outlined pill 4 · 앱 격자 · **로그인 상태**: 로그아웃이면 「로그인」 pill,
  * 로그인이면 캐릭터 아바타(원본 §1-2 의 구글 아바타 자리 — 사진 대신 브랜드 캐릭터, 사용자 주문 2026-09-13). 아바타 클릭 = 로그아웃(데모).
  */
-function DemoTopbar({ title, onTitleChange, user, onSignIn, onSignOut }: { title: string; onTitleChange: (t: string) => void; user: DemoUser | null; onSignIn: () => void; onSignOut: () => void }) {
+function DemoTopbar({ title, onTitleChange, user, onSignIn, onSignOut, onNewClick, quota }: { title: string; onTitleChange: (t: string) => void; user: DemoUser | null; onSignIn: () => void; onSignOut: () => void; onNewClick?: () => void; quota?: { remaining: number } }) {
   return (
     <div className="flex w-full items-center justify-between gap-4 px-4">
       <EditableText as="h1" value={title} onChange={onTitleChange} fallback="제목 없는 노트북" aria-label="노트북 제목" data-shell-title className="min-w-0 max-w-[40%] truncate font-normal focus:overflow-visible focus:whitespace-normal" style={{ fontSize: 22, lineHeight: "36px" }} />
       <div className="flex shrink-0 items-center gap-3">
-        <TopbarButton primary icon={<Plus aria-hidden />}>노트북 만들기</TopbarButton>
+        <TopbarButton primary icon={<Plus aria-hidden />} onClick={onNewClick}>노트북 만들기</TopbarButton>
+        {quota != null ? (
+          <span className="shrink-0 rounded-full border border-border bg-card px-3 py-1 text-sm text-muted-foreground outline-none ring-ring ring-offset-2 ring-offset-background">
+            남은 횟수 {quota.remaining}
+          </span>
+        ) : null}
         <TopbarButton icon={<Copy aria-hidden />}>복사</TopbarButton>
         <TopbarButton icon={<ChartNoAxesCombined aria-hidden />}>분석</TopbarButton>
         <TopbarButton icon={<Share2 aria-hidden />}>공유</TopbarButton>
@@ -446,7 +453,7 @@ function useDemoNotebook(empty: boolean, sourcePanel: Partial<Pick<GroundedSourc
       }}
     />
   )
-  return { left, center, topbar, leftCollapsed, setLeftCollapsed, rightCollapsed, setRightCollapsed, setDraft, mindmapSelected, setMindmapSelected, expandedOf, rememberExpanded, sourceCount: selectedIds.length }
+  return { left, center, topbar, leftCollapsed, setLeftCollapsed, rightCollapsed, setRightCollapsed, title, setTitle, user, setUser, setDraft, mindmapSelected, setMindmapSelected, expandedOf, rememberExpanded, sourceCount: selectedIds.length }
 }
 
 export function NotebookWorkspaceShellDemo({ empty = false }: { empty?: boolean }) {
@@ -742,10 +749,19 @@ export const MINDMAP_SHELL_RATIOS: [number, number, number] = [22, 43, 35]
 /** 마인드맵 변형 노트북 — 출처(에이전트가 쌓는 마크다운 — 추가·검색 없음) · 채팅 · 마인드맵. `empty` = 첫 진입(소스 0 · 인사 · 빈 마인드맵) */
 export function NotebookMindmapShellDemo({ empty = false }: { empty?: boolean }) {
   const d = useDemoNotebook(empty, { showAdd: false, showSearch: false, labels: { emptyBody: "채팅의 에이전트가 만든 마크다운 문서가 여기에 쌓입니다." } })
+  const quota = useQuota()
+  const [flash, setFlash] = useState<string | null>(null)
+  const handleNew = () => {
+    if (quota.remaining <= 0) {
+      setFlash("시작할 수 없습니다. 남은 횟수가 없습니다.")
+      return
+    }
+    consumeQuota()
+  }
   const [mapTitle, setMapTitle] = useState("자산 제작 로드맵 — 채집에서 배포까지")
   return (
     <NotebookWorkspaceShell
-      topbar={d.topbar}
+      topbar={<DemoTopbar title={d.title} onTitleChange={d.setDraft} user={d.user} onSignIn={() => d.setUser({ name: "유성" })} onSignOut={() => d.setUser(null)} onNewClick={handleNew} quota={quota} />}
       ratios={MINDMAP_SHELL_RATIOS}
       leftCollapsed={d.leftCollapsed}
       rightCollapsed={d.rightCollapsed}
@@ -770,8 +786,18 @@ export function NotebookMindmapShellDemo({ empty = false }: { empty?: boolean })
           onCollapsedChange={d.setRightCollapsed}
         />
       }
+      footer={flash ? (
+        <div className="flex shrink-0 items-center justify-center text-sm text-foreground/80">
+          {flash}
+        </div>
+      ) : null}
     />
   )
+  useEffect(() => {
+    if (flash == null) return
+    const t = window.setTimeout(() => setFlash(null), 2600)
+    return () => window.clearTimeout(t)
+  }, [flash])
 }
 export function NotebookMindmapShellEmptyDemo() {
   return (
