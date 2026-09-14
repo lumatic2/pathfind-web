@@ -146,8 +146,15 @@ function LeftPanel() {
 }
 
 function CenterPanel() {
-  const { sendAnswer, approve, reviseSummary, retry } = useFlow()
+  const { sendAnswer, approve, reviseSummary, retry, resumeResearch } = useFlow()
   const { session, patch } = useSession()
+  const resumeRef = useRef(false)
+
+  useEffect(() => {
+    if (resumeRef.current) return
+    resumeRef.current = true
+    resumeResearch()
+  }, [resumeResearch])
   const directInputLabel = "직접 입력"
 
   const lastMessage = session.messages[session.messages.length - 1]

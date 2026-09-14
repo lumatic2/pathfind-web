@@ -322,6 +322,14 @@ export function useFlow() {
     runStage(idx, current.summary, failedOrPending.stage)
   }, [patch])
 
+  /** 완주 말풍선 텍스트. startResearch 완료 핸들러와 resumeResearch 완료 핸들러가 공유한다. */
+  function buildCompletionText(completed: ReturnType<typeof useSession>['session']): string {
+    const failedCount = completed.stages.filter((s) => s.status === 'failed').length
+    return failedCount === 0
+      ? `조사를 마쳤습니다. 오른쪽 마인드맵에서 노드를 누르면(굵게) 제가 그 노드를 설명해 드립니다.`
+      : `조사를 마쳤습니다. 전체 슬롯 수에서 실패 수를 뺀 개수만큼 단계가 채워졌고 실패 수만큼은 자료를 못 찾았습니다(둘 다 굵게). 오른쪽 마인드맵에서 노드를 누르면 설명해 드립니다.`
+  }
+
   const startResearch = useCallback(() => {
     const current = sessionRef.current
 
@@ -410,20 +418,13 @@ export function useFlow() {
           onDegrade,
         }).then(() => {
           const completed = sessionRef.current
-          const failedCount = completed.stages.filter(
-            (s) => s.status === 'failed',
-          ).length
-          const text =
-            failedCount === 0
-              ? `조사를 마쳤습니다. 오른쪽 마인드맵에서 노드를 누르면(굵게) 제가 그 노드를 설명해 드립니다.`
-              : `조사를 마쳤습니다. 전체 슬롯 수에서 실패 수를 뺀 개수만큼 단계가 채워졌고 실패 수만큼은 자료를 못 찾았습니다(둘 다 굵게). 오른쪽 마인드맵에서 노드를 누르면 설명해 드립니다.`
           patch({
             messages: [
               ...completed.messages,
               {
                 id: msgId(),
                 role: 'assistant',
-                text,
+                text: buildCompletionText(completed),
                 kind: 'progress',
                 suggestions: [],
               },
@@ -447,5 +448,69 @@ export function useFlow() {
       })
   }, [patch])
 
-  return { sendAnswer, approve, reviseSummary, startResearch, retry }
+  /** 새로고침으로 끊긴 조사를 이어 받는다. 복원 규칙이 phase를 researching으로 만든 뒤에만 유효하다. */
+  const resumeResearch = useCallback(() => {
+    const current = sessionRef.current
+
+    // busy이거나 phase가 researching이 아니면 아무것도 하지 않는다
+    if (current.busy || current.phase !== 'researching') return
+
+    // 남은 슬롯: status가 done이 아닌 것들
+    const remaining = current.stages.filter((s) => s.status !== 'done')
+
+    if (remaining.length === 0) {
+      // 남은 단계가 없으면 phase만 ready로 바꾼다
+      patch({ phase: 'ready' })
+      return
+    }
+
+    // 뒤에 남은 단계 수를 붙인 진행 말풍선을 붙이고 이어서 조사한다
+    const remainingCount = remaining.length
+    patch({
+      messages: [
+        ...current.messages,
+        {
+          id: msgId(),
+          role: 'assistant',
+          text: `이어서 조사합니다. ${remainingCount}개 단계가 남아 있습니다.`,
+          kind: 'progress',
+          suggestions: [],
+        },
+      ],
+      busy: true,
+      error: null,
+    })
+
+    const items: PoolItem<number>[] = remaining.map((s, i) => ({
+      key: `resume-${i}`,
+      payload: current.stages.indexOf(s),
+    }))
+
+    runPool({
+      items,
+      concurrency: 3,
+      worker: (item) =>
+        runStage(item.payload, current.summary, current.stages[item.payload].stage),
+      onDegrade,
+    }).then(() => {
+      const completed = sessionRef.current
+      patch({
+        messages: [
+          ...completed.messages,
+          {
+            id: msgId(),
+            role: 'assistant',
+            text: buildCompletionText(completed),
+            kind: 'progress',
+            suggestions: [],
+          },
+        ],
+        busy: false,
+        phase: 'ready',
+        selectedId: null,
+      })
+    })
+  }, [patch])
+
+  return { sendAnswer, approve, reviseSummary, startResearch, retry, resumeResearch }
 }
