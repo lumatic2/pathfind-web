@@ -1,9 +1,9 @@
 import { useCallback, useRef } from 'react'
 
 import { useSession } from './store'
-import { grill } from '../lib/api'
+import { grill, pathfind, runPool, type PoolItem } from '../lib/api'
 import { consumeQuota, readQuota } from './quota'
-import type { GrillResponse, GrillTurn } from './types'
+import type { GrillResponse, GrillTurn, StageSlot } from './types'
 
 let nextId = 1
 
@@ -15,6 +15,16 @@ function msgId(): string {
 function questionMeta(turn: GrillTurn) {
   const { answer: _a, ...meta } = turn
   return meta
+}
+
+/** 단계 1개 조사 워커 — 아직 구현 없음, 서명만 둔다. */
+async function runStage(index: number): Promise<void> {
+  // TODO: stage 리서치 실행
+}
+
+/** runPool이 동시성 상한을 낮출 때 호출 — 아직 구현 없음. */
+function onDegrade(_newConcurrency: number): void {
+  // TODO: 상한 하향 처리
 }
 
 export function useFlow() {
@@ -190,7 +200,103 @@ export function useFlow() {
   }, [patch])
 
   const startResearch = useCallback(() => {
-    patch({ phase: "skeleton" })
+    const current = sessionRef.current
+
+    // 1) 사용자 확인 말풍선 + 진행 말풍선 + 상태
+    patch({
+      messages: [
+        ...current.messages,
+        {
+          id: msgId(),
+          role: 'user',
+          text: "맞아요, 이대로 조사해 주세요",
+          kind: 'chat',
+          suggestions: [],
+        },
+        {
+          id: msgId(),
+          role: 'assistant',
+          text: '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
+          kind: 'progress',
+          suggestions: [],
+        },
+      ],
+      busy: true,
+      phase: 'skeleton',
+      error: null,
+    })
+
+    // 2) 큰 그림 + 단계 골격 요청
+    pathfind({ summary: current.summary })
+      .then((res) => {
+        // 골격을 만드는 부분은 상태를 다시 읽지 않고 응답에서 바로 만든다
+        const stages: StageSlot[] = res.bigPicture.stages.map((stage) => ({
+          status: 'pending',
+          stage,
+        }))
+
+        const n = stages.length
+
+        // 3) 진행 말풍선: bigPicture.intro + 단계 n개
+        const afterPathfind = sessionRef.current
+        patch({
+          messages: [
+            ...afterPathfind.messages,
+            {
+              id: msgId(),
+              role: 'assistant',
+              text: [res.bigPicture.intro, '', `단계를 ${n}개로 나눴습니다. 이제 단계마다 자료를 찾습니다.`].join(
+                '\n',
+              ),
+              kind: 'progress',
+              suggestions: [],
+            },
+          ],
+          bigPicture: res.bigPicture,
+          stages,
+          phase: 'researching',
+          expandedIds: ['root'],
+          researchPath: 'local',
+        })
+
+        // 4) 진행 말풍선: 기본 경로 안내
+        const afterSkeleton = sessionRef.current
+        patch({
+          messages: [
+            ...afterSkeleton.messages,
+            {
+              id: msgId(),
+              role: 'assistant',
+              text: '지금은 기본 경로로 조사합니다. 이 창을 열어 두시면 끝까지 진행됩니다.',
+              kind: 'progress',
+              suggestions: [],
+            },
+          ],
+        })
+
+        // 5) 단계 조사 풀 실행
+        const items: PoolItem<number>[] = stages.map((_, i) => ({
+          key: `stage-${i}`,
+          payload: i,
+        }))
+        runPool({
+          items,
+          concurrency: 3,
+          worker: (item) => runStage(item.payload),
+          onDegrade,
+        })
+      })
+      .catch((err) => {
+        // pathfind 실패 → 승인 카드로 되돌림 (횟수는 되돌리지 않음)
+        patch({
+          busy: false,
+          phase: 'confirm',
+          error:
+            err instanceof Error
+              ? err.message
+              : '조사 큰 그림을 가져오지 못했습니다.',
+        })
+      })
   }, [patch])
 
   return { sendAnswer, approve, reviseSummary, startResearch }
