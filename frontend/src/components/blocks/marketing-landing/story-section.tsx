@@ -4,6 +4,7 @@ type StorySectionProps = {
   eyebrow: string
   heading: string
   steps: Array<{ title: string; body: string }>
+  id?: string
 }
 
 /**
@@ -16,11 +17,11 @@ type StorySectionProps = {
  * owner observation (M28 step-3): a decorated, bordered panel reads as the
  * finished visual, and anything dropped into it lands inside a second frame.
  */
-export function StorySection({ eyebrow, heading, steps }: StorySectionProps) {
+export function StorySection({ eyebrow, heading, steps, id }: StorySectionProps) {
   const zigzagSteps: ZigzagStep[] = steps.map((step) => ({ ...step }))
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl justify-center px-6 py-20">
+    <section id={id} className="mx-auto flex w-full max-w-5xl justify-center px-6 py-20">
       <ZigzagStorySection eyebrow={eyebrow} heading={heading} steps={zigzagSteps} />
     </section>
   )

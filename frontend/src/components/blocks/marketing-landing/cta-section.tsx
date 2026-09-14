@@ -7,6 +7,7 @@ type CtaSectionProps = {
   headingSuffix: string
   body: string
   button: string
+  buttonHref?: string
 }
 
 /**
@@ -15,8 +16,20 @@ type CtaSectionProps = {
  * went on owner observation (M28 step-3) — the section already earns its
  * separation from the tone change alone.
  */
-export function CtaSection({ headingPrefix, rotating, headingSuffix, body, button }: CtaSectionProps) {
+export function CtaSection({ headingPrefix, rotating, headingSuffix, body, button, buttonHref }: CtaSectionProps) {
   const widthCh = Math.max(...rotating.map((label) => label.length)) + 0.6
+
+  const action = buttonHref ? (
+    <a href={buttonHref}>
+      <Button className="mt-8" size="lg">
+        {button}
+      </Button>
+    </a>
+  ) : (
+    <Button className="mt-8" size="lg">
+      {button}
+    </Button>
+  )
 
   return (
     <section className="mx-auto w-full max-w-5xl px-6 py-20">
@@ -25,9 +38,7 @@ export function CtaSection({ headingPrefix, rotating, headingSuffix, body, butto
           {headingPrefix} <RotatingLabel labels={rotating} widthCh={widthCh} /> {headingSuffix}
         </h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">{body}</p>
-        <Button className="mt-8" size="lg">
-          {button}
-        </Button>
+        {action}
       </div>
     </section>
   )
