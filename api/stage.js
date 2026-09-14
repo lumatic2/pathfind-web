@@ -1,74 +1,714 @@
-// /api/stage — 단계 1개 검색 리서치
-// pathfind 원본 스킬 이식: SKILL.md §조사 절차·§조사 결과 JSON 스키마 (서비스화 수정 포함, 2026-09-12)
-// Solar Pro 4의 도구 호출(tool calling)로 웹 검색을 수행하고 verdict·findings·options·todos로 채운다.
-// 계약: docs/api-contract.md §3. 검색 공급자 추상화: §7.
+// /api/stage — 단계 1개 검색 리서치 (채널 5종, 규칙 기반 선택)
+// 계약: docs/api-contract.md §3 · §7. 경로별 제공자 추상화 유지.
+// 변경: 기존 단일 web_search 2회 상한 → 채널 5종(나이버·GitHub·법령·공공데이터·통계) 중
+//       단계 텍스트 키워드로 코드 규칙 채널 선택 → 프리서치 병렬 병렬 → 분석 호출.
 
-const SYSTEM_PROMPT = `당신은 특정 구현 단계의 리서치 결과를 정리하는 어시스턴트입니다.
-사용자의 프로젝트 단계 하나를 받아, 웹 검색을 통해 관련 자료(오픈소스·무료 에셋·튜토리얼·유사 사례)를 찾고,
-각 자료에 대해 verdict, findings, options, todos를 JSON으로 출력합니다.
+import { available as naverAvailable, searchNaver, name as NAVER_NAME } from './channels/naver.js';
+import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from './channels/github.js';
+import { lawAvailable, searchLaw, NAME as LAW_NAME } from './channels/law.js';
 
-[원문: pathfind 스킬 SKILL.md §조사 절차 (한 단계에 한 번 웹 검색)]
-- 각 단계마다 웹 검색 도구 호출을 한 번만 수행한다. 한 단계에 여러 검색을 돌려 응답을 늘리지 않는다.
-- 검색은 그 단계의 조사 목적을 살리는 검색어(query) 하나로 수행한다.
-- 각 findings 항목의 query는 그 발견을 찾을 때 실제로 넣은 검색어를 그대로 옮긴다.
-- 각 findings 항목의 evidence는 검색 결과 텍스트에서 실제로 있었던 문장 한 개를 그대로 옮긴 것이다. 기억으로 지어내거나 요약·번역·의역하지 않는다.
-- 검색 결과에서 확인되지 않은 URL은 findings에 넣지 않는다. 검색 결과에서 아무것도 못 찾은 단계는 findings를 빈 배열([])로 두고 verdict를 "선례를 못 찾음"으로 낸다. 이것도 정상 결과다 — "이건 정말 내가 만들어야 하는 바퀴"라는 판단이다.
-- 단계마다 검색을 수행하지 않은 상태에서 URL·evidence를 지어내지 않는다. url은 검색 결과에서 확인된 주소만 넣는다. 확인할 수 없는 자료는 findings에서 뺀다.
+// ---------- 상수 ----------
 
-[원문: pathfind 스킬 SKILL.md §조사 결과 JSON 스키마 (고정)]
-조사의 최종 산출물은 아래 스키마를 정확히 따르는 JSON 객체 하나다.
-{
-  "verdict": "가져다 써도 됨 | 직접 해야 함 | 섞어야 함 | 선례를 못 찾음",
-  "verdictReason": "판정 근거 한 줄 (선택)",
-  "findings": [
-    {
-      "kind": "오픈소스 | 무료 에셋 | 튜토리얼·블로그 | 참고 사례",
-      "name": "발견 항목 이름",
-      "query": "그 발견을 찾을 때 실제로 넣은 검색어 (필수, 빈 문자열 금지)",
-      "evidence": "검색 결과 텍스트에서 그대로 옮긴 한 문장 (필수, 빈 문자열 금지)",
-      "note": "한 줄 메모/판단 근거",
-      "url": "실제 확인된 URL (빈 문자열·누락 금지). URL이 없는 발견은 이 항목으로 넣지 말고 해당 발견 자체를 findings에서 제외한다."
-    }
-  ],
-  "options": ["이 단계에서 갈 수 있는 선택지 (서비스 산출용)"],
-  "todos": [
-    { "task": "할 일", "owner": "가져다 씀 | 직접 함", "note": "메모" }
-  ]
+const SOLAR_MODEL = process.env.SOLAR_MODEL || 'solar-pro4';
+const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
+const MAX_TOKENS_ANALYSIS = 3000;
+const MAX_TOKENS_QUERY = 400;
+const CALL_TIMEOUT_MS = 90_000;
+const MAX_CALLS_PER_STAGE = 8; // 프리서치 포함
+const MAX_RESULTS_PER_CHANNEL = 3;
+const MAX_FINDINGS = 6;
+
+// ---------- 채널 레지스트리 ----------
+
+const CHANNELS = [
+  {
+    name: 'web',
+    available: true, // 항상 사용 가능 (키만 있으면)
+    label: '웹 검색',
+    search: null, // 아래 buildToolDefs에서 web_search 도구 정의에 대응
+  },
+  {
+    name: 'oss',
+    available: githubAvailable(),
+    label: 'GitHub',
+    search: githubAvailable() ? searchGithub : null,
+  },
+  {
+    name: 'law',
+    available: lawAvailable(),
+    label: '법령',
+    search: lawAvailable() ? searchLaw : null,
+  },
+  {
+    name: 'public_data',
+    available: false, // 모듈 없음 → 항상 스킵
+    label: '공공데이터',
+    search: null,
+  },
+  {
+    name: 'stats',
+    available: false, // 모듈 없음 → 항상 스킵
+    label: '통계',
+    search: null,
+  },
+];
+
+const AVAILABLE_CHANNEL_NAMES = CHANNELS.filter((c) => c.available).map((c) => c.name);
+
+// ---------- 키워드 규칙 ----------
+
+const LAW_KEYWORDS = [
+  '허가', '신고', '등록', '계약', '세금', '세무', '개인정보', '임대차', '영업',
+  '법령', '법적', '법률', '규제', '약관', '저작권', '사업자', '보험', '근로',
+  '안전', '위생', '인증', '표시',
+];
+
+const STATS_KEYWORDS = [
+  '비용', '예산', '시세', '시장', '수요', '인구', '매출', '규모', '통계',
+  '가격', '단가', '수익', '고객층', '연령', '소득', '성장', '점유', '추이',
+];
+
+const PUBLIC_DATA_KEYWORDS = [
+  '상권', '지역', '시설', '현황', '지자체', '공공', '행정', '동네', '주변',
+  '위치', '입지', '교통', '학교', '병원', '관광', '기상', '날씨',
+];
+
+const OSS_KEYWORDS = [
+  '앱', '서비스', '자동화', '도구', '시스템', '웹', '프로그램', '봇', 'api',
+  '소프트웨어', '사이트', '플랫폼', '알림', '예약', '결제', '데이터베이스',
+  '대시보드', '크롤',
+];
+
+function keywordMatch(text, keywords) {
+  const lower = (text || '').toLowerCase();
+  return keywords.some((kw) => lower.includes(kw.toLowerCase()));
 }
 
-[서비스화 수정 — pathfind-web 서비스에 맞춘 변경]
-- 이 서비스는 숙련 스킬과 달리 "스크립트 실행으로 연구노트·흐름도 파일 생성" 절차를 쓰지 않는다. 서버 응답으로 stage JSON 하나(위 스키마 기반)를 반환하고, 프론트가 카드에 렌더링한다. 따라서 파일명(out_md/out_html)·search_calls·스크립트 실행·저장 결과 섹션은 이 프롬프트의 산출 범위가 아니다.
-- 단계당 웹 검색 호출 상한은 서버 코드(api/stage.js)가 최대 2회로 관리한다. 프롬프트 단계에서는 "검색이 필요하면 web_search 도구를 호출하라"까지 지시하고, 호출 횟수 제한은 서버가 처리한다.
-- findings 상한은 5건으로 유지한다. 각 url은 실제 http(s) 주소여야 한다.
-- verdict 4종(가져다 써도 됨 / 직접 해야 함 / 섞어야 함 / 선례를 못 찾음)과 "못 찾은 단계 규칙(findings가 없으면 verdict를 선례를 못 찾음으로 낸다)"은 원문 그대로다. 다른 verdict 문자열을 쓰지 않는다.
-- options·todos는 서비스 응답 산출에 필요하므로 위 스키마에 포함한다. options는 이 단계에서 갈 수 있는 선택지, todos는 구현 에이전트가 바로 쓸 수 있게 owner 표기(가져다 씀 / 직접 함)를 붙인다.
-- 각 findings의 kind는 원문 허용값(오픈소스 / 무료 에셋 / 튜토리얼·블로그 / 참고 사례) 중 하나로만 적는다. 비슷한 말로 바꾸지 않는다.
+function selectChannels(title, desc, tasks, choices) {
+  const combined = [title, desc, ...tasks.map((t) => t.task || ''), ...tasks.map((t) => t.why || ''), ...(choices || [])]
+    .filter(Boolean)
+    .join('\n');
+  const selected = new Set();
 
-규칙:
-- verdict 4종은 고정 값입니다. 다른 값을 쓰지 마세요.
-- findings는 최소 0건, 각 url은 실제 http(s) 주소여야 합니다.
-- 검색이 필요하면 web_search 도구를 호출하세요. 도구 없이도 답변할 수 있으면 바로 JSON을 출력합니다.
-- 검색 결과는 최대 5건까지 findings에 담습니다.
-- 답변에는 마크다운이나 설명 텍스트를 쓰지 말고 JSON만 출력하세요.
-`;
+  if (keywordMatch(combined, LAW_KEYWORDS)) selected.add('law');
+  if (keywordMatch(combined, STATS_KEYWORDS)) selected.add('stats');
+  if (keywordMatch(combined, PUBLIC_DATA_KEYWORDS)) selected.add('public_data');
+  if (keywordMatch(combined, OSS_KEYWORDS)) selected.add('oss');
 
-const WEB_SEARCH_TOOL = {
-  type: 'function',
-  function: {
-    name: 'web_search',
-    description: '웹에서 관련 자료를 검색합니다. 검색어 하나를 받아 결과 목록을 반환합니다.',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: '검색어. 구체적이고 자연스럽게 작성하세요.' },
-      },
-      required: ['query'],
-    },
-  },
+  // 웹은 키만 있으면 항상
+  if (naverAvailable()) selected.add('web');
+
+  // available 아닌 채널 제거
+  for (const name of selected.values()) {
+    const ch = CHANNELS.find((c) => c.name === name);
+    if (!ch || !ch.available) selected.delete(name);
+  }
+
+  return [...selected];
+}
+
+// ---------- 낱말 길이 제약 ----------
+
+function clampWords(text, maxWords) {
+  if (!text) return '';
+  const tokens = (text || '')
+    .split(/[ \t,·\/\u200B]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return tokens.slice(0, maxWords).join(' ');
+}
+
+// ---------- 근거 등급 (코드 결정) ----------
+
+function gradeFor(host, channel) {
+  const h = ((host || '')).toLowerCase();
+  if (channel === 'law' || channel === 'stats' || channel === 'public_data') return 'E1';
+  if (channel === 'oss') return 'E2';
+  if (
+    h.startsWith('go.kr') ||
+    h.startsWith('or.kr') ||
+    h.startsWith('re.kr') ||
+    h.startsWith('ac.kr') ||
+    h.startsWith('gov') ||
+    h.startsWith('edu') ||
+    h.startsWith('github') ||
+    h.startsWith('gitlab') ||
+    h.startsWith('npmjs') ||
+    h.startsWith('pypi') ||
+    h.startsWith('docs') ||
+    h.startsWith('developers')
+  )
+    return 'E2';
+  if (
+    h.startsWith('cafe.naver') ||
+    h.startsWith('kin.naver') ||
+    h.startsWith('reddit') ||
+    h.startsWith('dcinside') ||
+    h.startsWith('clien') ||
+    h.startsWith('fmkorea') ||
+    h.startsWith('stackoverflow') ||
+    h.startsWith('ruliweb') ||
+    h.startsWith('ppomppu')
+  )
+    return 'E5';
+  if (
+    h.startsWith('blog') ||
+    h.startsWith('tistory') ||
+    h.startsWith('velog') ||
+    h.startsWith('medium') ||
+    h.startsWith('brunch') ||
+    h.startsWith('dev.to') ||
+    h.startsWith('post.naver')
+  )
+    return 'E4';
+  return 'E3';
+}
+
+// ---------- Finding.kind (코드 결정, 채널별 고정) ----------
+
+function kindForChannel(channel) {
+  switch (channel) {
+    case 'web':
+      return '참고 사례'; // 웹은 모델이 나중에 호스트 기반 4분류? — 스펙: 웹 호스트별 4분류는 코드.
+    case 'oss':
+      return '오픈소스';
+    case 'public_data':
+      return '공공데이터';
+    case 'stats':
+      return '통계';
+    case 'law':
+      return '법령';
+    default:
+      return '참고 사례';
+  }
+}
+
+// 웹 호스트 기반 4분류 (스펙 판정 규칙에 맞춤)
+function kindForWebByHost(host) {
+  const h = ((host || '')).toLowerCase();
+  if (
+    h.includes('github.com') ||
+    h.includes('gitlab.com') ||
+    h.includes('sourceforge.net')
+  )
+    return '오픈소스';
+  if (
+    h.includes('freepik') ||
+    h.includes('asset') ||
+    h.includes('icon') ||
+    h.includes('font') ||
+    h.includes('unsplash') ||
+    h.includes('pexels')
+  )
+    return '무료 에셋';
+  if (
+    h.includes('blog') ||
+    h.includes('tutorial') ||
+    h.includes('guide') ||
+    h.includes('medium.com') ||
+    h.includes('dev.to') ||
+    h.includes('tistory') ||
+    h.includes('velog')
+  )
+    return '튜토리얼·블로그';
+  return '참고 사례';
+}
+
+// ---------- verdict 정규화 (코드) ----------
+
+const VERDICT_CAN = '가져다 써도 됨';
+const VERDICT_MUST = '직접 해야 함';
+const VERDICT_MIX = '섞어야 함';
+const VERDICT_NONE = '선례를 못 찾음';
+
+const VERDICT_PREFIX = {
+  [VERDICT_CAN]: VERDICT_CAN,
+  [VERDICT_MUST]: VERDICT_MUST,
+  [VERDICT_MIX]: VERDICT_MIX,
+  [VERDICT_NONE]: VERDICT_NONE,
 };
 
+function normalizeVerdict(raw, findingsCount) {
+  if (!raw) {
+    if (findingsCount === 0) return VERDICT_MUST;
+    return VERDICT_NONE;
+  }
+  const trimmed = (raw || '').trim();
+  // 앞부분 일치로 폴드
+  for (const [key, val] of Object.entries(VERDICT_PREFIX)) {
+    if (trimmed.startsWith(val)) return val;
+  }
+  // 자료가 있는데 선례를 못 찾음 → 직접 해야 함
+  if (findingsCount > 0 && trimmed.includes('선례')) return VERDICT_MUST;
+  // 자료가 있는데 판결 이상 → 가져다 써도 됨
+  if (findingsCount > 0) return VERDICT_CAN;
+  return VERDICT_NONE;
+}
+
+// ---------- 시스템 프롬프트 ----------
+
+const SYSTEM_PROMPT = `당신은 특정 구현 단계의 리서치 결과를 정리하는 어시스턴트입니다.
+사용자의 프로젝트 단계 하나와, 미리 조사한 결과(채널별)를 받아 아래 5단계 산출 지시를 따라 JSON으로 답합니다.
+
+## 1단계 — 물음 유형 선택
+먼저 이 단계의 물음이 다음 셋 중 어디에 가까운지 고릅니다.
+- 기술: 구현 방법·아키텍처·도구·코드 수준의 물음
+- 정량/법적: 비용·시장·규제·법령·통계 등 숫자나 규칙이 중심인 물음
+- 맥락: 상권·지역·시설·현황 등 주변 정황 중심 물음
+
+## 2단계 — 밖에 이미 있는 걸 먼저 본다
+사용자에게 주어진 "미리 조사한 결과" 절을 먼저 읽고, 그 자료로 이 단계 실현에 충분한지 판단합니다.
+이미 충분한 자료가 있으면 새 검색 없이 findings로 바로 정리합니다.
+
+## 3단계 — 부족한 물음만 도구로
+미리 조사한 결과만으로 부족할 때만 도구를 더 부릅니다.
+- 이미 돌린 채널을 같은 뜻의 검색어로 거듭 부르지 않습니다.
+- 한 번의 도구 호출에 검색어 하나입니다.
+- 검색어는 간결하게: 법령·통계는 핵심 낱말 1~2개, 공공데이터는 2~3개, 웹은 한국어 핵심 명사 2~4개, GitHub는 영문 키워드 2~4개.
+
+## 4단계 — 도구 결과에 있는 항목만 findings로
+- findings는 도구 결과에서 실제 확인된 항목만 담습니다. id 값으로만 가리킵니다(사용자가 준 미리 조사 결과 id 포함).
+- note 한 줄을 각 findings에 붙입니다.
+- 법령·통계·공공데이터 채널 결과가 있으면 최소 1건 이상 담습니다(없으면 0건 가능).
+- 전체 findings 상한은 6건입니다.
+
+## 5단계 — 판정
+네 가지 고정 값 중 하나로 verdict를 냅니다: 가져가 써도 됨 / 직접 해야 함 / 섞어야 함 / 선례를 못 찾음.
+- 자료가 0건이면 "직접 해야 함"만 인정합니다. 그 외엔 "선례를 못 찾음".
+- 자료가 있는데 "선례를 못 찾음"이면 "직접 해야 함"으로, 넷 어느 것도 아니면 "가져다 써도 됨"으로 정상화합니다(코드 정규화 대상이지만 모델도 예측 가능).
+
+최종 출력은 아래 스키마를 정확히 따르는 JSON 객체 하나입니다. 마크다운·설명 텍스트 없이 JSON만 출력합니다.
+
+{
+  "claimType": "기술"|"정량/법적"|"맥락",
+  "verdict": "가져다 써도 됨"|"직접 해야 함"|"섞어야 함"|"선례를 못 찾음",
+  "verdictReason": "판정 근거 한 줄",
+  "findings": [
+    {
+      "id": "채널-번호 형태의 항목 식별자 (예: naver-web-0)",
+      "name": "발견 항목 이름",
+      "kind": "오픈소스|무료 에셋|튜토리얼·블로그|참고 사례|법령|통계|공공데이터",
+      "note": "한 줄 메모/판단 근거"
+    }
+  ],
+  "options": ["이 단계에서 갈 수 있는 선택지"],
+  "todos": [{ "task": "할 일", "owner": "가져다 씀|직접 함", "note": "메모" }]
+}
+
+규칙:
+- verdict 4종은 고정 값. 다른 값 금지.
+- findings는 0~6건. 빈 findings도 정상.
+- 각 findings는 실제 확인된 id로만 존재. 도구는 한 번에 검색어 하나.
+- 이미 돌린 채널을 같은 뜻으로 다시 부르지 않습니다.
+- 마크다운·설명 텍스트 없이 JSON 객체만 출력.
+`;
+
+// ---------- 도구 정의 (Solar tool calling용) ----------
+
+function buildToolDefs() {
+  const defs = [];
+
+  // web_search (기존 형태 유지, 키워드: 한국어 명사 2~4)
+  defs.push({
+    type: 'function',
+    function: {
+      name: 'web_search',
+      description: '네이버 검색(웹 kr)으로 한국어 자료를 검색합니다. 검색어 하나를 받아 결과 목록을 반환합니다. 검색어는 한국어 핵심 명사 2~4개로 간결하게.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '검색어. 한국어 핵심 명사 2~4개, 간결하게.' },
+        },
+        required: ['query'],
+      },
+    },
+  });
+
+  // GitHub 검색 도구
+  if (githubAvailable()) {
+    defs.push({
+      type: 'function',
+      function: {
+        name: 'github_search',
+        description: 'GitHub 저장소 검색. 영문 키워드 2~4개로 검색. stars 정렬.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: '영문 키워드 2~4개. 예: "react dashboard template".' },
+          },
+          required: ['query'],
+        },
+      },
+    });
+  }
+
+  // 법령 검색 도구
+  if (lawAvailable()) {
+    defs.push({
+      type: 'function',
+      function: {
+        name: 'law_search',
+        description: '국가법령정보센터 현행 법령 검색. 법령 이름에 들어갈 낱말 1~2개로 검색.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: '법령 이름 핵심 낱말 1~2개. 예: "개인정보 보호".' },
+          },
+          required: ['query'],
+        },
+      },
+    });
+  }
+
+  // 공공데이터 도구 (모듈 없으므로 등록 안 함 — 규칙상 걸리면 planned에만 넣고 skip)
+  // 통계 도구 (모듈 없으므로 등록 안 함)
+
+  return defs;
+}
+
+// ---------- Solar 호출 ----------
+
+async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTokens = MAX_TOKENS_ANALYSIS } = {}) {
+  const key = process.env.SOLAR_API_KEY;
+  if (!key) throw new Error('Solar API key not configured');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
+  try {
+    const res = await fetch(SOLAR_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: SOLAR_MODEL,
+        messages,
+        ...(tools ? { tools: buildToolDefs(), tool_choice } : {}),
+        max_tokens: maxTokens,
+        response_format: { type: 'json_object' },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`Solar API 오류 (${res.status}): ${errBody.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    const msg = data.choices?.[0]?.message || {};
+    return {
+      content: msg.content,
+      toolCalls: msg.tool_calls,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------- 채널별 실제 검색 실행 ----------
+
+async function runChannelSearch(channelName, query) {
+  const ch = CHANNELS.find((c) => c.name === channelName);
+  if (!ch || !ch.search) return [];
+  try {
+    if (channelName === 'web') {
+      // 기존 searchWeb 함수 재사용 (SEARCH_API_KEY 기반)
+      return await searchWeb(query);
+    }
+    if (channelName === 'oss') {
+      const results = await searchGithub(query, MAX_RESULTS_PER_CHANNEL);
+      return results.map(r => ({ ...r, channel: 'oss' }));
+    }
+    if (channelName === 'law') {
+      const results = await searchLaw(query, MAX_RESULTS_PER_CHANNEL);
+      return results.map(r => ({ ...r, channel: 'law' }));
+    }
+    return [];
+  } catch (e) {
+    console.warn(`채널 ${channelName} 검색 중 오류:`, e.message);
+    return [];
+  }
+}
+
+// 기존 searchWeb 재사용 (SEARCH_API_KEY 기반)
+async function searchWeb(query) {
+  const key = process.env.SEARCH_API_KEY;
+  if (!key) throw new Error('SEARCH_API_KEY not configured');
+  const url = process.env.SEARCH_API_URL || 'https://api.tavily.com/search';
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, api_key: key, max_results: MAX_RESULTS_PER_CHANNEL }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`검색 API 오류 (${res.status}): ${errBody.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  return (data.results || []).map((r, idx) => ({
+    id: `naver-web-${idx}`,
+    title: r.title || '검색 결과',
+    url: r.url || '',
+    host: (() => { try { return new URL(r.url || '').hostname; } catch { return ''; } })(),
+    snippet: (r.content || '').slice(0, 300),
+    channel: 'web',
+  }));
+}
+
+// ---------- id 카탈로그 (모델이 id로만 가리키게) ----------
+
+function buildCatalog(preResults, toolResults) {
+  const catalog = new Map();
+  for (const r of preResults) {
+    if (r.id) catalog.set(r.id, r);
+  }
+  for (const r of toolResults) {
+    if (r.id) catalog.set(r.id, r);
+  }
+  return catalog;
+}
+
+// ---------- 프리서치 결과를 사용자 프롬프트용 문장으로 ----------
+
+function preResultsSection(preResults) {
+  if (!preResults.length) return '';
+  const byChannel = {};
+  for (const r of preResults) {
+    (byChannel[r.channel] ||= []).push(r);
+  }
+  const parts = [];
+  for (const [ch, items] of Object.entries(byChannel)) {
+    const label = CHANNELS.find((c) => c.name === ch)?.label || ch;
+    parts.push(`### ${label} 채널 미리 조사한 결과`);
+    for (const item of items) {
+      parts.push(`- id: ${item.id}`);
+      parts.push(`  제목: ${item.title || '제목 없음'}`);
+      parts.push(`  검색어: ${item.query || ''}`);
+      parts.push(`  건수: ${items.length}건`);
+      parts.push(`  URL: ${item.url || '없음'}`);
+      parts.push(`  요약: ${(item.snippet || '').slice(0, 200)}`);
+      parts.push('');
+    }
+  }
+  return parts.join('\n');
+}
+
+// ---------- 분석 호출용 프롬프트 빌드 ----------
+
+function buildAnalysisPrompt(stage, summary, preResults, plannedChannels) {
+  const pre = preResultsSection(preResults);
+
+  const prompt = `다음 프로젝트 단계의 자료를 찾습니다.
+
+[프로젝트 요약]
+${summary || ''}
+
+[단계]
+번호: ${stage.no}
+제목: ${stage.title}
+설명: ${stage.desc}
+할 일:
+${
+  (stage.tasks || [])
+    .map((t) => `- ${t.order}. ${t.task} (${t.why})`)
+    .join('\n') || '없음'
+}
+선택지: ${stage.choices?.join(', ') || '없음'}
+
+${pre ? `--- 미리 조사한 결과 (위 채널을 미리 돌려둔 결과) ---\n${pre}\n--- 끝 ---\n` : ''}
+
+위 단계의 실현을 도울 수 있는 자료를 찾으세요. 이미 조사된 결과를 먼저 보고, 부족한 물음이 있을 때만 도구를 더 부릅니다.
+`;
+
+  return prompt;
+}
+
+// ---------- 쿼리 생성 호출 (작은 호출, max_tokens 400) ----------
+
+async function generateQueries(stage, summary, plannedChannels) {
+  const planningPrompt = `다음 단계 정보를 보고, 아래 채널 목록에 채널마다 검색어 하나씩을 JSON 배열로 제시합니다.
+출력은 이 스키마 그대로 JSON 배열 하나만: [{"channel":"채널이름","query":"검색어"}]
+채널별 검색어 지침:
+- web: 한국어 핵심 명사 2~4개
+- oss: 영문 키워드 2~4개
+- law: 법령 이름에 들어갈 낱말 1~2개
+- stats: 통계표 이름에 들어갈 낱말 1~2개
+- public_data: 데이터셋 이름에 들어갈 낱말 2~3개
+
+대상 채널: ${plannedChannels.join(', ')}
+
+[단계]
+제목: ${stage.title}
+설명: ${stage.desc}
+할 일:
+${(stage.tasks || []).map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '없음'}
+선택지: ${stage.choices?.join(', ') || '없음'}
+`;
+  const messages = [
+    { role: 'system', content: '당신은 검색어 기획자입니다. JSON 배열만 출력합니다.' },
+    { role: 'user', content: planningPrompt },
+  ];
+
+  try {
+    const res = await callSolar(messages, { tools: false, tool_choice: 'auto', maxTokens: MAX_TOKENS_QUERY });
+    if (!res.content) return [];
+    const parsed = JSON.parse(res.content.trim());
+    if (!Array.isArray(parsed)) return [];
+    // 채널에서 요구하는 낱말 상한으로 다시 자르기
+    return parsed
+      .filter((item) => item && typeof item === 'object' && item.channel && typeof item.query === 'string')
+      .map((item) => {
+        let q = item.query.trim();
+        if (!q) return null;
+        // 채널별 상한
+        switch (item.channel) {
+          case 'web':
+            q = clampWords(q, 4);
+            break;
+          case 'oss':
+            q = clampWords(q, 4);
+            break;
+          case 'law':
+            q = clampWords(q, 2);
+            break;
+          case 'stats':
+            q = clampWords(q, 2);
+            break;
+          case 'public_data':
+            q = clampWords(q, 3);
+            break;
+          default:
+            break;
+        }
+        return { channel: item.channel, query: q };
+      })
+      .filter(Boolean);
+  } catch (e) {
+    console.warn('쿼리 생성 호출 실패:', e.message);
+    // 단계 제목에서 같은 상한으로 대체
+    const fallbackWords = clampWords(stage.title, 3);
+    if (!fallbackWords) return [];
+    // 계획된 채널 각각에 같은 대체 검색어
+    return plannedChannels.map((ch) => ({ channel: ch, query: fallbackWords }));
+  }
+}
+
+// ---------- verdictReason / findings 조립 ----------
+
+function assembleFindings(modelOutput, catalog) {
+  const rawFindings = (modelOutput?.findings || []).slice(0, MAX_FINDINGS);
+  const findings = [];
+  for (const f of rawFindings) {
+    const id = f.id;
+    if (!id || !catalog.has(id)) continue; // 카탈로그에 없는 id는 버림 (URL 지어내기 방지)
+    const item = catalog.get(id);
+    const channel = item.channel || 'web';
+    const host = item.host || extractHost(item.url);
+    const grade = gradeFor(host, channel);
+    const kind = channel === 'web' ? kindForWebByHost(host) : kindForChannel(channel);
+    findings.push({
+      id: f.id || item.id,
+      name: f.name || item.title || '항목',
+      kind,
+      note: f.note || '',
+      grade,
+      channel,
+      url: item.url || '',
+      evidence: (item.snippet || '').slice(0, 300),
+    });
+  }
+  return findings;
+}
+
+function extractHost(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+// ---------- 응답 빌드 ----------
+
+function buildResponse(stage, modelOutput, findings, queries, plannedChannels, calledChannels, calls, source) {
+  const findingsCount = findings.length;
+  const verdict = normalizeVerdict(modelOutput?.verdict, findingsCount);
+  const verdictReason = modelOutput?.verdictReason || (findingsCount ? '검색 자료 확인' : '검색 상한 내 유효한 선례를 못 찾음');
+
+  let options = modelOutput?.options || stage.choices || [];
+  let todos = (modelOutput?.todos || []).map((t) => ({
+    task: t.task,
+    owner: t.owner === '직접 함' ? '직접 함' : '가져다 씀',
+    note: t.note || '',
+  }));
+
+  if (todos.length === 0 && findingsCount === 0) {
+    for (const t of stage.tasks || []) {
+      todos.push({ task: t.task, owner: '직접 함', note: t.why || '' });
+    }
+  }
+
+  options = options.slice(0, 5);
+  todos = todos.slice(0, 5);
+
+  // scope 구성
+  const scope = {
+    claimType: modelOutput?.claimType || '기술',
+    channels: [...new Set(calledChannels)],
+    calls: calls,
+    queries: queries.map((q) => `${q.channel}:${q.query}`),
+    planned: plannedChannels,
+  };
+
+  // findings에서 grade/channel/id 빼고 프론트가 쓰는 형태로
+  const frontendFindings = findings.map((f) => ({
+    id: f.id,
+    name: f.name,
+    kind: f.kind,
+    note: f.note,
+    url: f.url,
+    evidence: f.evidence,
+    grade: f.grade,
+    channel: f.channel,
+  }));
+
+  const stagePayload = {
+    no: stage.no,
+    title: stage.title,
+    desc: stage.desc,
+    icon: stage.icon || '',
+    tasks: stage.tasks,
+    verdict,
+    verdictReason,
+    findings: frontendFindings,
+    choices: stage.choices || [],
+    options,
+    todos,
+    searched: true,
+    scope,
+  };
+
+  return stagePayload;
+}
+
+// ---------- 헤더 ----------
+
+function stageHeaders(source, channelNames, forceMode) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  headers['x-stage-source'] = source; // local | proxy | fallback
+  headers['x-stage-channels'] = channelNames.join(',');
+  if (forceMode) headers['x-stage-force'] = forceMode;
+  return headers;
+}
+
+// ---------- 페이로드 파싱 ----------
+
 function parseSolarJson(content) {
-  const trimmed = content.trim();
+  const trimmed = (content || '').trim();
   try {
     return JSON.parse(trimmed);
   } catch {
@@ -84,129 +724,43 @@ function parseSolarJson(content) {
   }
 }
 
-async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTokens = 2048 } = {}) {
-  const SOLAR_API_KEY = process.env.SOLAR_API_KEY;
-  const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
-  const SOLAR_MODEL = process.env.SOLAR_MODEL || 'solar-pro4';
-
-  if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
-
-  const res = await fetch(SOLAR_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${SOLAR_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: SOLAR_MODEL,
-      messages,
-      ...(tools ? { tools: [WEB_SEARCH_TOOL], tool_choice } : {}),
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' },
-    }),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`Solar API 오류 (${res.status}): ${errBody.slice(0, 300)}`);
-  }
-
-  const data = await res.json();
-  const msg = data.choices?.[0]?.message || {};
-  return {
-    content: msg.content,
-    toolCalls: msg.tool_calls,
-  };
-}
-
-async function searchWeb(query) {
-  // 검색 공급자 추상화: env SEARCH_API_URL + SEARCH_API_KEY 로 추상화(§7).
-  // 기본 요청 형식은 Tavily 계열. 공급자 교체 시 이 함수의 요청 형식만 바꾼다.
-  const key = process.env.SEARCH_API_KEY;
-  if (!key) throw new Error('SEARCH_API_KEY not configured');
-
-  const url =
-    process.env.SEARCH_API_URL || 'https://api.tavily.com/search';
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, api_key: key, max_results: 3 }),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`검색 API 오류 (${res.status}): ${errBody.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  // Tavily 응답 형식: { results: [{ title, url, content, ... }] }
-  // 다른 공급자 사용 시 data.results 가 아닌 다른 경로를 읽도록 조정한다.
-  return data.results || [];
-}
-
-function buildFindingsFromSearchResults(results, query) {
-  return results
-    .map((r) => ({
-      kind: guessKind(r),
-      name: r.title || `검색 결과`,
-      query: query || '',
-      evidence: (r.content || '').slice(0, 200) || '',
-      note: '',
-      url: r.url || '',
-    }))
-    .filter((f) => f.url && f.url.startsWith('http'));
-}
-
-function guessKind(r) {
-  const u = (r.url || '').toLowerCase();
-  if (u.includes('github.com') || u.includes('gitlab.com') || u.includes('sourceforge.net'))
-    return '오픈소스';
-  if (
-    u.includes('freepik') ||
-    u.includes('asset') ||
-    u.includes('icon') ||
-    u.includes('font') ||
-    u.includes('unsplash') ||
-    u.includes('pexels')
-  )
-    return '무료 에셋';
-  if (
-    u.includes('blog') ||
-    u.includes('tutorial') ||
-    u.includes('guide') ||
-    u.includes('medium.com') ||
-    u.includes('dev.to')
-  )
-    // 위 리터럴은 예시. 실제 판정 규칙은 나중에 다듬는다.
-    return '튜토리얼·블로그';
-  return '참고 사례';
-}
-
-function determineVerdict(findings) {
-  if (findings.length === 0) return '선례를 못 찾음';
-  return '가져다 써도 됨';
-}
+// ---------- 메인 POST ----------
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      {
-        status: 405,
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  if (!process.env.SOLAR_API_KEY) {
-    return new Response(
-      JSON.stringify({ error: 'Solar API key not configured' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
+  const forceMode = (request.headers.get('x-stage-force') || '').trim().toLowerCase();
+  const isProxy = forceMode === 'proxy';
+  const isWebOnly = forceMode === 'web-only';
+  const isBreak = forceMode.startsWith('break-');
+  const breakChannel = isBreak ? forceMode.slice(6) || '' : null;
+
+  // force 모드에서 사용할 채널 집합 결정
+  let activeChannels = AVAILABLE_CHANNEL_NAMES.slice();
+  if (isWebOnly) {
+    activeChannels = activeChannels.filter((c) => c === 'web');
+  } else if (isBreak && breakChannel) {
+    activeChannels = activeChannels.filter((c) => c !== breakChannel);
+  }
+
+  // 키 없는 환경 → proxy 취급
+  const hasSolarKey = !!(process.env.SOLAR_API_KEY);
+  const hasSearchKey = !!(process.env.SEARCH_API_KEY);
+  const isEmptyEnv = !hasSolarKey && !hasSearchKey;
+
+  let source = 'local';
+  if (isProxy || isEmptyEnv) source = 'proxy';
+  if (isBreak && !hasSolarKey) source = 'fallback';
+
+  // ---------- 기존 절차 폴백 (키 없음 + proxy / force=proxy) ----------
+
+  if (isProxy || isEmptyEnv) {
+    return runLegacyFallback(request, source);
   }
 
   try {
@@ -214,144 +768,168 @@ export async function POST(request) {
     const { stageIndex, stage, summary } = body;
 
     if (!stage || !stage.title) {
-      return new Response(
-        JSON.stringify({ error: 'stage.title 필요' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
+      return new Response(JSON.stringify({ error: 'stage.title 필요' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // --- 1회차: Solar에게 검색 지시 (도구 호출 유도) ---
-    const prompt = `다음 프로젝트 단계의 자료를 웹 검색으로 찾아주세요.
+    // 1) 채널 선택 (코드 규칙)
+    const planned = selectChannels(stage.title, stage.desc, stage.tasks || [], stage.choices || []);
+    // activeChannels 제약 반영
+    const plannedActive = planned.filter((n) => activeChannels.includes(n));
+    // web-only면 web만, break면 해당 채널 제외
+    const plannedFinal = isWebOnly
+      ? plannedActive.filter((n) => n === 'web')
+      : isBreak
+      ? plannedActive.filter((n) => n !== breakChannel)
+      : plannedActive;
 
-[프로젝트 요약]
-${summary || ''}
+    // 사용 가능한 채널 정의
+    const tools = buildToolDefs();
 
-[단계]
-번호: ${stage.no}
-제목: ${stage.title}
-설명: ${stage.desc}
-할 일:
-${stage.tasks?.map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '없음'}
-선택지: ${stage.choices?.join(', ') || '없음'}
+    // 2) 쿼리 생성 호출 (작은 호출)
+    const queries = await generateQueries(stage, summary, plannedFinal);
+    const queryMap = new Map(queries.map((q) => [q.channel, q.query]));
 
-위 단계의 실현을 도울 수 있는 오픈소스·무료 에셋·튜토리얼·유사 사례를 검색하세요.
-검색이 필요하면 web_search 도구를 호출하세요.`;
+    // 3) 프리서치: 규칙 채널 병렬 실행
+    const preResults = [];
+    let calls = 0;
+    const prePromises = plannedFinal.map(async (ch) => {
+      const q = queryMap.get(ch) || stage.title;
+      const results = await runChannelSearch(ch, q);
+      calls++;
+      return { channel: ch, results, query: q };
+    });
 
+    const preResultsList = await Promise.all(prePromises);
+    for (const { channel, results, query } of preResultsList) {
+      for (const r of results.slice(0, MAX_RESULTS_PER_CHANNEL)) {
+        preResults.push({ ...r, query });
+      }
+    }
+
+    // 4) 분석 호출 (tool_choice auto)
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: prompt },
+      { role: 'user', content: buildAnalysisPrompt(stage, summary, preResults, plannedFinal) },
     ];
 
-    // --- 도구 호출 처리 (상한 2회) ---
-    // 첫 Solar 호출이 실패하면 검색 상한 내 유효한 선례를 못 찾은 것으로 간주하고
-    // 500 대신 200 + verdict "선례를 못 찾음"으로 내려 전체를 죽이지 않는다(킷 규칙 "전체 실패 금지").
-    let toolResult;
+    let analysisResult;
     try {
-      toolResult = await callSolar(messages, { tools: true, tool_choice: 'auto', maxTokens: 4096 }); // 첫 Solar 호출
+      analysisResult = await callSolar(messages, { tools: tools.length ? tools : false, tool_choice: 'auto', maxTokens: MAX_TOKENS_ANALYSIS });
     } catch (e) {
-      console.warn('첫 Solar 호출 실패 — 선례를 못 찾음으로 폴백:', e.message);
+      console.warn('분석 호출 실패:', e.message);
+      // 모델 오류 → 200 폴백
       return new Response(
         JSON.stringify({
-          stage: {
-            no: stage.no,
-            title: stage.title,
-            desc: stage.desc,
-            icon: stage.icon || '',
-            tasks: stage.tasks,
-            verdict: '선례를 못 찾음',
-            verdictReason: 'Solar 호출 단계에서 오류가 발생해 검색 상한 내 유효한 선례를 못 찾음',
-            findings: [],
-            choices: stage.choices || [],
-            options: stage.choices || [],
-            todos: (stage.tasks || []).map((t) => ({ task: t.task, owner: '직접 함', note: t.why || '' })),
-            searched: false,
-          },
+          stage: buildResponse(
+            stage,
+            { verdict: '선례를 못 찾음', claimType: '확인 불가' },
+            [],
+            queries,
+            plannedFinal,
+            [],
+            0,
+            source
+          ),
         }),
-        { headers: { 'Content-Type': 'application/json' } }
+        { headers: stageHeaders(source, plannedFinal, forceMode) }
       );
     }
 
+    // 도구 호출 처리 (상한 MAX_CALLS_PER_STAGE)
     const toolMessages = messages.slice();
     let toolCallCount = 0;
-    const searchedQueries = [];
+    const toolResults = [];
+    let toolResult = analysisResult;
 
-    while (toolCallCount < 2) {
-      const tcs = toolResult.toolCalls;
+    while (toolCallCount < MAX_CALLS_PER_STAGE) {
+      const tcs = toolResult?.toolCalls;
       if (!tcs?.length) break;
 
       const tc = tcs[0];
-      if (!tc || tc.function?.name !== 'web_search') break;
+      if (!tc || tc.function?.name !== 'web_search' && tc.function?.name !== 'github_search' && tc.function?.name !== 'law_search') break;
 
       try {
         const args = JSON.parse(tc.function.arguments || '{}');
         const q = args.query || '';
         if (!q) break;
 
-        const searchResults = await searchWeb(q);
-        searchedQueries.push(q);
+        let results = [];
+        let chname = 'web';
+        if (tc.function.name === 'github_search') {
+          results = await searchGithub(q, MAX_RESULTS_PER_CHANNEL);
+          chname = 'oss';
+        } else if (tc.function.name === 'law_search') {
+          results = await searchLaw(q, MAX_RESULTS_PER_CHANNEL);
+          chname = 'law';
+        } else {
+          results = await searchWeb(q);
+        }
+
+        // 낱말 상한 적용
+        const clamped = clampWords(q, tc.function.name === 'law_search' || tc.function.name === 'stats' ? 2 : tc.function.name === 'public_data' ? 3 : 4);
+        calls++;
         toolCallCount++;
 
-        // 도구 결과 메시지를 버퍼에 누적
+        const enriched = results.map((r, idx) => ({
+          ...r,
+          id: `${chname}-${idx}`,
+          query: clamped,
+          channel: chname,
+        }));
+
+        toolResults.push(...enriched);
+
         toolMessages.push(
           { role: 'assistant', content: null, tool_calls: tcs },
           {
             role: 'tool',
             tool_call_id: tc.id,
             content: JSON.stringify(
-              searchResults.map((r) => ({
+              enriched.map((r) => ({
+                id: r.id,
                 title: r.title,
                 url: r.url,
-                content: r.content,
-              })),
+                host: r.host,
+                snippet: r.snippet,
+                query: r.query,
+                channel: r.channel,
+              }))
             ),
-          },
+          }
         );
 
-        // 도구 결과 반영 후 다시 Solar 호출
-        toolResult = await callSolar(toolMessages, { tools: false, maxTokens: 4096 });
+        toolResult = await callSolar(toolMessages, { tools: false, maxTokens: MAX_TOKENS_ANALYSIS });
       } catch (e) {
-        console.warn('검색 도구 실행 중 오류:', e.message);
+        console.warn('도구 실행 중 오류:', e.message);
         break;
       }
     }
 
-    const finalResult = toolResult;
+    // 5) id 카탈로그 구축
+    const catalog = buildCatalog(preResults, toolResults);
 
-    // --- 최종 응답 파싱 ---
-    let parsed = null;
-    if (finalResult.content) {
-      try {
-        parsed = parseSolarJson(finalResult.content);
-      } catch (e) {
-        console.warn('최종 JSON 파싱 실패, 폴백:', e.message);
-      }
-    }
+    // 모델 findings 조립 (카탈로그 없는 id 버림)
+    const parsed = parseSolarJson(toolResult.content || '');
+    const findings = assembleFindings(parsed, catalog);
+    const calledChannels = new Set();
+    for (const f of findings) calledChannels.add(f.channel);
 
-    // findings 구성: Solar findings + 검색 결과 병합
-    const solarFindings = parsed?.findings || [];
-    let findings = solarFindings.filter((f) => f.url && f.url.startsWith('http'));
+    // scope
+    const scopeCalls = calls + toolCallCount;
+    const scope = {
+      claimType: parsed?.claimType || '기술',
+      channels: [...calledChannels],
+      calls: scopeCalls,
+      queries: queries.map((q) => `${q.channel}:${q.query}`),
+      planned: plannedFinal,
+    };
 
-    // 검색 결과에서 추가 (중복 제거: url 기준)
-    if (searchedQueries.length && finalResult.content) {
-      // 검색 결과는 tool 피드백 시점에 이미 확보. 여기서는 Solar가 검색 결과 기반으로
-      // 생성한 findings를 우선하고, 빠진 검색 결과를 보충한다.
-      const existingUrls = new Set(findings.map((f) => f.url));
-      // 마지막 tool 결과 메시지는 messages에 들어있으나, 검색 결과 원데이터를 별도로
-      // 보관하지 않았으므로, 재검색하지 않는다. Solar가 결과에 포함했을 것으로 신뢰.
-    }
+    const verdict = normalizeVerdict(parsed?.verdict, findings.length);
+    const verdictReason = parsed?.verdictReason || (findings.length ? '검색 자료 확인' : '검색 상한 내 유효한 선례를 못 찾음');
 
-    // findings 상한 5건
-    findings = findings.slice(0, 5);
-
-    // verdict
-    const verdict = parsed?.verdict || determineVerdict(findings);
-    const verdictReason =
-      parsed?.verdictReason || (findings.length ? '검색 자료 확인' : '검색 상한 내 유효한 선례를 못 찾음');
-
-    // options / todos
     let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
       task: t.task,
@@ -359,16 +937,71 @@ ${stage.tasks?.map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '�
       note: t.note || '',
     }));
 
-    // findings가 없으면 tasks 기반 기본 todos (직접 함 추정)
     if (todos.length === 0 && findings.length === 0) {
-      for (const t of stage.tasks) {
+      for (const t of stage.tasks || []) {
         todos.push({ task: t.task, owner: '직접 함', note: t.why || '' });
       }
     }
 
-    todos = todos.slice(0, 5);
     options = options.slice(0, 5);
+    todos = todos.slice(0, 5);
 
+    const frontendFindings = findings.map((f) => ({
+      id: f.id,
+      name: f.name,
+      kind: f.kind,
+      note: f.note,
+      url: f.url,
+      evidence: f.evidence,
+      grade: f.grade,
+      channel: f.channel,
+    }));
+
+    const stagePayload = {
+      no: stage.no,
+      title: stage.title,
+      desc: stage.desc,
+      icon: stage.icon || '',
+      tasks: stage.tasks,
+      verdict,
+      verdictReason,
+      findings: frontendFindings,
+      choices: stage.choices || [],
+      options,
+      todos,
+      searched: true,
+      scope,
+    };
+
+    return new Response(JSON.stringify({ stage: stagePayload }), {
+      headers: stageHeaders(source, [...calledChannels], forceMode),
+    });
+  } catch (err) {
+    console.error('stage.js 오류:', err.message);
+    return new Response(JSON.stringify({ error: err.message || '서버 오류' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
+
+// ---------- 기존 절차 폴백 (키 없는 환경 / proxy force) ----------
+
+async function runLegacyFallback(request, source) {
+  // 기존 stage.js 동작 그대로: Solar 키 없으면 500 대신 "선례를 못 찾음" 200
+  // force=proxy 일 때도 이 경로
+  try {
+    const body = await request.json().catch(() => ({}));
+    const { stageIndex, stage, summary } = body;
+
+    if (!stage || !stage.title) {
+      return new Response(JSON.stringify({ error: 'stage.title 필요' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 기존 절차 그대로: 도구 없이 판단 → 선례를 못 찾음
     return new Response(
       JSON.stringify({
         stage: {
@@ -377,25 +1010,26 @@ ${stage.tasks?.map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '�
           desc: stage.desc,
           icon: stage.icon || '',
           tasks: stage.tasks,
-          verdict,
-          verdictReason,
-          findings,
+          verdict: '선례를 못 찾음',
+          verdictReason: 'Solar 호출 단계에서 오류가 발생해 검색 상한 내 유효한 선례를 못 찾음',
+          findings: [],
           choices: stage.choices || [],
-          options,
-          todos,
-          searched: true,
+          options: stage.choices || [],
+          todos: (stage.tasks || []).map((t) => ({
+            task: t.task,
+            owner: '직접 함',
+            note: t.why || '',
+          })),
+          searched: false,
         },
       }),
-      { headers: { 'Content-Type': 'application/json' } },
+      { headers: stageHeaders(source, [], request.headers.get('x-stage-force') || '') }
     );
   } catch (err) {
-    console.error('stage.js 오류:', err.message);
-    return new Response(
-      JSON.stringify({ error: err.message || '서버 오류' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
+    console.error('폴백 처리 중 오류:', err.message);
+    return new Response(JSON.stringify({ error: err.message || '서버 오류' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

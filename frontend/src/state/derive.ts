@@ -19,6 +19,69 @@ export function normalizeVerdict(v: unknown): Verdict {
   return "선례를 못 찾음"
 }
 
+export function verdictLabel(v: Verdict): string {
+  switch (v) {
+    case "가져다 써도 됨":
+      return "이미 있음"
+    case "직접 해야 함":
+      return "없음"
+    case "섞어야 함":
+      return "일부만 있음"
+    case "선례를 못 찾음":
+      return "못 찾음"
+  }
+}
+
+export const channelLabel: Record<string, string> = {
+  web: "웹 검색",
+  oss: "오픈소스 GitHub",
+  public_data: "공공데이터포털",
+  stats: "국가통계 KOSIS",
+  law: "국가법령정보",
+}
+
+/** findings의 kind를 자료 행 부제(7종)로 정리 */
+export function findingKindLabel(kind: string | undefined): string {
+  if (kind == null) return ""
+  if (kind === "튜토리얼·블로그") return "튜토리얼 블로그"
+  return kind
+}
+
+export const channelShort: Record<string, string> = {
+  web: "웹",
+  oss: "GitHub",
+  public_data: "공공데이터",
+  stats: "통계",
+  law: "법령",
+}
+
+export function channelTally(findings: Finding[]): { channel: string; count: number }[] {
+  const counts: Record<string, number> = {}
+  for (const f of findings) {
+    const ch = f.channel
+    if (ch == null) continue
+    counts[ch] = (counts[ch] ?? 0) + 1
+  }
+  return Object.entries(counts)
+    .map(([channel, count]) => ({ channel, count: count as number }))
+    .sort((a, b) => b.count - a.count)
+}
+
+function stageSubtitle(stage: StageSlot["stage"], status: StageRunStatus): string | undefined {
+  if (status === "pending") return undefined
+  if (status === "running") return "조사 중"
+  if (status === "done") {
+    const findings = stage.findings ?? []
+    const todos = stage.todos ?? []
+    const taskCount = stage.tasks?.length ?? 0
+    const 가져다쓸것 = findings.length + todos.filter((t) => t.owner === "가져다 씀").length
+    const 직접만들것 = taskCount + todos.filter((t) => t.owner === "직접 함").length
+    if (가져다쓸것 === 0 && 직접만들것 === 0) return undefined
+    return `가져다 쓸 것 ${가져다쓸것}개, 직접 만들 것 ${직접만들것}개`
+  }
+  return undefined
+}
+
 const STAGEPREFIX = "stage-"
 
 function stageDoc(stageNo: number, stage: StageSlot["stage"], status: StageRunStatus): SourceDoc {
@@ -32,23 +95,150 @@ function stageDoc(stageNo: number, stage: StageSlot["stage"], status: StageRunSt
     findingCount: stage.findings?.length ?? 0,
     verdict: stage.verdict ?? undefined,
     children: [],
+    subtitle: stageSubtitle(stage, status),
   }
 }
 
 function summaryDoc(stageNo: number, stage: StageSlot["stage"], status: StageRunStatus): SourceDoc {
+  const markdown = summaryMarkdown(stage, status)
   return {
     id: `${STAGEPREFIX}${stageNo}-summary`,
     kind: "summary",
     stageNo,
-    title: `${stageNo}. ${stage.title}`,
-    markdown: "",
+    title: stageTitle(stage, status),
+    markdown,
     status,
     findingCount: stage.findings?.length ?? 0,
     verdict: stage.verdict ?? undefined,
   }
 }
 
+function stageTitle(stage: StageSlot["stage"], status: StageRunStatus): string {
+  const base = `${stage.no}. ${stage.title}`
+  if (status === "running") return `${base} — 조사 중`
+  if (status === "failed") return `${base} — 자료를 못 찾았습니다.`
+  return base
+}
+
+function summaryMarkdown(stage: StageSlot["stage"], status: StageRunStatus): string {
+  const lines: string[] = []
+  lines.push(`# ${stageTitle(stage, status)}`)
+  lines.push("")
+  lines.push(stage.desc)
+  lines.push("")
+
+  if (status === "running") {
+    lines.push("아직 조사하고 있습니다.")
+    lines.push("")
+  } else if (status === "failed") {
+    lines.push("이 단계는 자료를 못 찾았습니다.")
+    lines.push("")
+    return lines.join("\n")
+  }
+
+  if (stage.verdict != null) {
+    lines.push(`**${verdictLabel(stage.verdict)}**`)
+    if (stage.verdictReason != null && stage.verdictReason.trim().length > 0) {
+      lines.push(stage.verdictReason)
+    }
+    lines.push("")
+  }
+
+  if (stage.scope != null) {
+    const channelNames = stage.scope.channels
+      .map((c) => channelLabel[c] ?? c)
+      .join(", ")
+    const plannedLine =
+      stage.scope.planned && stage.scope.planned.length > 0
+        ? ` · 규칙으로 미리 돌린 채널: ${stage.scope.planned.map((p) => channelLabel[p] ?? p).join(", ")}`
+        : ""
+    lines.push(`조사 범위: ${stage.scope.claimType} · ${channelNames} · ${stage.scope.calls}회 호출${plannedLine}`)
+    lines.push("")
+  }
+
+  const tasks = stage.tasks ?? []
+  if (tasks.length > 0) {
+    lines.push("## 할 일")
+    lines.push("")
+    for (const t of tasks) {
+      lines.push(`- ${t.task}`)
+    }
+    lines.push("")
+  }
+
+  const findings = stage.findings ?? []
+  if (findings.length > 0) {
+    lines.push("## 찾은 자료")
+    lines.push("")
+    for (const f of findings) {
+      const grade = f.grade ? ` · ${f.grade}` : ""
+      lines.push(`- ${f.name}${grade}`)
+      if (f.channel != null) {
+        lines.push(`  - ${CHANNEL_LABELS[f.channel] ?? f.channel}`)
+      }
+      lines.push(`  - ${f.evidence}`)
+      if (f.query.trim().length > 0) {
+        lines.push(`  - 검색어: ${f.query}`)
+      }
+    }
+    lines.push("")
+  }
+
+  const todos = stage.todos ?? []
+  if (todos.length > 0) {
+    lines.push("## 역할 나눔")
+    lines.push("")
+    for (const t of todos) {
+      lines.push(`- ${t.task} — 역할 나눔: ${t.owner}`)
+      if (t.note.trim().length > 0) {
+        lines.push(`  - ${t.note}`)
+      }
+    }
+    lines.push("")
+  }
+
+  const choices = stage.choices ?? []
+  if (choices.length > 0) {
+    lines.push("## 갈림길")
+    lines.push("")
+    for (const c of choices) {
+      lines.push(`- ${c}`)
+    }
+    lines.push("")
+  }
+
+  return lines.join("\n")
+}
+
 function findingDoc(stageNo: number, idx: number, f: Finding): SourceDoc {
+  const lines: string[] = []
+  lines.push(`# ${f.name}`)
+  lines.push("")
+  if (f.grade) {
+    lines.push(`**근거 등급**: ${f.grade}`)
+    lines.push("")
+  }
+  const channelLabel = f.channel != null ? (CHANNEL_LABELS[f.channel] ?? f.channel) : "—"
+  lines.push(`종류: ${f.kind} · 단계: ${stageNo} · 출처: ${channelLabel}`)
+  lines.push("")
+  if (f.grade != null) {
+    const parts: string[] = []
+    parts.push(`근거 등급: ${f.grade}`)
+    if (f.channel != null) parts.push(`채널: ${channelLabel}`)
+    lines.push(parts.join(", "))
+    lines.push("")
+  }
+  lines.push("## 근거")
+  lines.push("")
+  lines.push(f.evidence)
+  if (f.query.trim().length > 0) {
+    lines.push("")
+    lines.push(`검색어: ${f.query}`)
+  }
+  lines.push("")
+  lines.push("## 제약 주의")
+  lines.push("")
+  lines.push(f.note)
   return {
     id: `${STAGEPREFIX}${stageNo}-finding-${idx}`,
     kind: "finding",
@@ -57,31 +247,47 @@ function findingDoc(stageNo: number, idx: number, f: Finding): SourceDoc {
     subtitle: f.kind,
     url: f.url,
     evidence: f.evidence,
-    markdown: "",
+    markdown: lines.join("\n"),
     status: "done",
   }
 }
 
 function taskDoc(stageNo: number, idx: number, t: Task): SourceDoc {
+  const lines: string[] = []
+  lines.push(`# ${t.task}`)
+  lines.push("")
+  lines.push(`단계: ${stageNo}`)
+  lines.push("")
+  lines.push(`**왜**: ${t.why}`)
+  lines.push("")
+  lines.push(`순서: ${t.order}`)
   return {
     id: `${STAGEPREFIX}${stageNo}-task-${idx}`,
     kind: "item",
     stageNo,
     title: t.task,
     subtitle: "할 일",
-    markdown: "",
+    markdown: lines.join("\n"),
     status: "done",
   }
 }
 
 function todoDoc(stageNo: number, idx: number, t: Todo): SourceDoc {
+  const lines: string[] = []
+  lines.push(`# ${t.task}`)
+  lines.push("")
+  lines.push(`**누가**: ${t.owner}`)
+  lines.push("")
+  if (t.note.trim().length > 0) {
+    lines.push(`**메모**: ${t.note}`)
+  }
   return {
     id: `${STAGEPREFIX}${stageNo}-todo-${idx}`,
     kind: "item",
     stageNo,
     title: t.task,
-    subtitle: `${t.owner} — ${t.owner === "가져다 씀" ? "가져다 써도 됨" : "직접 해야 함"}`,
-    markdown: "",
+    subtitle: `역할 나눔 ${t.owner}`,
+    markdown: lines.join("\n"),
     status: "done",
   }
 }
@@ -293,6 +499,8 @@ function walkAncestors(nodes: SourceDoc[], id: string, acc: string[]): boolean {
       if (walkAncestors(node.children, id, acc)) {
         return true
       }
+    } else if (node.id === id) {
+      return true
     }
   }
   return false
