@@ -99,6 +99,19 @@ function MegaPanel({
 /** 항목·링크는 `content.nav` 가 소유한다 — 여기는 구조만 */
 export function Navbar() {
   const N = content.nav;
+  const [loginPopover, setLoginPopover] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!loginPopover) return;
+    const close = (e: Event) => {
+      if (!popoverRef.current?.contains(e.target as Node)) {
+        setLoginPopover(false);
+      }
+    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [loginPopover]);
   return (
     <header className="nav">
       <div className="container nav__inner">
@@ -114,9 +127,29 @@ export function Navbar() {
         {/* 원본의 오른쪽은 **버튼이 아니다** — 텍스트 링크 둘이고 두 번째만 밑줄이 있다.
             여기 버튼을 두면 히어로의 CTA 와 같은 것이 화면에 둘 생긴다. */}
         <div className="nav__end">
-          {N.end.map((l) => (
-            <a key={l.label} className={`nav__link${l.marked ? ' -marked' : ''}`} href={l.href}>{l.label}</a>
-          ))}
+          {N.end.map((l) =>
+            l.label === '로그인' ? (
+              <a
+                key={l.label}
+                className={`nav__link${l.marked ? ' -marked' : ''}`}
+                href={l.href}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setLoginPopover(open => !open);
+                }}
+                aria-expanded={loginPopover}
+              >
+                {l.label}
+              </a>
+            ) : (
+              <a key={l.label} className={`nav__link${l.marked ? ' -marked' : ''}`} href={l.href}>{l.label}</a>
+            )
+          )}
+          {loginPopover && (
+            <div ref={popoverRef} className="nav__popover" role="dialog" aria-label="로그인">
+              <p className="nav__popover-text">준비 중입니다~</p>
+            </div>
+          )}
         </div>
       </div>
     </header>

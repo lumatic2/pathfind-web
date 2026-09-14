@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { useSession } from '../state/store'
-import { useQuota, QUOTA_TOTAL } from '../state/quota'
+import { useQuota } from '../state/quota'
+import type { ChatMessage, ChatStatus } from '../components/chat-conversation-panel'
+import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import {
   NotebookWorkspaceShell,
   NotebookTopbar,
@@ -127,18 +129,52 @@ function LeftPanel() {
 }
 
 function CenterPanel() {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [status, setStatus] = useState<ChatStatus>("idle")
+  const nextId = useRef(0)
+  const exampleChips = [
+    "동네 카페 사장님이 단골을 기억하게 돕는 앱을 만들고 싶어요",
+    "학교 동아리 회비를 자동으로 정산하는 도구가 필요해요",
+    "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
+  ]
+  const directInputLabel = "직접 입력"
+  const allSuggestions = [...exampleChips, directInputLabel]
+
+  const sendAnswer = (text: string) => {
+    nextId.current += 1
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `msg-${nextId.current}`,
+        role: "user",
+        text,
+      },
+    ])
+    setStatus("waiting")
+  }
+
   return (
     <div className="panel-center">
-      <div className="center-empty">
-        <h2 className="center-empty__title">{CENTER_GREETING}</h2>
-        <p className="center-empty__body">{CENTER_BODY}</p>
-        <input
-          className="center-empty__composer"
-          placeholder={CENTER_PLACEHOLDER}
-          readOnly
-          aria-label="작곡창"
-        />
-      </div>
+      <ChatConversationPanel
+        variant="grounded"
+        className="h-full max-w-none rounded-none border-0 bg-card"
+        title="로드맵 만들기"
+        messages={messages}
+        status={status}
+        onSend={sendAnswer}
+        onRetry={() => setStatus("idle")}
+        emptyTitle={`무엇을 만들고 싶으세요?`}
+        emptyHint="한 문단으로 적어 주세요. 몇 가지만 여쭙고 로드맵을 만들어 드립니다."
+        suggestions={allSuggestions}
+        onSuggestion={(s) => {
+          if (s === directInputLabel) return
+          sendAnswer(s)
+        }}
+        directInputLabel={directInputLabel}
+        composerPlaceholder="오늘 어떤 로드맵을 그려볼까요"
+        onCopy={(m) => navigator.clipboard?.writeText(m.text)}
+        onFeedback={() => {}}
+      />
     </div>
   )
 }

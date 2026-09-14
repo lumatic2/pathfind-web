@@ -402,8 +402,9 @@ function Suggestions({ items, onPick, notes, directInputLabel }: { items: string
  * M117 보강(옵트인 — 기본 렌더 무변경): `reasoning`·`citations` + `renderCitation` 슬롯 · `suggestions` 세로 칩 ·
  * `scopeLabel` 근거 범위 · `draft` 제어 · `variant="grounded"`. 관측 근거 `evidence/m117/…observation.md` §3.
  */
-export function ChatConversationPanel({ messages, status, onSend, onRetry, emptyHint, variant = "default", renderCitation, suggestions, onSuggestion, scopeLabel, draft: draftProp, onDraftChange, title, showHeaderActions = true, emptyTitle, suggestionsPrompt, onSaveNote, onCopy, onFeedback, saveNoteLabel = "메모에 저장", composerPlaceholder = "소스에 대해 물어보세요", renderAssistantMark, assistantMarkPlacement = "leading", waitingLabel, directInputLabel, suggestionNotes, className }: ChatConversationPanelProps) {
+export function ChatConversationPanel({ messages, status, onSend, onRetry, emptyHint, variant = "default", renderCitation, suggestions, onSuggestion, scopeLabel, draft: draftProp, onDraftChange, title, showHeaderActions = true, emptyTitle, suggestionsPrompt, onSaveNote, onCopy, onFeedback, saveNoteLabel = "메모에 저장", composerPlaceholder = "한 문장으로 편하게 적어 주세요. 잘 모르면 “잘 모르겠어요”도 괜찮습니다.", renderAssistantMark, assistantMarkPlacement = "leading", waitingLabel, directInputLabel, suggestionNotes, className }: ChatConversationPanelProps) {
   const [draftState, setDraftState] = useState("")
+  const [composerError, setComposerError] = useState<string | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   // 「직접 입력」은 답이 아니라 문이다 — 보내지 않고 입력창으로 포커스만 옮긴다(M122).
   const pick = (s: string) => {
@@ -431,7 +432,11 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
   const canSend = draft.trim().length > 0 && status !== "waiting"
 
   const send = () => {
-    if (!canSend) return
+    if (!canSend) {
+      setComposerError("한 글자 이상 적어 주세요.")
+      window.setTimeout(() => setComposerError(null), 2200)
+      return
+    }
     onSend(draft.trim())
     setDraft("")
   }
@@ -467,7 +472,7 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
           // 원본 §3 빈 상태 — 좌정렬 컨테이너(패딩 48 40 · max 672) · 👋 48 · 제목 32/40 400 · 본문 14/24 · 유도 14/24 500 · 칩 세로
           <div data-chat-zero className="flex flex-col items-start gap-4" style={{ padding: `${ZERO_PAD_Y_PX - 16}px ${ZERO_PAD_X_PX - 16}px`, maxWidth: ZERO_MAX_PX }}>
             <HandIcon aria-hidden className="size-12 text-muted-foreground motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:duration-500" />
-            <h1 className="font-normal" style={{ fontSize: ZERO_TITLE_PX, lineHeight: `${ZERO_TITLE_LINE_PX}px` }}>
+            <h1 className="font-semibold" style={{ fontSize: ZERO_TITLE_PX, lineHeight: `${ZERO_TITLE_LINE_PX}px` }}>
               {emptyTitle}
             </h1>
             {emptyHint ? <p className="break-keep text-sm leading-6">{emptyHint}</p> : null}
@@ -629,6 +634,9 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
             send()
           }}
         >
+          {composerError ? (
+            <p className="mb-2 shrink-0 text-sm text-destructive">{composerError}</p>
+          ) : null}
           {/* 세로 정렬: 한 줄일 때 textarea(24 + 상하 8 = 40)·「소스 N개」·전송 원 40 이 같은 높이의 중앙에 선다. 여러 줄이면 바닥 정렬 */}
           <div className="flex items-end gap-3 rounded-2xl border border-muted-foreground/60 bg-card px-4 py-3 motion-safe:transition-[border-color,box-shadow] focus-within:border-foreground focus-within:ring-1 focus-within:ring-foreground">
             <textarea

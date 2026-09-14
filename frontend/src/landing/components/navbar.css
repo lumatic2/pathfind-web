@@ -97,6 +97,29 @@
   outline-offset: var(--focus-ring-offset);
 }
 
+/* 로그인 팝오버 */
+.nav__end { position: relative; }
+.nav__popover {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-3));
+  inset-inline-start: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--card);
+  color: var(--card-foreground);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px color-mix(in oklch, var(--foreground) 8%, transparent);
+  font-size: var(--fs-lead);
+  white-space: nowrap;
+  z-index: 30;
+  animation: mphb-in var(--panel-dur) ease forwards;
+}
+.nav__popover-text { margin: 0; }
+
+@media (max-width: 767px) {
+  .nav__popover { display: none; }
+}
+
 /* ── 메가패널 */
 .mphb { position: relative; }
 
