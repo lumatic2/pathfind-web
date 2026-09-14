@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'primary';
+  variant?: 'default' | 'primary' | 'outline';
   size?: 'default' | 'sm' | 'lg';
 }
 
@@ -11,6 +11,7 @@ export function Button({ className, variant = 'default', size = 'default', ...pr
   const variants = {
     default: 'bg-primary text-primary-foreground hover:bg-primary/90 ring-offset-background',
     primary: 'bg-foreground text-background hover:bg-foreground/90',
+    outline: 'border border-current bg-transparent hover:bg-accent/20 hover:text-accent',
   };
   const sizes = {
     default: 'h-9 px-4 py-2',

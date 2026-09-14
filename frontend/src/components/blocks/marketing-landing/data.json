@@ -1,0 +1,139 @@
+{
+  "hero": {
+    "title": "Ship a polished product story before lunch",
+    "description": "Beacon turns a plain-language brief into a deployed, on-brand landing surface — tokens, sections, and motion included.",
+    "primaryCta": "Start free",
+    "secondaryCta": "See it work"
+  },
+  "logoStrip": {
+    "caption": "Teams shipping with Beacon",
+    "logos": ["Northwind", "Arclight", "Fieldnote", "Halcyon", "Waypoint", "Mosaic", "Kelvin Labs", "Ridgeline"]
+  },
+  "story": {
+    "eyebrow": "How it works",
+    "heading": "From brief to live page in three moves",
+    "steps": [
+      {
+        "title": "Describe the product in one paragraph",
+        "body": "No wireframes, no moodboards. Write what you are building and who it is for — Beacon extracts tone, color direction, and type direction as editable decisions."
+      },
+      {
+        "title": "Review a composed draft, not a blank canvas",
+        "body": "You get a full funnel — hero, proof, demo, pricing — already wired to your tokens. Every section is a file you can reorder, replace, or delete."
+      },
+      {
+        "title": "Publish and keep iterating in code",
+        "body": "The output is plain React and CSS variables. Your team edits it like any other code — no lock-in surface between the draft and production."
+      }
+    ]
+  },
+  "demo": {
+    "eyebrow": "Live demo",
+    "heading": "Watch a page assemble itself",
+    "body": "The same loop runs for every brief: generate, verify against the token contract, deploy a preview.",
+    "capabilities": [
+      "Design tokens derived from the brief",
+      "Sections restyled to your palette",
+      "Contrast checked before deploy",
+      "Preview URL in under a minute"
+    ],
+    "scenes": [
+      {
+        "prompt": "beacon init --brief launch.md",
+        "lines": ["✓ tokens derived from brief", "✓ 9 sections composed", "✓ contrast gate passed"],
+        "result": { "address": "preview.beacon.dev/launch", "label": "Preview" }
+      },
+      {
+        "prompt": "beacon deploy",
+        "lines": ["✓ build 1.2s", "✓ verify 0 violations", "✓ live at beacon.dev"],
+        "result": { "address": "beacon.dev", "label": "Production" }
+      }
+    ]
+  },
+  "comparison": {
+    "eyebrow": "Why it is different",
+    "heading": "Template output reads as a template",
+    "before": {
+      "label": "Template builders",
+      "headline": "Same page, different logo",
+      "body": "Generic sections with your name dropped in — every competitor who used the tool shipped the same face."
+    },
+    "after": {
+      "label": "With Beacon",
+      "headline": "Your tokens drive every pixel",
+      "body": "Sections take their color, type, and motion from your own design decisions, so the output belongs to your brand."
+    }
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "heading": "Start free, pay when it ships",
+    "tiers": [
+      {
+        "name": "Draft",
+        "price": "$0",
+        "period": "forever",
+        "blurb": "For trying the loop end to end.",
+        "features": ["3 projects", "All sections", "Community support"],
+        "cta": "Start free",
+        "highlighted": false
+      },
+      {
+        "name": "Studio",
+        "price": "$29",
+        "period": "per month",
+        "blurb": "For teams shipping real launches.",
+        "features": ["Unlimited projects", "Custom token packs", "Preview deploys", "Priority support"],
+        "cta": "Start 14-day trial",
+        "highlighted": true
+      },
+      {
+        "name": "Agency",
+        "price": "$99",
+        "period": "per month",
+        "blurb": "For studios shipping for clients.",
+        "features": ["Everything in Studio", "Client workspaces", "White-label output", "SLA"],
+        "cta": "Talk to us",
+        "highlighted": false
+      }
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "heading": "The questions buyers actually ask",
+    "items": [
+      {
+        "question": "Do I own the output?",
+        "answer": "Yes. The result is plain React components and CSS variables in your repository — no runtime dependency on Beacon."
+      },
+      {
+        "question": "Can I change the section order?",
+        "answer": "Every section is an independent file. Reorder, remove, or duplicate them like any other component — the composition is yours."
+      },
+      {
+        "question": "What happens to my brand tokens?",
+        "answer": "Tokens live in one CSS definition layer that you edit. Every section reads from it, so a palette change re-themes the whole page."
+      },
+      {
+        "question": "Does it work without JavaScript animation libraries?",
+        "answer": "Core motion uses CSS scroll timelines with reduced-motion fallbacks. Nothing breaks when animation is unavailable — content always renders."
+      }
+    ]
+  },
+  "cta": {
+    "headingPrefix": "Launch your",
+    "rotating": ["SaaS", "beta", "tool", "docs"],
+    "headingSuffix": "with a page that sells it",
+    "body": "Free to try. Your first composed draft takes about a minute.",
+    "button": "Start free"
+  },
+  "footer": {
+    "product": "Beacon",
+    "tagline": "Composed landing pages from plain-language briefs.",
+    "columns": [
+      { "heading": "Product", "links": ["Features", "Pricing", "Changelog", "Roadmap"] },
+      { "heading": "Resources", "links": ["Documentation", "Guides", "API", "Status"] },
+      { "heading": "Company", "links": ["About", "Blog", "Careers", "Contact"] }
+    ],
+    "legal": "© 2026 Beacon Labs. All rights reserved."
+  }
+}

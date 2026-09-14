@@ -30,9 +30,17 @@
   --muted:              var(--text-secondary);
   --muted-foreground:   var(--text-secondary);
   --card:               var(--surface);
+  --card-foreground:    var(--text);
   --primary:            var(--accent);
   --primary-foreground: var(--on-accent);
   --ring:               var(--accent);
+  --popover:            var(--surface);
+  --popover-foreground: var(--text);
+  --secondary:          var(--accent-soft);
+  --secondary-foreground: var(--text);
+  --destructive:        #b22222;
+  --destructive-foreground: var(--text);
+  --accent-foreground:    var(--on-accent);
 
   /* --- DESIGN.md에 값 없는 변수는 설계 판단으로 정의 --- */
   --radius:             6px;
@@ -70,6 +78,14 @@
     --primary:            var(--accent);
     --primary-foreground: var(--on-accent);
     --ring:               var(--accent);
+
+    --card-foreground:    var(--text-dark);
+    --popover:            var(--card-dark);
+    --popover-foreground: var(--text-dark);
+    --secondary:          var(--accent-dim);
+    --secondary-foreground: var(--text-dark);
+    --destructive-foreground: var(--text-dark);
+    --on-accent:          #ffffff;
 
     --radius:             6px;
     --input:              var(--card-dark);
