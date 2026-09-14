@@ -1,9 +1,17 @@
 import { useCallback, useRef } from 'react'
 
 import { useSession } from './store'
-import { grill, pathfind, runPool, type PoolItem } from '../lib/api'
+import {
+  grill,
+  pathfind,
+  runPool,
+  stage,
+  RateLimited,
+  type PoolItem,
+} from '../lib/api'
 import { consumeQuota, readQuota } from './quota'
-import type { GrillResponse, GrillTurn, StageSlot } from './types'
+import { normalizeVerdict } from './derive'
+import type { Finding, GrillResponse, GrillTurn, StageSlot, Stage } from './types'
 
 let nextId = 1
 
@@ -17,20 +25,110 @@ function questionMeta(turn: GrillTurn) {
   return meta
 }
 
-/** 단계 1개 조사 워커 — 아직 구현 없음, 서명만 둔다. */
-async function runStage(index: number): Promise<void> {
-  // TODO: stage 리서치 실행
-}
-
-/** runPool이 동시성 상한을 낮출 때 호출 — 아직 구현 없음. */
 function onDegrade(_newConcurrency: number): void {
-  // TODO: 상한 하향 처리
+  // 상한 하향은 진행 중인 고급 단계가 자연스레 느려지는 것으로 드러나므로 별도 마커를 붙이지 않는다.
 }
 
 export function useFlow() {
   const { session, patch } = useSession()
   const sessionRef = useRef(session)
   sessionRef.current = session
+
+  /** 단계 1개 조사. 요약·슬롯을 갱신하고 결과 줄을 진행한다. */
+  async function runStage(index: number, summary: string, currentStage: Stage): Promise<void> {
+    const latest = sessionRef.current
+    const slot = latest.stages[index]
+    if (slot == null) return
+
+    // 1) status → running
+    patch({
+      stages: latest.stages.map((s, i) => (i === index ? { ...s, status: 'running' as const } : s)),
+    })
+
+    // 2) 서버 호출 (6분 타임아웃은 api.stage의 기본값과 같다)
+    let res: Awaited<ReturnType<typeof stage>>
+    try {
+      res = await stage({ stageIndex: index, stage: currentStage, summary })
+    } catch (err) {
+      if (err instanceof RateLimited) throw err
+      const message =
+        err instanceof Error
+          ? err.message
+          : '이 단계는 자료를 못 찾았습니다. 나머지는 계속합니다.'
+      patch({
+        stages: latest.stages.map((s, i) =>
+          i === index ? { ...s, status: 'failed' as const, error: message } : s,
+        ),
+        messages: [
+          ...latest.messages,
+          {
+            id: msgId(),
+            role: 'assistant',
+            text: message,
+            kind: 'progress',
+            suggestions: [],
+          },
+        ],
+      })
+      return
+    }
+
+    // 3) 판정 정규화
+    const verdict = normalizeVerdict(res.stage.verdict)
+
+    // 4) findings 정리
+    const rawFindings: unknown = res.stage.findings
+    const findings: Finding[] =
+      Array.isArray(rawFindings)
+        ? rawFindings.filter((f): f is Finding => typeof f !== 'string') as Finding[]
+        : []
+
+    // 5) 원본 유지 필드만 남기고 나머지 교체
+    const kept: Stage = {
+      no: currentStage.no,
+      title: currentStage.title,
+      desc: currentStage.desc,
+      icon: currentStage.icon,
+      tasks: currentStage.tasks,
+      choices: currentStage.choices,
+    }
+    const merged: Stage = {
+      ...res.stage,
+      ...kept,
+      verdict,
+      findings,
+    }
+
+    // 6) 슬롯 상태 done, stage 교체
+    const nextStages = latest.stages.map((s, i) =>
+      i === index ? { ...s, status: 'done' as const, stage: merged } : s,
+    )
+    patch({ stages: nextStages })
+
+    // 7) 결과 줄 (kind progress)
+    const top = findings.slice(0, 3)
+    const citationTitles = top.map((f) => (typeof f === 'object' && f != null ? (f as { name?: string }).name ?? '' : ''))
+    const citationIds = top.map((_f, i) => `stage-${index}-finding-${i}`)
+    const markerSuffix =
+      top.length > 0 ? ` [${top.map((_f, i) => i + 1).join(', ')}]` : ''
+    const verdictLine = `${verdict}`
+    const text = `${index + 1}. ${merged.title}\n\n**${verdictLine}**${markerSuffix}`
+
+    patch({
+      messages: [
+        ...latest.messages,
+        {
+          id: msgId(),
+          role: 'assistant',
+          text,
+          kind: 'progress',
+          suggestions: [],
+          citationTitles,
+          citationIds,
+        },
+      ],
+    })
+  }
 
   const sendAnswer = useCallback(
     (text: string) => {
@@ -275,14 +373,15 @@ export function useFlow() {
         })
 
         // 5) 단계 조사 풀 실행
-        const items: PoolItem<number>[] = stages.map((_, i) => ({
+        const items: PoolItem<number>[] = stages.map((s, i) => ({
           key: `stage-${i}`,
           payload: i,
         }))
         runPool({
           items,
           concurrency: 3,
-          worker: (item) => runStage(item.payload),
+          worker: (item) =>
+            runStage(item.payload, current.summary, stages[item.payload].stage),
           onDegrade,
         })
       })
