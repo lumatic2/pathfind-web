@@ -10,13 +10,10 @@
  */
 import { ScrollDrivenRevealItem } from "@/components/scroll-driven-reveal"
 import { CtaSection } from "./cta-section"
-import { ComparisonSection } from "./comparison-section"
 import { DemoSection } from "./demo-section"
 import { FaqSection } from "./faq-section"
 import { FooterSection } from "./footer-section"
 import { HeroSection } from "./hero-section"
-import { LogoStripSection } from "./logo-strip-section"
-import { PricingSection } from "./pricing-section"
 import { StorySection } from "./story-section"
 import data from "./data.json"
 
@@ -24,18 +21,11 @@ export function MarketingLandingPage() {
   return (
     <main className="w-full bg-background text-foreground">
       <HeroSection {...data.hero} />
-      <LogoStripSection {...data.logoStrip} />
       <ScrollDrivenRevealItem>
         <StorySection {...data.story} />
       </ScrollDrivenRevealItem>
       <ScrollDrivenRevealItem>
         <DemoSection {...data.demo} />
-      </ScrollDrivenRevealItem>
-      <ScrollDrivenRevealItem>
-        <ComparisonSection {...data.comparison} />
-      </ScrollDrivenRevealItem>
-      <ScrollDrivenRevealItem>
-        <PricingSection {...data.pricing} />
       </ScrollDrivenRevealItem>
       <ScrollDrivenRevealItem>
         <FaqSection {...data.faq} />
