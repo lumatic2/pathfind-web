@@ -1,0 +1,189 @@
+/* 전역 내비 + 메가패널 — 정본: recipes/navigation/mega-panel-hover-bridge.md
+   값은 전부 토큰 참조. 컴포넌트에 px 리터럴을 두지 않는다. */
+
+/* 내비는 히어로 위에 겹쳐 앉는다 — 원본처럼 배경이 이어져 보이게, 스크롤하면 같이 올라간다.
+   ⚠ `position: sticky` 로 두면 흐름 공간을 차지해 히어로 위에 흰 띠가 생긴다(2026-09-12 적발). */
+.nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: transparent;
+  /* 원본 내비는 상하 46px 을 쓴다 — 줄 높이만큼만 차지하던 띠를 그 사다리로 올린다 */
+  padding-block: var(--pad-nav-y);
+}
+
+.nav__inner {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-6) * 1.2);
+  min-height: var(--nav-h);
+  /* 내비 20% 확대 — 링크·트리거는 `font: inherit` 라 여기서 한 번에 (2026-09-13 사용자 DoD 0 지시) */
+  font-size: 1.2rem;
+}
+
+.nav__logo {
+  color: var(--primary);
+  text-decoration: none;
+  display: inline-flex;
+}
+.nav__logo:focus-visible {
+  outline: var(--focus-ring-width) solid var(--ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* 로고 — 원본 실측: 마크 높이 ≈ 워드마크 x-height 보다 조금 크고, 둘 사이 간격은 마크 폭의 1/4.
+   워드마크는 소문자·굵게·자간 촘촘하게(원본 `glide`). */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--logo-fs);
+  font-weight: 800;
+  letter-spacing: var(--ls-head);
+  line-height: 1;
+}
+.logo__mark {
+  width: var(--logo-mark);
+  height: var(--logo-mark);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.logo__accent { fill: var(--askewly-lavender); stroke: currentColor; }
+.logo__word { translate: 0 -0.04em; }
+
+.nav__menu { display: flex; align-items: center; gap: var(--space-1); }
+/* 오른쪽 묶음 — 링크 둘. `-marked` 만 밑줄로 강조한다(원본 `Get Started`). */
+.nav__end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.nav__link.-marked {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: var(--space-2);
+  text-decoration-thickness: 2px;
+}
+
+.nav__link,
+.mphb__trigger {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-weight: 500;
+  color: var(--foreground);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  text-decoration: none;
+  cursor: pointer;
+}
+.nav__link:hover,
+.mphb__trigger:hover { color: var(--primary); }
+
+.nav__link:focus-visible,
+.mphb__trigger:focus-visible,
+.mphb__item:focus-visible,
+.mphb__overview:focus-visible {
+  outline: var(--focus-ring-width) solid var(--ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* ── 메가패널 */
+.mphb { position: relative; }
+
+.mphb__panel {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: var(--panel-w);
+  margin-left: calc(var(--panel-w) / -2);
+  margin-top: var(--panel-gap);
+  padding: var(--space-7);
+  background: var(--card);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 4px 50px color-mix(in oklch, var(--foreground) 10%, transparent);
+  z-index: 10;
+}
+.mphb__panel.-lg { --panel-w: var(--panel-w-lg); }
+
+/* ⚠ 브리지 — 트리거와 패널 사이 여백을 투명 띠로 덮는다.
+   이게 없으면 마우스가 틈을 지나는 순간 hover 가 끊겨 패널이 닫힌다.
+   원본이 `:after{top:-30px;height:30px}` 로 하던 것과 같은 장치다. */
+.mphb__panel::before {
+  content: '';
+  position: absolute;
+  top: calc(var(--panel-gap) * -1);
+  left: 0;
+  right: 0;
+  height: var(--panel-gap);
+}
+
+/* 꼭지 — 이미지 없이 border 삼각형으로 */
+.mphb__panel::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--arrow) * -1);
+  left: 50%;
+  margin-left: calc(var(--arrow) * -1);
+  border-style: solid;
+  border-width: 0 var(--arrow) var(--arrow) var(--arrow);
+  border-color: transparent transparent var(--card) transparent;
+}
+
+/* 열림 전이 — 5px 아래에서 제자리로 + 불투명해진다 */
+.mphb__panel:not([hidden]) { animation: mphb-in var(--panel-dur) ease forwards; }
+
+@keyframes mphb-in {
+  from { opacity: 0; transform: translateY(calc(var(--space-1) * -1)); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mphb__panel:not([hidden]) { animation: none; }
+}
+
+.mphb__overview {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--primary);
+  text-decoration: none;
+}
+.mphb__overview:hover { text-decoration: underline; }
+
+.mphb__grid { display: grid; gap: var(--space-2); }
+.mphb__panel.-lg .mphb__grid { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+
+.mphb__item {
+  display: block;
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  text-decoration: none;
+}
+.mphb__item:hover { background: var(--muted); }
+
+.mphb__item-title {
+  display: block;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.mphb__item-desc {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 767px) {
+  .nav__menu { display: none; }
+}

@@ -1,0 +1,208 @@
+.hero {
+  position: relative;
+  overflow: hidden;
+  /* 원본 히어로는 1350px = 뷰포트의 1.5배다(1440 실측). 화면 한 판에 다 담기지 않는 것이
+     이 블록의 설계다 — 제목만 먼저 읽히고 풍경은 굴려야 드러난다.
+     100vh 로 눌러 담으면 제목과 집이 같은 화면에서 자리를 다투고 CTA 가 지붕에 겹친다. */
+  /* M120 step-4 — 원본 구도: 무대(4:3, 폭 기준 0.75w)가 히어로 **바닥**에 앉고 그 위 여백이 무대 높이의
+     25%(1350 = 1080 + 270 @1440)다. 이 비율이 p=0 의 프레이밍(제목은 하늘에, 집 지붕은 아래변)을 만든다.
+     125vh 로 두면 여백이 45px 뿐이라 장면이 원본보다 200px 넘게 위로 올라앉는다(역설계 §2·M120 실측).
+     기준은 **150vh** (1440×900 에서 1350 — 원본과 같다). 폭 기준(93.75vw)으로 두면 넓은 화면에서 히어로가
+     뷰포트보다 훨씬 커져 집이 원본(2000×1215 캡처: 지붕 0.74)보다 아래(0.82)에 앉았다(DoD 0 2회차, 사용자 지시).
+     `80vw` 하한은 아주 넓고 낮은 화면에서 무대(0.75w)가 히어로 위로 넘치지 않게 하는 안전판이다. */
+  min-height: max(150vh, 80vw);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: center;
+  /* 내비가 히어로 위에 겹쳐 앉으므로 그 높이만큼 띄운다. +space-8 은 문구를 소폭 아래로(2026-09-13 사용자 DoD 0 지시). */
+  padding-block: calc(var(--nav-h) + var(--space-12) + var(--space-8)) 0;
+  /* 바탕 = 원경 판의 단색 하늘과 **같은 색** (M120 결정 7 · 역설계 §2·§9-1).
+     원본은 판이 히어로 상단을 다 덮지 않는다(p=0 에서 위 28px 이 바탕) — 이음매를 커버리지가 아니라
+     색 일치로 숨긴다. 값은 `scripts/prep_hero_plates.py --flatten-sky` 가 찍은 기준색이다.
+     판이 못 덮는 영역·자산 로드 실패 시에도 흰 판이 아니라 이 색이 남는다. */
+  background: rgb(253 241 253);
+  isolation: isolate;
+
+  /* 깊이 장면의 면 색 — 라벤더 한 계열로만 간다.
+     보라 + 청록은 배제 클리셰라 근경 잎에 민트를 쓰지 않는다
+     (research/2026-09-03-m104-reference-sites.md). */
+  --leaf: color-mix(in oklch, var(--primary) 20%, var(--card));
+}
+/* 모바일은 150vh 가 과하다(무대가 폭 기준이라 작은데 하늘만 커진다) — 이전 구도 125vh 유지. 원본 390 실측 1097 ≈ 130vh. */
+@media (max-width: 767px) {
+  .hero { min-height: 125vh; }
+}
+
+.hero__stage {
+  position: absolute;
+  /* ⚠⚠ **판 셋은 같은 상자를 쓴다.** 이것이 M119 의 핵심이고, 앞선 두 회차가 계속
+     실패한 자리다. 원본은 1920×1440 짜리 **전체 장면** 3장을 같은 캔버스에 겹친다
+     (M119 실측 1) — 우리가 쓰던 「높이가 서로 다른 가로 띠 3개」가 아니다.
+
+     띠 배치는 판마다 상자 높이·바닥 오프셋·오버스캔을 따로 줘야 했고, 그래서
+     ① 띠 경계가 가로줄로 드러나고 ② 자산을 갈 때마다 숫자가 어긋나 그림이 잘리고
+     ③ 하늘 영역과 겹침을 손으로 계산해야 했다. 셋 다 **상자를 하나로 만들면 사라진다**. */
+  inset: auto 0 0 0;
+  aspect-ratio: var(--stage-ratio);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero__layer {
+  /* 판은 캔버스를 그대로 채운다 — 판별 높이도, 바닥 오프셋도, 오버스캔도 없다.
+     `100% auto` + `bottom center` 라 자산이 캔버스보다 납작하면 아래에 붙고 위가 비며,
+     캔버스와 비율이 같으면 꽉 찬다. **어느 쪽이든 잘리지 않는다** — 폭을 채우는 높이를
+     상자가 자르지 않기 때문이다. 그래서 자산을 갈아도 이 규칙은 안 바뀐다.
+     회귀 감시: `scripts/check_layer_crop.py` · `scripts/check_asset_modules.py` */
+  position: absolute;
+  inset: 0;
+  background-image: var(--img);
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: 100% auto;
+}
+
+/* ── 집 창문 점등 (원본 `.gl-hero-bg-addon.-v1~-v5`)
+   오버레이는 `.hero__layer--mid` 의 **자식**이다 — 원본이 `-merge` 상자로 하는 일을
+   판 자신이 한다. 같은 상자에 같은 배경 규칙을 쓰므로 정합이 **구조적으로** 맞고,
+   중경이 움직이면 불빛도 같이 간다(좌표 보정 0).
+   ⚠ 여기서 `background-size`·`background-position` 을 판과 다르게 주면 그 정합이 깨진다. */
+.hero__light {
+  position: absolute;
+  inset: 0;
+  background-image: var(--img);
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: 100% auto;
+  opacity: 0;
+  will-change: opacity;
+}
+
+/* ⚠ **판에 불투명도를 주지 않는다.** M118 까지 원경이 0.75 였고, 그 뒤의 구름이 산을 통과해
+   보였다. 그때 주석은 「원경 뒤에는 판이 없고 바탕색뿐이라 비칠 것이 없다」였는데 사실이
+   아니었다. 대기 원근(먼 것이 옅다)은 **자산이 들고 온다** — 원경 그림 자체가 옅게 그려진다.
+   지금은 구름이 판보다 **앞**이라 비침이 구조적으로 불가능하지만, 그건 이 규칙을 되돌릴
+   이유가 아니라 두 겹으로 막은 것이다. */
+
+/* ── 구름 (원본 `.gl-hero-bg-cloud.-v1~-v4`)
+   원본에서 구름은 **별개 그룹이고 판보다 앞(z:1)이며 스크롤에 전혀 반응하지 않는다**
+   (M119 실측 6 — transform 전 구간 0, animationName none). 판 PNG 안에 구름이 들어가는 일이
+   원리적으로 없는 배치다. 우리 `hero-far.png` 에는 구름 4개가 그려져 있었고(M119 실측 10)
+   그게 사용자가 두 회차 연속 지적한 결함의 원인이었다 — step-2 가 자산에서 떼어냈다.
+   ⚠ 구름은 장식이 아니라 판이다 — 빼면 하늘이 빈 색면이 되어 판이 셋뿐임이 드러난다. */
+.hero__sky {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--sky-h);
+  /* 판(z:0)보다 앞. 원본 `.gl-hero-bg-clouds { z-index: 1 }` 그대로다. */
+  z-index: 1;
+  pointer-events: none;
+}
+/* ⚠ 구름을 화면 밖으로 내보내지 않는다 — 좌우 끝이 잘려 보인다(2026-09-12 사용자 지적).
+   원본 구름은 윤곽이 없어 잘려도 안 보이지만, 우리 구름은 먹선이 있어 잘린 자리가 드러난다.
+   왼쪽 것은 `left`, 오른쪽 것은 `right` 로 안쪽에 앉힌다. 진입 슬라이드는 transform 이 맡는다. */
+.hero__cloud {
+  position: absolute;
+  width: var(--cloud-w);
+  aspect-ratio: var(--cloud-ratio);
+  background-image: var(--img);
+  background-repeat: no-repeat;
+  background-size: 100% auto;
+  /* 투명감은 자산이 들고 온다(원본 낱장도 alpha 44~49% 의 PNG 를 opacity 1 로 둔다 — 역설계 §3).
+     M119 의 0.7 은 먹선 구름을 눌러 두려는 값이었고, 결이 같은 구름에서는 사라지게만 만든다. */
+  opacity: 1;
+  transform-origin: center;
+}
+/* 어느 구름이 어디 앉는지는 `content.hero.clouds` — 컴포넌트가 top/left/right·폭·비율을 인라인으로 넘긴다 */
+
+.hero__content {
+  position: relative;
+  z-index: 2;  /* 구름(1) · 판(0) 보다 앞 — 원본 `.gl-hero-content { z-index: 2 }` */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero__eyebrow {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-bottom: var(--space-4);
+}
+
+/* 원본 실측(1440): 60px/72 ls -1.8px · 본문 22px/1.2 · 둘 다 본문 폭 1000px 안에서 중앙.
+   제목을 더 키우지 않는다 — 원본의 힘은 크기가 아니라 **여백과 행간**에서 온다. */
+.hero__title {
+  /* ×1.2 — 2026-09-13 사용자 DoD 0 지시(「크기를 20% 정도 늘리고」). 부제도 같이 키운다. */
+  font-size: calc(var(--fs-display) * 1.2);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-head);
+  color: var(--foreground);
+  max-width: 20ch;
+}
+
+.hero__lede {
+  margin-top: var(--space-6);
+  font-size: calc(var(--fs-lead) * 1.2);
+  color: var(--secondary-foreground);
+  max-width: 52ch;
+}
+
+.hero__actions {
+  margin-top: var(--space-8);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+/* 버튼 — 원본 실측(1440): padding 21/42 · radius 5 · 17px/700 · ls -0.51px.
+   가로 여백이 세로의 정확히 두 배다. 모서리는 카드(30)·CTA(20)와 달리 5 로 **작게** 둔다 —
+   면이 아니라 조작이라는 신호다. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--btn-pad-y) var(--btn-pad-x);
+  border-radius: var(--r-btn);
+  font-weight: 700;
+  font-size: var(--fs-btn);
+  letter-spacing: var(--ls-head);
+  line-height: 1.2;
+  text-decoration: none;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.btn--primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.btn--primary:hover { background: var(--primary-hover); }
+
+/* 색면 위의 버튼은 반전한다 — 같은 보라를 얹으면 면에 묻힌다 */
+.btn--white {
+  background: var(--card);
+  color: var(--primary);
+}
+.btn--white:hover { background: var(--muted); }
+
+.btn--ghost {
+  background: transparent;
+  color: var(--foreground);
+  box-shadow: inset 0 0 0 var(--hairline) var(--border);
+}
+.btn--ghost:hover { background: var(--card); }
+
+.btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}

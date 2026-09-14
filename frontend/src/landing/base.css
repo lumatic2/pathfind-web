@@ -1,0 +1,283 @@
+/* 랜딩 기반 스타일. 값은 전부 tokens.css 의 커스텀 프로퍼티를 참조한다.
+   원본 Glide 는 커스텀 프로퍼티가 0건이고 hex 리터럴이 217건이었다 — 그 점은 뒤집어서 가져온다. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* `hidden` 속성은 display 선언에 밀린다 — `.ppc__grid{display:grid}` 가 [hidden] 을 이겨
+   탭 패널 두 벌이 동시에 보였다(2026-09-12 참조 대조에서 적발).
+   전역으로 못박아 두면 컴포넌트마다 되풀이하지 않는다. */
+[hidden] { display: none !important; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Pretendard', 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   공유 컨테이너 — 수확 축 A
+   원본은 31개 셀렉터가 규칙 하나를 공유하고 거터가 뷰포트 사다리로만 바뀐다.
+   가져오는 것은 그 **구조**이고, 값은 우리 토큰으로 다시 정한다.
+   근거: evidence/m115/observation/container-ladder.md
+   ───────────────────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  max-width: var(--measure, none);
+}
+
+:root {
+  /* ── 간격 스케일 (4px 격자) — 숫자가 사는 유일한 자리다.
+     컴포넌트 파일에는 px 리터럴을 두지 않는다. 원본은 반대였다:
+     커스텀 프로퍼티 0건 / hex 217건 / 수직 패딩 83종. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 40px;
+  --space-10: 48px;
+  --space-12: 64px;
+  --space-13: 72px;
+  --space-14: 80px;
+  --space-16: 96px;
+  --space-18: 120px;
+  --space-20: 160px;
+
+  /* 선 굵기 — 간격이 아니므로 별도 축 */
+  --hairline: 1px;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --dot-size: 6px;
+  --btn-pad-y: 21px;
+  --btn-pad-x: 42px;   /* 원본 실측 — 가로가 세로의 정확히 두 배 */
+
+  /* 내비·패널 */
+  --nav-h: calc(var(--space-14) * 1.2);   /* 내비 20% 확대 — 2026-09-13 사용자 DoD 0 지시(M120 범위 확장) */
+  --touch-min: 44px;
+  --panel-w: 420px;
+  --panel-w-lg: 560px;
+  --panel-gap: var(--space-4);
+  --panel-dur: 200ms;
+  --arrow: 10px;
+  --radius-panel: 16px;
+  --badge-overhang: 12px;
+  --avatar: 72px;
+
+  /* 패럴랙스 오버스캔 — 위로 움직이는 판이 바닥을 들키지 않게 */
+  /* 판 셋이 공유하는 캔버스 비율 — 원본 자산이 1920×1440 (4:3) 이다 (M119 실측 1).
+     ⚠ 구 `--overscan-far/-mid` 는 은퇴했다. 판마다 상자 높이가 달랐을 때 위로 움직이는 판의
+     바닥이 들려 투명한 띠가 드러나는 것을 막던 값인데, 상자를 하나로 만들면서 그 결함 자체가
+     없어졌다. */
+  --stage-ratio: 4 / 3;
+
+
+  /* ── 가로 사다리 (수확 축 A) */
+  --gutter: var(--space-5);
+  --measure: none;
+
+  /* ── 타이포 사다리 — 2026-09-12 원본 1440 실측에서 비율만 가져왔다.
+     원본(GothamPro 60/72 ls -1.8 · 50/65 ls -1.5 · Mulish 22/1.4 · 인용 30/42)에서
+     **글꼴이 아니라 단계와 비율**을 옮긴다. 값은 우리 것이고 clamp 로 접는다.
+     근거: evidence/m115/reference-shots/live-measure.json */
+  --fs-display: clamp(2.25rem, 4.2vw, 3.75rem);   /* 36 → 60 */
+  --fs-h2:      clamp(1.75rem, 3.5vw, 3.125rem);  /* 28 → 50 */
+  --fs-quote:   clamp(1.25rem, 2.1vw, 1.875rem);  /* 20 → 30 */
+  --fs-item:    clamp(1.125rem, 1.8vw, 1.625rem); /* 18 → 26 */
+  --fs-lead:    clamp(1.0625rem, 1.5vw, 1.375rem);/* 17 → 22 */
+  --fs-btn: 17px;
+  --fs-foot:    clamp(1.375rem, 2.1vw, 1.875rem);  /* 22 → 30 */
+  --lh-tight: 1.2;
+  --lh-head: 1.3;
+  --lh-quote: 1.4;
+  --ls-head: -0.03em;
+
+  /* ── 면과 모서리 — 원본은 카드 30 / CTA 20 / 버튼 5 로 **세 단**을 쓴다.
+     크기가 클수록 모서리를 키우는 관례가 아니라, 역할마다 고정값이다. */
+  --r-card: 30px;
+  --r-cta: 20px;
+  --r-btn: 5px;
+
+  /* ── 블록별 치수 — 원본 1440 실측을 우리 폭(본문 1000px)에 그대로 대응시켰다 */
+  --trust-h: 520px;          /* 궤도 윗부분이 사는 높이 — 아래는 인용 카드가 덮는다 */
+  --bubble-min: 82px;        /* 말풍선 최소 폭 / 높이 — 원본 실측 */
+  --bubble-h: 50px;
+  --mood: 28px;              /* 기분 표시 원 — 22px 에서는 입 호가 6.8px 라 두 표정이 같아 보였다(M118 D6) */
+  --logo-fs: calc(1.5rem * 1.2);   /* 로고 워드마크 — 원본 33px 대응 × 1.2 (M120 내비 20% 확대) */
+  --logo-mark: calc(32px * 1.2);   /* 원본 마크는 워드마크보다 키가 크다 × 1.2 */
+  --hairline-2: 2px;
+  /* 동심원 바깥 지름. **본문 폭(1000)보다 커야 한다** — 궤도가 본문 안에 갇히면
+     아래 절반이 인용 카드에 통째로 덮여 원이 반쪽만 있는 것처럼 읽힌다(진단 D4·D5).
+     카드 밖으로 나온 좌우 호가 「바깥에 더 있다」를 만든다. */
+  --orbit-w: 1240px;
+  --ring-w: var(--hairline-2);  /* 1px 헤어라인은 흰 바탕에서 사라진다(D5) */
+  /* 궤도를 섹션 윗변에서 한 칸 내린다 — 링의 맨 윗호는 국소적으로 수평이라,
+     섹션 경계선과 겹치면 두 선이 한 줄로 합쳐져 「풍경이 잘린 단면」처럼 읽힌다
+     (2026-09-13 실측: 경계에서 154열 연속). 제목 자리는 `.trust` 패딩이 잡으므로 안 움직인다. */
+  --orbit-drop: 48px;
+  --ring-line: color-mix(in oklch, var(--foreground) 30%, var(--border));
+  --avatar: 84px;            /* 인용 카드에 걸터앉는 아바타 */
+  --quote-surface: color-mix(in oklch, var(--askewly-lavender) 16%, var(--card));
+  --quote-measure: 34ch;     /* 원본 인용 폭 530/1000 */
+  --band-overhang: 200px;    /* 카드가 색면 아랫변을 넘어 흰 바탕으로 내려가는 길이 */
+  --tile: 56px;              /* 도식의 도구 타일 */
+  /* 타일 + 라벨이 쓰는 폭. **고정 104px 로 두면 좁은 폭에서 라벨끼리 겹친다**(390 에서 4건,
+     1024 에서 1건 — 자리값이 패널 대비 % 라 패널이 줄면 슬롯만 안 줄어든다).
+     패널 폭에 묶어 같이 줄인다. */
+  --tile-slot: clamp(72px, 27%, 104px);
+  --icon-lg: 56px;           /* 2×2 아이콘 */
+  --cta-base: var(--primary-hover);
+  --cta-h: 486px;            /* 원본 CTA 카드 높이 */
+  --cta-copy-w: 46%;
+  --cta-figure-w: 30%;
+  --fs-cta-title: clamp(1.5rem, 2.4vw, 2.1875rem);  /* 24 → 35 */
+  --paper: 60px;
+  --start-card: 302px;       /* 원본 실측 302×253 */
+  /* 시작 표제는 공통 h2(50px)보다 한 단 작다 — 우리 표제가 원본보다 단어가 많아
+     같은 크기로는 열 폭 안에서 네 줄로 접힌다(진단 D9). */
+  --fs-start: clamp(1.5rem, 2.4vw, 2.125rem);  /* 24 → 34 — 36 은 둘째 줄이 420px 열에서 8px 넘친다 */
+  --start-gap: var(--space-10);
+
+  /* ── 세로 리듬 — 좁은 폭의 기본값. 위 스케일로 세운 단일 리듬이다. */
+  --section-y: var(--space-18);
+  --hero-pad-min: var(--space-14);
+  --hero-pad-max: var(--space-20);
+
+  /* ── 섹션별 세로 패딩 (M118) ─────────────────────────────────
+     여덟 섹션이 `--section-y` **한 값**을 나눠 쓰면 인접 섹션이 만날 때마다
+     두 패딩이 더해져 같은 폭의 빈 띠가 반복된다(진단 D1). 원본은 섹션마다 다른 단을 쓰고
+     아홉 중 네 자리가 `padB = 0` 이다 — 다음 블록이 앞 블록을 물고 올라오는 이음매다.
+
+     기본값은 단일 리듬을 그대로 둔다. **사다리는 ≥1200 에만 적용한다** —
+     원본 계측이 1440 한 폭뿐이라 그 아래 폭의 값은 근거가 아니라 발명이 된다.
+     과녁 표: evidence/m118/diagnosis-2026-09-13.md 「추가 계측」 */
+  --pad-nav-y:    0px;
+  --pad-hero-t:   calc(var(--nav-h) + var(--space-12));
+  --pad-hero-b:   0px;
+  --hero-stage-h: 68%;                           /* 풍경이 사는 띠 — 히어로 아래 패딩과 같다 */
+  --pad-trust-t:  calc(var(--orbit-w) * 0.21);   /* 궤도가 사는 띠 — .trust 가 쓴다 */
+  --pad-trust-b:  var(--section-y);
+  --pad-quote-t:  0px;
+  --pad-quote-b:  var(--section-y);
+  --pad-band-t:   var(--section-y);
+  --pad-band-b:   0px;
+  --pad-team-t:   var(--section-y);
+  --pad-team-b:   var(--section-y);
+  --pad-cta-t:    0px;
+  --pad-cta-b:    var(--section-y);
+  --pad-start-t:  var(--section-y);
+  --pad-start-b:  var(--section-y);
+  --pad-foot-t:   var(--space-18);
+  --pad-foot-b:   var(--space-12);
+}
+@media (min-width: 768px)  { :root { --gutter: 30px;              --section-y: var(--space-16); } }
+@media (min-width: 1024px) { :root { --gutter: var(--space-14);   --section-y: var(--space-18); } }
+@media (min-width: 1200px) { :root { --gutter: 100px; --measure: 1200px; --section-y: 144px; } }
+@media (min-width: 1600px) { :root { --gutter: var(--space-20); --measure: 1600px; --section-y: 168px; --start-card: 302px; } }
+
+/* 원본 사다리 — 1440 실측값을 그대로 박는다. 여기가 이 파일에서 유일하게
+   스케일 밖 숫자를 쓰는 자리이고, 그래서 출처를 줄마다 적는다. */
+@media (min-width: 1200px) {
+  :root {
+    --pad-nav-y:   46px;    /* gl-navbar  46 / 46 */
+    --pad-hero-t: 210px;    /* gl-hero   210 / 832 — 아래 832 가 풍경이 사는 띠다 */
+    --pad-hero-b: 832px;
+    --hero-stage-h: var(--pad-hero-b);
+    --pad-trust-t: 520px;   /* gl-radar  520 / 90 — 위 520 이 궤도가 사는 띠다 */
+    --pad-trust-b:  90px;
+    --pad-quote-t:   0px;   /* gl-feedback 0 / 0 — 카드가 자기 패딩을 쓴다 */
+    --pad-quote-b:   0px;
+    --pad-band-t:  260px;   /* gl-package 260 / 0 */
+    --pad-band-b:    0px;
+    --pad-team-t:  354px;   /* gl-service 354 / 0 — 앞 카드의 돌출을 이 띠가 받는다 */
+    --pad-team-b:    0px;
+    --pad-cta-t:     0px;   /* gl-cta      0 / 0 */
+    --pad-cta-b:     0px;
+    --pad-start-t: 180px;   /* gl-start  180 / 180 */
+    --pad-start-b: 180px;
+    --pad-foot-t:  110px;   /* gl-footer 110 / 60 */
+    --pad-foot-b:   60px;
+    --start-card: 250px;    /* 표제가 두 줄로 서려면 왼쪽 열이 420px 은 돼야 한다 */
+  }
+}
+
+.section { padding-block: var(--section-y); }
+
+/* 섹션 id 로 건다 — 조립부(`App.tsx`)는 M118 범위 밖이라 클래스를 새로 붙이지 않는다.
+   id 는 `.section.-ct` 보다 특정도가 높으므로 아래 상쇄 규칙을 이긴다. */
+#trust { padding-block: 0 var(--pad-trust-b); }   /* 위 띠는 `.trust` 가 쓴다(궤도가 그 안에 산다) */
+#quote { padding-block: var(--pad-quote-t) var(--pad-quote-b); }
+#team  { padding-block: var(--pad-team-t)  var(--pad-team-b); }
+#cta   { padding-block: var(--pad-cta-t)   var(--pad-cta-b); }
+#start { padding-block: var(--pad-start-t) var(--pad-start-b); }
+
+/* 조판 상쇄 — 정본: recipes/marketing/section-padding-collapse.md
+   인접 섹션의 배경이 같으면 두 패딩이 합쳐져 의도한 리듬의 두 배가 된다.
+   순서를 아는 쪽(조립부)이 선언하므로 선택자가 순서에 의존하지 않는다. */
+.section.-ct { padding-block-start: 0; }
+.section.-cb { padding-block-end: 0; }
+.section.-cp { padding-block: 0; }
+
+/* ─────────────────────────────────────────────────────────────
+   진입 연출 — 수확 축 E
+   원본 안무 어휘: opacity 0→1 · y 20/30/40/50 → 0 · ease expo.out(81/100) · duration 1.
+   오프셋 공식: 제목 0 → 본문 .1~.15 → 액션 .2~.4 → 아이템 묶음 stagger .05
+   ───────────────────────────────────────────────────────────── */
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, var(--reveal-y, var(--space-9)), 0);
+  transition:
+    opacity 1s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0s);
+}
+[data-reveal][data-revealed='true'] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* 감소 모션 — 이동 없이 즉시 최종 상태. 콘텐츠를 opacity 0 에 묶어 두지 않는다. */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+    transition-delay: 0s;
+  }
+}
+
+h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -0.02em; }
+p { margin: 0; }
+
+.muted { color: var(--muted-foreground); max-width: 62ch; margin-top: var(--space-4); }
+
+
+
+/* 행·스택 간격 — 세로 리듬은 우리 scale 로 세운다(원본의 83종 즉흥값을 쓰지 않는다) */
+:root {
+  --row-gap: var(--space-8);
+  --row-gap-wide: var(--space-12);
+  --row-stack: var(--space-13);
+  --stack-xs: var(--space-2);
+  --stack-sm: var(--space-4);
+  --stack-md: var(--space-6);
+}
+@media (min-width: 1024px) {
+  :root { --row-gap-wide: var(--space-14); --row-stack: var(--space-16); }
+}
+@media (min-width: 1200px) {
+  :root { --row-gap-wide: var(--space-16); --row-stack: var(--space-18); }
+}

@@ -1,10 +1,11 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { MarketingLandingPage } from '@/components/blocks/marketing-landing/page'
-import '@/app/index.css'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './tokens.css';
+import './base.css';
+import { App } from './App';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <MarketingLandingPage />
-  </React.StrictMode>,
-)
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);

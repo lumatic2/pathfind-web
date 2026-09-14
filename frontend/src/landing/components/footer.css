@@ -1,0 +1,137 @@
+/* 두 모드 푸터 — 정본: recipes/navigation/two-mode-footer-nav.md */
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* 원본 실측(1440): padding 110/60 · 브랜드 색면 전면 · 흰 글씨.
+   푸터를 회색 면으로 두면 페이지가 흐려지며 끝난다 — 색면이라야 마감이 된다. */
+.ft {
+  padding-block: var(--pad-foot-t) var(--pad-foot-b);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.ft__main { display: grid; gap: var(--space-10); }
+@media (min-width: 1024px) {
+  .ft__main { grid-template-columns: 1fr 2fr; gap: var(--space-16); }
+}
+
+/* 원본 30px/42 weight **500** — 제목보다 가볍다. 700 으로 올리면 내비와 경쟁한다. */
+.ft__tagline {
+  font-size: var(--fs-foot);
+  font-weight: 500;
+  line-height: var(--lh-quote);
+  color: var(--primary-foreground);
+  max-width: 18ch;
+}
+
+.tmfn { display: grid; gap: var(--space-4); }
+@media (min-width: 768px) {
+  .tmfn { grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
+}
+
+.tmfn__head { display: flex; align-items: center; justify-content: space-between; }
+
+.tmfn__title {
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  color: var(--primary-foreground);
+  text-decoration: none;
+  min-height: var(--touch-min);
+  display: inline-flex;
+  align-items: center;
+}
+.tmfn__title:hover { text-decoration: underline; }
+
+.tmfn__toggle {
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+.tmfn__toggle::before,
+.tmfn__toggle::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: var(--space-3);
+  height: var(--hairline);
+  margin-left: calc(var(--space-3) / -2);
+  background: var(--primary-foreground);
+  transition: transform 200ms ease;
+}
+.tmfn__toggle::after { transform: rotate(90deg); }
+.-open .tmfn__toggle::after { transform: rotate(0deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tmfn__toggle::before, .tmfn__toggle::after { transition: none; }
+}
+
+.tmfn__links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* 모바일 — 접혀 있다 */
+@media (max-width: 767px) {
+  .tmfn__links { display: none; padding-block: var(--space-3) var(--space-4); }
+  .tmfn__col.-open .tmfn__links { display: grid; }
+}
+
+/* 데스크톱 — 항상 펼쳐져 있고 버튼은 보이지 않는다 */
+@media (min-width: 768px) {
+  .tmfn__toggle { display: none; }
+  .tmfn__title { min-height: auto; }
+  .tmfn__links { margin-top: var(--space-3); }
+}
+
+/* 2단은 80% 알파다 — 다른 색이 아니라 **같은 흰색을 묽게** 쓴다.
+   회색을 섞으면 색면 위에서 탁해진다. */
+.tmfn__link {
+  color: color-mix(in oklch, var(--primary-foreground) 80%, transparent);
+  text-decoration: none;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+.tmfn__link:hover { color: var(--primary-foreground); }
+
+.tmfn__link:focus-visible,
+.tmfn__title:focus-visible,
+.tmfn__toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary-foreground);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.ft__bottom {
+  margin-top: var(--space-18);
+  display: grid;
+  gap: var(--space-4);
+  align-items: center;
+  color: color-mix(in oklch, var(--primary-foreground) 85%, transparent);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+@media (min-width: 900px) {
+  .ft__bottom { grid-template-columns: auto 1fr auto; gap: var(--space-12); }
+}
+/* 색면 위에서는 흰 로고 — `currentColor` 로 마크와 워드마크가 같이 바뀐다. 문(accent)만 라벤더로 남긴다. */
+.ft__logo { color: var(--primary-foreground); display: inline-flex; }
+.ft__logo img { filter: brightness(0) invert(1); }
+.ft__terms { display: flex; gap: var(--space-6); }
+.ft__terms a {
+  color: inherit;
+  text-decoration: none;
+}
+.ft__terms a:hover { color: var(--primary-foreground); text-decoration: underline; }
+.ft__terms a:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary-foreground);
+  outline-offset: var(--focus-ring-offset);
+}

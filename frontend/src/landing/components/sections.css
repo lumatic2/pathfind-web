@@ -1,0 +1,642 @@
+/* 랜딩 본문 블록 — 원본 `/` 대조 조판.
+   숫자는 base.css 의 토큰만 쓴다. 여기 px 리터럴을 두지 않는다.
+   레퍼런스 실측: evidence/m115/reference-shots/live-measure.json (1440 뷰포트) */
+
+/* ── 공통 제목 ─────────────────────────────────────────── */
+.trust__title,
+.band__title,
+.team__title,
+.start__title {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  line-height: var(--lh-head);
+  letter-spacing: var(--ls-head);
+}
+
+/* ── 아바타 시트 슬라이싱 ───────────────────────────────
+   자산 한 장(5열 × 2행)에서 칸을 꺼낸다. 칸 좌표 `--ax`(0~4) · `--ay`(0~1) 는
+   **JS 가 계산해 넘긴다** — CSS calc 의 `%` 는 나머지가 아니라 백분율 단위라
+   `idx % 5` 를 calc 안에서 쓰면 규칙이 통째로 무효가 되고 전부 0번 칸이 된다. */
+/* 시트 경로는 `content.trust.avatars.src` — 블록 루트가 `--avatars` 로 넘긴다 */
+.trust__node,
+.quote__avatar {
+  background-image: var(--avatars);
+  background-repeat: no-repeat;
+  background-size: 500% 200%;
+  background-position: calc(var(--ax, 0) * 25%) calc(var(--ay, 0) * 100%);
+}
+
+/* ────────────────────────────────────────────────────────
+   Trust — 원본 `gl-radar`
+   ──────────────────────────────────────────────────────── */
+/* 원본 `.gl-radar-figure` 는 섹션보다 크고(1360 / 섹션 740) `z-index:-1` 로 **다음 블록 뒤로 이어진다**.
+   섹션에서 잘라 내면 원 위아래에 칼로 벤 선이 생긴다(2026-09-12 사용자 지적 「라인 잘림」).
+   자르지 않는다 — 궤도를 섹션 윗변에 붙이고, 아래 절반은 인용 카드가 덮게 둔다. */
+/* 제목은 궤도의 21~30% 높이에 앉는다(원본 실측: 도형 top 240 / 제목 520~650 / 도형 1360).
+   위 줄 아바타(top −3~16%)와 아래 쌍(39~42%) **사이**다 — 가운데 정렬하면 아래 쌍 위에 겹친다. */
+.trust {
+  position: relative;
+  display: grid;
+  place-items: start center;
+  /* 궤도가 사는 띠 — 섹션이 아니라 이 블록이 쓴다. 궤도는 이 띠의 위쪽 0 에 붙으므로
+     패딩을 섹션으로 올리면 궤도 위에 빈 띠가 생긴다(M118 D1). */
+  padding-top: var(--pad-trust-t);
+  min-height: var(--trust-h);
+  isolation: isolate;
+}
+
+/* 좁은 화면에서 오른쪽 말풍선이 뷰포트 밖으로 나가 문서 폭을 넓힌다(390px 에서 431 실측).
+   세로는 그대로 두고 가로만 자른다 — `clip` 은 스크롤 컨테이너를 만들지 않아
+   궤도가 아래 블록 뒤로 이어지는 것은 유지된다.
+   ⚠ 자르는 자리는 `.trust`(본문 폭)가 아니라 **섹션**이다 — 본문 폭에서 자르면
+   본문보다 큰 궤도의 좌우가 잘려 나가 원이 사각 모서리로 끝난다. */
+#trust { overflow: clip visible; }
+
+.trust__orbit {
+  position: absolute;
+  top: var(--orbit-drop);
+  left: 50%;
+  translate: -50% 0;
+  width: min(var(--orbit-w), 92vw);
+  aspect-ratio: 1;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 동심원 두 겹 — 원본은 안쪽 원이 바깥의 12% 안쪽(=76%)이다. 겹쳐 보이면 한 겹으로 읽힌다. */
+.trust__ring {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  translate: -50% -50%;
+  border: var(--ring-w) solid var(--ring-line);
+  border-radius: 50%;
+  transform-origin: center;
+}
+.trust__ring--outer { width: 100%; height: 100%; }
+.trust__ring--inner { width: 76%; height: 76%; }
+
+/* 아바타 — 원본처럼 top/left 백분율로 앉힌다(극좌표가 아니다).
+   그래야 `transform` 이 비어 있어 진입 연출(scale 0→1)이 그 속성을 통째로 쓸 수 있다. */
+.trust__node {
+  position: absolute;
+  /* 자리는 극좌표 중심값으로 들어온다 — 중심 맞춤은 `translate` 가 한다.
+     `transform` 은 진입 연출(scale 0→1)이 쥐고 있어 여기 쓰면 서로 덮는다(M115 결함 2). */
+  translate: -50% -50%;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background-color: var(--node-bg, var(--askewly-lavender));
+  background-size: 500% 200%;
+  box-shadow: 0 0 0 var(--hairline) var(--card) inset;
+}
+.trust__node:nth-child(3n)   { --node-bg: var(--askewly-orchid); }
+.trust__node:nth-child(3n+1) { --node-bg: var(--askewly-sky); }
+
+/* 말풍선 — 원본 `.gl-radar-figure-item-popup`: 아바타의 오른쪽 위(left 90% / bottom 90%)에 붙고,
+   점 3개가 깜빡이다가(`gl-load`) 글자가 한 자씩 들어오며 폭이 늘어난다. */
+.trust__bubble {
+  position: absolute;
+  left: 90%;
+  bottom: 90%;
+  min-width: var(--bubble-min);
+  height: var(--bubble-h);
+  padding-inline: var(--space-5);
+  display: flex;
+  align-items: center;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--r-card);
+  transform-origin: left bottom;
+  white-space: nowrap;
+}
+.trust__bubble.-a { background: var(--askewly-orchid); }
+.trust__bubble::after {
+  /* 꼬리 */
+  content: '';
+  position: absolute;
+  left: var(--space-2);
+  bottom: calc(var(--space-2) * -1);
+  width: var(--space-4);
+  height: var(--space-4);
+  background: inherit;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.trust__bubble-dots {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  translate: -50% -50%;
+  display: flex;
+  gap: var(--space-2);
+}
+.trust__bubble-dots i {
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  background: currentColor;
+  animation: bubble-load 1s linear infinite;
+}
+.trust__bubble-dots i:nth-child(2) { animation-delay: 0.2s; }
+.trust__bubble-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bubble-load {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.trust__bubble-text {
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.trust__bubble-text span { opacity: 0; }
+
+.trust__title {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 18ch;
+}
+.trust__title b { color: var(--primary); font-weight: 900; }
+
+/* ────────────────────────────────────────────────────────
+   Quote — 원본 `gl-feedback`
+   ──────────────────────────────────────────────────────── */
+/* 인용 블록은 궤도의 아래 절반 **위에** 놓인다 — z-index 가 궤도(0)보다 커야 한다 */
+.quote-wrap { position: relative; z-index: 1; }
+
+/* 캐러셀 — 트랙이 한 장 폭씩 옆으로 밀린다(원본 owl smartSpeed 500ms).
+   ⚠ 아바타가 카드 윗변 밖으로 절반 나와 있다. `overflow: hidden` 을 그냥 걸면 그 절반이
+   잘린다(2026-09-12 사용자 지적). 잘리는 상자 **안에** 아바타 높이만큼 위 여백을 둔다 —
+   패딩은 overflow 상자 안쪽이라 거기 걸친 것은 살아남는다. */
+.quote__viewport { overflow: hidden; padding-top: calc(var(--avatar) / 2); }
+.quote__track {
+  display: flex;
+  transform: translateX(calc(var(--i, 0) * -100%));
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.quote {
+  flex: 0 0 100%;
+  position: relative;
+  margin: 0;
+  padding: calc(var(--avatar) / 2 + var(--space-10)) var(--space-12) var(--space-12);
+  background: var(--quote-surface);
+  border-radius: var(--r-card);
+  text-align: center;
+}
+
+.quote__nav {
+  margin-top: var(--space-8);
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+}
+.quote__dot {
+  width: var(--space-3);
+  height: var(--space-3);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: background-color 200ms ease, transform 200ms ease;
+}
+.quote__dot[aria-selected='true'] { background: var(--primary); transform: scale(1.25); }
+.quote__dot:focus-visible {
+  outline: var(--focus-ring-width) solid var(--ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* 카드 윗변을 물고 걸터앉는다 — 절반이 카드 밖으로 나와야 이 구성이 읽힌다.
+   카드 안으로 들여놓으면 그냥 아이콘이 된다. */
+.quote__avatar {
+  position: absolute;
+  inset: calc(var(--avatar) / -2) auto auto 50%;
+  translate: -50% 0;
+  width: var(--avatar);
+  height: var(--avatar);
+  border-radius: 50%;
+  background-color: var(--askewly-orchid);
+  --ax: 4; --ay: 1;
+  box-shadow: 0 0 0 var(--space-2) var(--background);
+}
+
+/* 본문 글꼴의 따옴표는 가늘고 작다 — 세리프로 바꿔야 원본처럼 덩어리로 읽힌다 */
+.quote__mark {
+  display: block;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: calc(var(--fs-h2) * 2.4);
+  font-weight: 700;
+  line-height: 0.75;
+  color: var(--primary);
+  text-align: start;
+  max-width: var(--quote-measure);
+  margin-inline: auto;
+}
+
+.quote__text {
+  margin: var(--space-6) auto 0;
+  max-width: var(--quote-measure);
+  font-size: var(--fs-quote);
+  font-weight: 700;
+  line-height: var(--lh-quote);
+}
+
+.quote__who {
+  margin-top: var(--space-10);
+  display: grid;
+  gap: var(--space-1);
+}
+.quote__name { font-size: var(--fs-lead); font-weight: 700; }
+.quote__role { color: var(--muted-foreground); }
+
+/* ────────────────────────────────────────────────────────
+   Compare — 원본 `gl-package`
+   ──────────────────────────────────────────────────────── */
+.band {
+  position: relative;
+  padding-block: var(--pad-band-t) var(--pad-band-b);
+  color: var(--primary-foreground);
+  text-align: center;
+}
+
+/* ⚠ 카드를 음수 마진으로 끌어내리는 방법은 **안 먹는다** — 마지막 자식의 아래 마진은
+   부모와 상쇄(collapse)되어 부모 높이가 줄지 않는다(2026-09-12 실측: 넘침 0px).
+   반대로 한다: 색면을 바닥에 깔고 그 바닥을 카드보다 먼저 끊는다.
+   그러면 카드의 아래 200px 이 흰 바탕 위에 놓여 두 섹션을 꿰맨다. */
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 var(--band-overhang) 0;
+  background: var(--primary);
+  z-index: 0;
+}
+.band > .container { position: relative; z-index: 1; }
+
+.band__title { max-width: 22ch; margin-inline: auto; }
+.band__lede {
+  margin: var(--space-6) auto 0;
+  max-width: 48ch;
+  font-size: var(--fs-lead);
+  color: color-mix(in oklch, var(--primary-foreground) 88%, var(--primary));
+}
+
+.band__card {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--space-16);
+  padding: var(--space-14) var(--space-12) var(--space-12);
+  background: var(--card);
+  color: var(--card-foreground);
+  border-radius: var(--r-card);
+}
+
+.band__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--row-gap-wide);
+}
+@media (min-width: 900px) {
+  .band__grid { grid-template-columns: 1fr 1fr; }
+}
+
+.band__col-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  margin-bottom: var(--space-8);
+}
+/* 원본은 이모지(😥 / 😊)다. 우리 그림체로 — 먹선 원 안에 점 눈 둘과 입 하나. */
+/* ⚠ 두 표정은 **말이 아니라 그림으로** 갈려야 한다. 22px 원에 34% 짜리 입 호를 그리면
+   실효 두께가 6.8px 라 좌우가 육안으로 같아진다(진단 D6 — 사용자 지적).
+   지름을 한 단 키우고, 입을 넓게 잡고, 낯빛까지 갈라 둔다. */
+.band__mood {
+  position: relative;
+  width: var(--mood);
+  height: var(--mood);
+  border-radius: 50%;
+  border: var(--hairline-2) solid var(--foreground);
+  background: var(--askewly-lavender);
+}
+.band__mood.-high { background: var(--askewly-lavender); }
+.band__mood.-low  { background: var(--muted); }
+.band__mood::before {
+  content: '';
+  position: absolute;
+  top: 32%;
+  left: 27%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--foreground);
+  box-shadow: calc(var(--mood) * 0.4) 0 0 var(--foreground);
+}
+.band__mood::after {
+  content: '';
+  position: absolute;
+  left: 24%;
+  right: 24%;
+  height: 42%;
+  border: var(--hairline-2) solid transparent;
+  border-radius: 50%;
+}
+.band__mood.-high::after { bottom: 10%; border-bottom-color: var(--foreground); }
+.band__mood.-low::after  { bottom: 2%;  border-top-color: var(--foreground); }
+
+.band__wheel-rotor {
+  position: absolute;
+  inset: 0;
+  transform-origin: center;
+}
+
+/* 두 도식은 같은 캔버스를 쓴다 — 높이가 다르면 좌우가 비교로 안 읽힌다 */
+.band__scatter,
+.band__wheel {
+  position: relative;
+  aspect-ratio: 6 / 5;
+}
+/* 한 열로 접히면 패널이 좁아져 라벨끼리 겹친다 — 가로로 못 벌리면 세로로 벌린다 */
+@media (max-width: 640px) {
+  .band__scatter,
+  .band__wheel { aspect-ratio: 3 / 4; }
+  /* 타일도 한 단 줄인다 — 슬롯만 줄이면 라벨이 타일보다 좁아져 글자가 접힌다 */
+  .band__tile,
+  .band__spoke { --tile: 44px; --tile-slot: clamp(60px, 22%, 104px); }
+}
+
+/* 실선이 아니라 **파선**이다 — 원본도 그렇다. 실선이면 배선도처럼 읽히고,
+   파선이라야 "느슨하게 이어져 있다"가 된다. */
+.band__threads {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  /* viewBox 를 패널 비율에 맞춰 늘인다 — 비율을 지키면 파선이 패널 한쪽에 몰린다 */
+  preserve-aspect-ratio: none;
+  stroke: var(--askewly-lavender);
+  stroke-width: 2;
+  stroke-dasharray: 6 8;
+  stroke-linecap: round;
+}
+
+/* 도구 타일 — 낱장 자산(`/tile-0..7.png`). 시트에서 background-position 으로 꺼내면
+   이웃 칸의 가장자리가 1px 새어 나온다(2026-09-12 적발). */
+.band__tile,
+.band__spoke {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  /* ⚠ 폭을 타일과 같게 두면 라벨이 옆 타일 위로 흘러 서로 겹친다.
+     라벨이 들어갈 폭을 따로 준다 — 타일은 그 안에서 가운데 선다. */
+  width: var(--tile-slot);
+  text-align: center;
+  line-height: 1.3;
+  /* 중심 맞춤은 `translate`, 연출(날아듦·역회전)은 `transform` — 두 속성이 서로를 안 덮는다 */
+  translate: -50% -50%;
+  transform-origin: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.band__tile::before,
+.band__spoke::before {
+  content: '';
+  width: var(--tile);
+  height: var(--tile);
+  border-radius: var(--radius-xl);
+  background-color: var(--card);
+  box-shadow: 0 0 0 var(--hairline) var(--border);
+  /* 그림은 `content.compare` 의 `icon` — 타일마다 `--img` 로 받는다 */
+  background-image: var(--img);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 62% auto;
+}
+
+/* 타일·스포크 자리는 `content.compare` 가 인라인 left/top 으로 준다 — 흩어짐과 네 방위는 데이터다 */
+
+
+.band__hub {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  translate: -50% -50%;
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  letter-spacing: var(--ls-head);
+  color: var(--primary);
+}
+
+.band__action { margin-top: var(--space-14); }
+
+/* ────────────────────────────────────────────────────────
+   Team — 원본 `gl-service`
+   ──────────────────────────────────────────────────────── */
+.team__title { max-width: 16ch; }
+
+.team__grid {
+  margin-top: var(--space-16);
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .team__grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* 칸을 나누는 것은 테두리가 아니라 **안쪽 선 하나**다.
+   각 칸에 border 를 두르면 겹쳐 2px 이 되고 바깥 테두리까지 생긴다.
+   시작 변에만 그어 십자만 남긴다. */
+/* 칸 아래 여백이 내용보다 크면 넷이 허공에 뜬다(진단 D8 — 실측 220px).
+   행 높이 차이(가장 짧은 칸이 행에 맞춰 늘어나는 몫)까지 합쳐 96px 아래로 들어와야 한다. */
+.team__cell { padding: var(--space-12) var(--space-12) var(--space-10); }
+@media (min-width: 768px) {
+  .team__cell:nth-child(2n)   { border-inline-start: var(--hairline) solid var(--border); }
+  .team__cell:nth-child(n+3)  { border-block-start: var(--hairline) solid var(--border); }
+  .team__cell:nth-child(2n+1) { padding-inline-start: 0; }
+  .team__cell:nth-child(2n)   { padding-inline-end: 0; }
+}
+@media (max-width: 767px) {
+  .team__cell { padding-inline: 0; }
+  .team__cell + .team__cell { border-block-start: var(--hairline) solid var(--border); }
+}
+
+.team__icon {
+  display: block;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  /* 아이콘은 `content.team.items[].icon` — 셀마다 `--img` 로 받는다 */
+  background-image: var(--img);
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: left center;
+}
+
+/* 원본 hover: `img.src` 를 `.animation.png` 로 교체(움직이는 PNG). 우리는 같은 자리에서 흔든다. */
+.team__cell:hover .team__icon { animation: icon-nudge 600ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes icon-nudge {
+  0%   { transform: translateY(0) rotate(0); }
+  35%  { transform: translateY(-6px) rotate(-6deg); }
+  70%  { transform: translateY(0) rotate(4deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+
+.team__text {
+  margin-top: var(--space-8);
+  font-size: var(--fs-item);
+  font-weight: 600;
+  line-height: var(--lh-quote);
+  max-width: 22ch;
+}
+.team__text b { color: var(--primary); font-weight: 700; }
+
+/* ────────────────────────────────────────────────────────
+   CtaCard — 원본 `gl-cta`
+   ──────────────────────────────────────────────────────── */
+.cta {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-cta);
+  background: var(--cta-base);
+  color: var(--primary-foreground);
+  isolation: isolate;
+  min-height: var(--cta-h);
+  display: grid;
+  align-items: center;
+}
+
+.cta__bg { position: absolute; inset: 0; z-index: -1; }
+
+/* ⚠ 원은 **카드보다 크다**(실측 1142×1258 / 카드 1000×486).
+   작은 원을 올리면 물방울 장식이 되고, 큰 원이라야 잘린 호가 면을 가른다. */
+.cta__circle {
+  position: absolute;
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+/* ⚠ 밝은 원을 **카피가 앉는 쪽에 두지 않는다.**
+   흰 글씨가 라벤더 위로 올라가 22px 본문이 대비 3.3 으로 떨어졌다(2026-09-12 적발).
+   밝은 면은 인물이 서는 오른쪽으로 보낸다 — 인물은 먹선이라 밝은 바탕에서 더 또렷하다. */
+.cta__circle.-c1 { width: 114%; left: -24%; top: -160%; background: var(--askewly-orchid); }
+.cta__circle.-c2 { width: 78%;  left: 94%;  top: -38%;  background: var(--askewly-lavender); }
+.cta__circle.-c3 { width: 108%; left: -43%; top: 22%;   background: var(--primary); }
+
+.cta__figure {
+  position: absolute;
+  /* 카드 오른쪽 변에 딱 붙이면 팔꿈치가 잘린다 — 한 칸 들여 세운다 */
+  inset: auto var(--space-8) 0 auto;
+  width: var(--cta-figure-w);
+  aspect-ratio: var(--ratio);          /* content.cta.figure */
+  background-image: var(--img);
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: 100% auto;
+}
+
+/* 흩날리는 서류 — 원본에도 세 장이 카드 밖으로 반쯤 나가 있다 */
+/* 흰 사각형만으로는 종이로 안 읽힌다 — 괘선이 있어야 서류가 된다 */
+.cta__paper {
+  position: absolute;
+  width: var(--paper);
+  aspect-ratio: 3 / 4;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 9px,
+      var(--border) 9px calc(9px + var(--hairline))
+    ) center / 70% 72% no-repeat,
+    var(--card);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 var(--hairline) var(--border);
+}
+.cta__paper.-p1 { left: 52%; top: -6%;  rotate: -14deg; }
+.cta__paper.-p2 { left: 42%; top: 72%;  rotate: 12deg; }
+.cta__paper.-p3 { left: 80%; top: 62%;  rotate: -8deg; }
+
+.cta__body {
+  position: relative;
+  padding: var(--space-14) var(--space-12);
+  max-width: var(--cta-copy-w);
+}
+.cta__title {
+  font-size: var(--fs-cta-title);
+  font-weight: 700;
+  line-height: var(--lh-head);
+  letter-spacing: var(--ls-head);
+}
+.cta__text {
+  margin-top: var(--space-6);
+  font-size: var(--fs-lead);
+}
+.cta .btn { margin-top: var(--space-10); }
+
+/* ────────────────────────────────────────────────────────
+   StartHelp — 원본 `gl-start`
+   ──────────────────────────────────────────────────────── */
+.start {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--start-gap);
+  align-items: start;
+}
+/* 두 열은 **≥1200 에서만** 선다. 900~1199 에서 가르면 왼쪽 열이 130px 대로 좁아져
+   표제가 네 줄로 접힌다(진단 D9). 그 폭에서는 표제를 위에 통째로 눕히는 편이 읽힌다. */
+@media (min-width: 1200px) {
+  .start { grid-template-columns: minmax(0, 1fr) auto; }
+}
+
+/* 표제는 공통 h2 한 단 아래 — 우리 둘째 줄이 원본보다 길어서 50px 로는 열 안에 안 선다 */
+.start__title { font-size: var(--fs-start); max-width: none; }
+
+/* 카드 두 장은 **가로로** 선다 — `auto-fit` 은 부모가 좁으면 조용히 세로로 접어
+   왼쪽 제목 옆에 긴 기둥을 만든다(2026-09-12 적발). 2열을 명시한다. */
+.start__links {
+  display: grid;
+  grid-template-columns: repeat(2, var(--start-card));
+  gap: var(--space-8);
+}
+@media (max-width: 767px) {
+  .start__links { grid-template-columns: 1fr; }
+  .start__link { width: auto; }
+}
+
+/* 카드는 정사각에 가깝다 — 가로로 긴 띠가 아니다.
+   라벨은 위, 화살표는 아래 — 같은 줄에 두면 버튼처럼 읽힌다. */
+.start__link {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--space-8);
+  width: var(--start-card);
+  aspect-ratio: 6 / 5;
+  padding: var(--space-10);
+  border-radius: var(--r-card);
+  text-decoration: none;
+  transition: translate 200ms ease;
+}
+.start__link.-solid { background: var(--primary); color: var(--primary-foreground); }
+.start__link.-quiet { background: var(--muted); color: var(--foreground); }
+.start__link:hover { translate: 0 calc(var(--space-1) * -1); }
+.start__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.start__label {
+  font-size: var(--fs-item);
+  font-weight: 700;
+  line-height: var(--lh-head);
+}
+.start__arrow { font-size: var(--fs-item); line-height: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .start__link { transition: none; }
+  .start__link:hover { translate: none; }
+  .quote__track { transition: none; }
+  .team__cell:hover .team__icon { animation: none; }
+  .trust__bubble-dots i { animation: none; }
+  .trust__bubble-text { width: auto; }
+  .trust__bubble-text span { opacity: 1; }
+}
