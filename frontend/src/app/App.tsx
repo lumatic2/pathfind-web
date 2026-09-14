@@ -188,7 +188,7 @@ function treeToSources(tree: SourceDoc[]): GroundedSource[] {
 }
 
 function CenterPanel() {
-  const { sendAnswer, approve, reviseSummary, retry, resumeResearch } = useFlow()
+  const { sendAnswer, approve, reviseSummary, retry, resumeResearch, fillMissingOutlines } = useFlow()
   const { session, patch } = useSession()
   const resumeRef = useRef(false)
 
@@ -197,6 +197,13 @@ function CenterPanel() {
     resumeRef.current = true
     resumeResearch()
   }, [resumeResearch])
+
+  // 새로고침 뒤 phase가 ready이고 busy가 아니면 빠진 outline을 하나씩 채운다
+  useEffect(() => {
+    if (session.phase === 'ready' && !session.busy) {
+      fillMissingOutlines()
+    }
+  }, [session.phase, session.busy, fillMissingOutlines])
   const directInputLabel = "직접 입력"
 
   const lastMessage = session.messages[session.messages.length - 1]

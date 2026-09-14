@@ -4,6 +4,7 @@ import { useSession } from './store'
 import {
   grill,
   pathfind,
+  outline,
   runPool,
   stage,
   RateLimited,
@@ -120,7 +121,29 @@ export function useFlow() {
     )
     patch({ stages: nextStages })
 
-    // 7) 결과 줄 (kind progress)
+    // 7) 이 단계만 outline 불러서 채운다 (빈 배열이면 필드를 두지 않고, 실패해도 done 유지)
+    outline({ stage: merged, summary })
+      .then((res) => {
+        if (res.topics.length > 0) {
+          patch({
+            stages: sessionRef.current.stages.map((s, i) =>
+              i === index ? { ...s, outline: res.topics } : s,
+            ),
+          })
+        } else {
+          // 빈 배열이면 필드를 아예 두지 않는다
+          patch({
+            stages: sessionRef.current.stages.map((s, i) =>
+              i === index ? { ...s, outline: undefined } : s,
+            ),
+          })
+        }
+      })
+      .catch(() => {
+        // 실패해도 단계 상태는 done 그대로
+      })
+
+    // 8) 결과 줄 (kind progress)
     const top = findings.slice(0, 3)
     const citationTitles = top.map((f) => (typeof f === 'object' && f != null ? (f as { name?: string }).name ?? '' : ''))
     const citationIds = top.map((_f, i) => `stage-${index}-finding-${i}`)
@@ -509,8 +532,60 @@ export function useFlow() {
         phase: 'ready',
         selectedId: null,
       })
+      // 단계가 모두 끝난 뒤 빠진 outline을 채운다
+      fillMissingOutlines()
     })
   }, [patch])
 
-  return { sendAnswer, approve, reviseSummary, startResearch, retry, resumeResearch }
+  /** phase가 ready이고 busy가 아닐 때, done이고 outline이 없는 단계 중
+   *  항목이 3개 이상인 것만 하나씩 outlines를 채운다.
+   *  빈 결과를 받은 단계는 outline: []로 표시해 재호출을 막는다.
+   */
+  function fillMissingOutlines() {
+    const current = sessionRef.current
+    if (current.phase !== 'ready' || current.busy) return
+
+    const pending = current.stages
+      .map((slot, index) => ({ slot, index }))
+      .filter(
+        ({ slot }) =>
+          slot.status === 'done' &&
+          slot.outline === undefined &&
+          (slot.stage.findings?.length ?? 0) +
+            (slot.stage.tasks?.length ?? 0) +
+            (slot.stage.todos?.length ?? 0) >=
+            3,
+      )
+
+    if (pending.length === 0) return
+
+    // 한 번에 하나씩만 채운다
+    const item = pending[0]
+    outline({ stage: item.slot.stage, summary: current.summary })
+      .then((res) => {
+        if (res.topics.length > 0) {
+          patch({
+            stages: sessionRef.current.stages.map((s, i) =>
+              i === item.index ? { ...s, outline: res.topics } : s,
+            ),
+          })
+        } else {
+          // 빈 결과 — outline: [] 로 표시해서 다시 묻지 않는다
+          patch({
+            stages: sessionRef.current.stages.map((s, i) =>
+              i === item.index ? { ...s, outline: [] } : s,
+            ),
+          })
+        }
+      })
+      .catch(() => {
+        // 실패해도 이 단계에서는 더 채우지 않는다 (다음 새로고침에서 재시도)
+      })
+      .finally(() => {
+        // 하나를 처리했으니 나머지도 채운다
+        fillMissingOutlines()
+      })
+  }
+
+  return { sendAnswer, approve, reviseSummary, startResearch, retry, resumeResearch, fillMissingOutlines }
 }
