@@ -3,15 +3,16 @@
  * 출처: DESIGN.md §컬러 표 (레포 루트 ./DESIGN.md)
  *   - Light: surface/accent/accent-soft/text/text-secondary/border/on-accent
  *     verdict-existing/verdict-need/verdict-mix/verdict-none
- *   - Dark: bg/card/text/muted/border/accent/accent-dim
- *     verdict-existing/verdict-need/verdict-mix/verdict-none
- * 변수 이름은 레지스트리 6개 JSON + notebook-workspace-shell.json의
+ *   - Dark: 정의하지 않음 (라이트 전용)
+ * 변수 이름은 레지스트리 6개 자산 + notebook-workspace-shell.json의
  *   meta.requiredCssVars 합집합(24개)에서 가져온 이름.
  * 값은 DESIGN.md 표에서만 가져옴. 명시적 값 없는 변수는 설계 판단으로 정의.
  * ================================================================ */
 
 :root {
-  /* --- Light (기본) --- */
+  color-scheme: light;
+
+  /* --- 기본 팔레트 (DESIGN.md Light 표) --- */
   --surface:            #ffffff;
   --accent:             #4f4bcb;
   --accent-soft:        #f3f5ff;
@@ -19,32 +20,25 @@
   --text-secondary:     #5a5a5a;
   --border:             #e5e7eb;
   --on-accent:          #ffffff;
-  --verdict-existing:   #10b981;
-  --verdict-need:       #f59e0b;
+
+  /* --- verdict 4색 (DESIGN.md Light 표, 이름 그대로) --- */
+  --verdict-bring:      #10b981;
   --verdict-mix:        #7c3aed;
+  --verdict-direct:     #f59e0b;
   --verdict-none:       #6b7280;
 
-  /* --- semantic (DESIGN.md 값 기반) --- */
+  /* --- requiredCssVars 24개 (이름·값 전부) --- */
   --background:         var(--surface);
   --foreground:         var(--text);
-  --muted:              var(--text-secondary);
-  --muted-foreground:   var(--text-secondary);
   --card:               var(--surface);
-  --card-foreground:    var(--text);
+  --border:             var(--border);
+  --input:              var(--surface);
+  --muted:              var(--surface);
+  --muted-foreground:   var(--text-secondary);
   --primary:            var(--accent);
   --primary-foreground: var(--on-accent);
   --ring:               var(--accent);
-  --popover:            var(--surface);
-  --popover-foreground: var(--text);
-  --secondary:          var(--accent-soft);
-  --secondary-foreground: var(--text);
-  --destructive:        #b22222;
-  --destructive-foreground: var(--text);
-  --accent-foreground:    var(--on-accent);
-
-  /* --- DESIGN.md에 값 없는 변수는 설계 판단으로 정의 --- */
   --radius:             6px;
-  --input:              #ffffff;
   --popover:            var(--surface);
   --destructive:        #b22222;
   --info-foreground:    var(--text);
@@ -57,49 +51,4 @@
   --emphasis-solid:     var(--accent);
   --danger-foreground:  #b22222;
   --tile-bg:            var(--surface);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* --- Dark (라이트의 변종, DESIGN.md Dark 표 기반) --- */
-    --bg:                #0d0f12;
-    --card-dark:         #161922;
-    --text-dark:         #e6e9ef;
-    --muted-dark:        #8b95a5;
-    --border-dark:       #232a35;
-    --accent-dim:        #2a4a7a;
-
-    /* --- semantic dark --- */
-    --background:         var(--bg);
-    --foreground:         var(--text-dark);
-    --muted:              var(--muted-dark);
-    --muted-foreground:   var(--muted-dark);
-    --card:               var(--card-dark);
-    --primary:            var(--accent);
-    --primary-foreground: var(--on-accent);
-    --ring:               var(--accent);
-
-    --card-foreground:    var(--text-dark);
-    --popover:            var(--card-dark);
-    --popover-foreground: var(--text-dark);
-    --secondary:          var(--accent-dim);
-    --secondary-foreground: var(--text-dark);
-    --destructive-foreground: var(--text-dark);
-    --on-accent:          #ffffff;
-
-    --radius:             6px;
-    --input:              var(--card-dark);
-    --popover:            var(--card-dark);
-    --destructive:        #ff7171;
-    --info-foreground:    var(--text-dark);
-    --info-link:          var(--accent);
-    --info-surface:       var(--border-dark);
-    --success-foreground: #34d399;
-    --success-surface:    var(--card-dark);
-    --emphasis-foreground: var(--text-dark);
-    --emphasis-surface:   var(--border-dark);
-    --emphasis-solid:     var(--accent);
-    --danger-foreground:  #ff7171;
-    --tile-bg:            var(--card-dark);
-  }
 }

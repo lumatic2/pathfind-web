@@ -5,27 +5,60 @@
 /*    Askewly 토큰 주입 아님. 값은 DESIGN.md 표 + 본인 토큰 파일에서 파생. */
 /*    실질 정의는 frontend/tokens.css (레지스트리 requiredCssVars 이름도 거기 병기). */
 
+/* ── Tailwind dark variant: .dark 클래스에만 묶음 (우리는 그 클래스를 붙이지 않음) ── */
+@variant dark {
+  .dark & { }
+}
+
 /* ── Tailwind 테마 확장: 커스텀 색상·반경을 유틸리티로 노출 ── */
 @theme {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-card: var(--card);
-  --color-border: var(--border);
-  --color-primary: var(--primary);
+  --color-background:         var(--background);
+  --color-foreground:         var(--foreground);
+  --color-card:               var(--card);
+  --color-border:             var(--border);
+  --color-input:              var(--input);
+  --color-muted:              var(--muted);
+  --color-muted-foreground:   var(--muted-foreground);
+  --color-primary:            var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-ring: var(--ring);
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
+  --color-ring:               var(--ring);
+  --color-popover:            var(--popover);
+  --color-destructive:        var(--destructive);
+  --color-accent:             var(--accent);
+  --color-info-foreground:    var(--info-foreground);
+  --color-info-link:          var(--info-link);
+  --color-info-surface:       var(--info-surface);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-surface:    var(--success-surface);
+  --color-emphasis-foreground: var(--emphasis-foreground);
+  --color-emphasis-surface:   var(--emphasis-surface);
+  --color-emphasis-solid:     var(--emphasis-solid);
+  --color-danger-foreground:  var(--danger-foreground);
+  --color-tile-bg:            var(--tile-bg);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
 }
 
 /* ── Verdict 4색: frontend/tokens.css 에서 정의 (DESIGN.md § verdict 색상 표 기준) ── */
-/*    값 출처: DESIGN.md Light/Dark 표. 기존 variables.css에서 이름·값 그대로 이식. */
+/*    값 출처: DESIGN.md Light 표. 기존 variables.css에서 이름·값 그대로 이식. */
 @theme {
-  --color-verdict-bring: var(--verdict-bring);
-  --color-verdict-mix:   var(--verdict-mix);
-  --color-verdict-direct: var(--verdict-direct);
-  --color-verdict-none:  var(--verdict-none);
+  --color-verdict-bring:   var(--verdict-bring);
+  --color-verdict-mix:     var(--verdict-mix);
+  --color-verdict-direct:  var(--verdict-direct);
+  --color-verdict-none:    var(--verdict-none);
+}
+
+/* ── 문서 기본 스타일 ── */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: "Noto Sans KR", system-ui, sans-serif;
+  word-break: keep-all;
+  background-color: var(--background);
+  color: var(--foreground);
 }
