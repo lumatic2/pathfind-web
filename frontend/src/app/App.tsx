@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { useSession } from '../state/store'
 import { useQuota } from '../state/quota'
@@ -131,37 +131,48 @@ function LeftPanel() {
 
 function CenterPanel() {
   const { sendAnswer } = useFlow()
-  const { session } = useSession()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [status, setStatus] = useState<ChatStatus>("idle")
-  const nextId = useRef(0)
-  const exampleChips = [
-    "동네 카페 사장님이 단골을 기억하게 돕는 앱을 만들고 싶어요",
-    "학교 동아리 회비를 자동으로 정산하는 도구가 필요해요",
-    "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
-  ]
+  const { session, patch } = useSession()
   const directInputLabel = "직접 입력"
-  const allSuggestions = [...exampleChips, directInputLabel]
-  const waitingLabel = "다음 질문을 고르는 중…"
+
+  const status: ChatStatus =
+    session.error != null ? "error" : session.busy ? "waiting" : "idle"
+
+  const isBlankInterview =
+    session.phase === "interview" &&
+    session.turnCount === 0 &&
+    session.messages.length === 0
+
+  const suggestions: string[] = isBlankInterview
+    ? [
+        "동네 카페 사장님이 단골을 기억하게 돕는 앱을 만들고 싶어요",
+        "학교 동아리 회비를 자동으로 정산하는 도구가 필요해요",
+        "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
+        directInputLabel,
+      ]
+    : session.pending?.exampleButtons ?? []
+
+  const chatMessages: ChatMessage[] = session.messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    text: m.text,
+    citations:
+      m.citationTitles != null
+        ? m.citationTitles.map((t, i) => ({
+            n: i + 1,
+            title: t,
+            id: m.citationIds?.[i] ?? undefined,
+          }))
+        : undefined,
+  }))
 
   const sendAnswerLocal = (text: string) => {
-    nextId.current += 1
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `msg-${nextId.current}`,
-        role: "user",
-        text,
-      },
-    ])
-    setStatus("waiting")
+    if (text === directInputLabel) return
     sendAnswer(text)
   }
 
-  const showProgress = session.phase === "interview" && session.busy
-  const progressionLabel = showProgress
-    ? `몇 가지만 여쭤볼게요 ${session.turnCount}/5`
-    : null
+  const handleRetry = () => patch({ error: null })
+
+  const waitingLabel = session.pending != null ? "다음 질문을 고르는 중…" : undefined
 
   return (
     <div className="panel-center">
@@ -169,26 +180,23 @@ function CenterPanel() {
         variant="grounded"
         className="h-full max-w-none rounded-none border-0 bg-card"
         title="로드맵 만들기"
-        messages={messages}
+        messages={chatMessages}
         status={status}
         onSend={sendAnswerLocal}
-        onRetry={() => setStatus("idle")}
-        emptyTitle={`무엇을 만들고 싶으세요?`}
+        onRetry={handleRetry}
+        emptyTitle="무엇을 만들고 싶으세요?"
         emptyHint="한 문단으로 적어 주세요. 몇 가지만 여쭙고 로드맵을 만들어 드립니다."
-        suggestions={allSuggestions}
-        onSuggestion={(s) => {
-          if (s === directInputLabel) return
-          sendAnswerLocal(s)
-        }}
+        suggestions={suggestions}
+        onSuggestion={sendAnswerLocal}
         directInputLabel={directInputLabel}
         composerPlaceholder="오늘 어떤 로드맵을 그려볼까요"
         onCopy={(m) => navigator.clipboard?.writeText(m.text)}
         onFeedback={() => {}}
         waitingLabel={waitingLabel}
       />
-      {progressionLabel ? (
+      {session.phase === "interview" && session.busy ? (
         <div className="interview-progress" aria-live="polite">
-          {progressionLabel}
+          몇 가지만 여쭤볼게요 {session.turnCount}/5
         </div>
       ) : null}
     </div>
