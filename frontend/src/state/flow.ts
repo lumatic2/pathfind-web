@@ -149,8 +149,11 @@ export function useFlow() {
     const citationIds = top.map((_f, i) => `stage-${index}-finding-${i}`)
     const markerSuffix =
       top.length > 0 ? ` [${top.map((_f, i) => i + 1).join(', ')}]` : ''
-    const verdictLine = `${verdict}`
-    const text = `${index + 1}. ${merged.title}\n\n**${verdictLine}**${markerSuffix}`
+    const tally = channelTally(findings)
+    const tallySuffix = tally.length > 0
+      ? ` (${tally.map((t) => `${channelShort[t.channel]} ${t.count}`).join('·')})`
+      : ''
+    const text = `${index + 1}. ${merged.title}\n\n**${verdict}**${tallySuffix}${markerSuffix}`
 
     patch({
       messages: [

@@ -64,9 +64,18 @@ type Action =
 function reducer(state: Session, action: Action): Session {
   let next: Session
   switch (action.type) {
-    case "PATCH":
-      next = { ...state, ...action.payload }
+    case "PATCH": {
+      const payload = action.payload
+      let sourceCards: Session['sourceCards']
+      if (payload.sourceCards != null) {
+        sourceCards = {
+          ...(state.sourceCards ?? {}),
+          ...payload.sourceCards,
+        }
+      }
+      next = { ...state, ...payload, sourceCards }
       break
+    }
     case "REPLACE":
       next = action.payload
       break

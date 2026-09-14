@@ -10,7 +10,8 @@ import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
 import { renderMarkdown } from '../components/chat-conversation-panel'
 import { sourceTree } from '../state/derive'
-import type { SourceDoc } from '../state/types'
+import type { Finding, Stage, SourceDoc } from '../state/types'
+import { sourceCard } from '../lib/api'
 import type { GroundedSource } from '../components/grounded-source-panel'
 import { GroundedSourcePanel } from '../components/grounded-source-panel'
 import {
@@ -128,7 +129,70 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
     .filter((n): n is SourceDoc => n.kind === 'stage' && n.children != null)
     .map((n) => n.id)
   const expanded = session.sourceExpandedIds ?? stageFolderIds
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const inflightRef = useRef<Set<string>>(new Set())
+  const triedRef = useRef<Set<string>>(new Set())
+
+  function sourceDocToGrounded(node: SourceDoc): GroundedSource {
+    const children = node.children != null ? node.children.map(sourceDocToGrounded) : undefined
+    const kind: 'doc' | 'folder' = node.kind === 'stage' || node.kind === 'folder' ? 'folder' : 'doc'
+    const isFolder = kind === 'folder'
+    const cardMarkdown = session.sourceCards?.[node.id] ?? node.markdown
+    const isInflight = inflightRef.current.has(node.id)
+    const body =
+      !isFolder && cardMarkdown.trim().length > 0
+        ? renderMarkdown(cardMarkdown, {})
+        : isInflight
+          ? <p className="text-sm text-muted-foreground">카드를 채우는 중…</p>
+          : undefined
+    return {
+      id: node.id,
+      title: node.title,
+      subtitle: node.subtitle,
+      url: node.url,
+      kind,
+      children,
+      favicon: isFolder ? undefined : <FileText size={20} aria-hidden />,
+      body,
+    }
+  }
+
+  function treeToSources(tree: SourceDoc[]): GroundedSource[] {
+    return tree.map(sourceDocToGrounded)
+  }
+
   const sources = treeToSources(tree)
+
+  const handleSourceOpen = useCallback((id: string) => {
+    const cards = session.sourceCards ?? {}
+    if (cards[id] != null) return
+    if (inflightRef.current.has(id) || triedRef.current.has(id)) return
+
+    const m = id.match(/^stage-(\d+)-finding-(\d+)$/)
+    if (m == null) return
+    const stageNo = parseInt(m[1], 10)
+    const idx = parseInt(m[2], 10)
+    const slot = session.stages[stageNo - 1]
+    if (slot == null) return
+    const stage = slot.stage
+    const finding = stage.findings?.[idx]
+    if (finding == null) return
+
+    inflightRef.current.add(id)
+    ;(async () => {
+      try {
+        const res = await sourceCard({ finding, stage, summary: session.summary ?? '' })
+        if (res.markdown.trim().length > 0) {
+          patch({ sourceCards: { ...cards, [id]: res.markdown } })
+        }
+      } catch {
+        // degraded 포함 실패 — 오류 문구 안 보임
+      } finally {
+        inflightRef.current.delete(id)
+        triedRef.current.add(id)
+      }
+    })()
+  }, [session.sourceCards, session.stages, session.summary, patch])
 
   return (
     <div className="panel-left">
@@ -159,6 +223,11 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
         }}
         expandedIds={expanded}
         onExpandedChange={(ids) => patch({ sourceExpandedIds: ids })}
+        detailId={detailId}
+        onDetailChange={(id) => {
+          setDetailId(id)
+          if (id != null) handleSourceOpen(id)
+        }}
         showAdd={false}
         showSearch={false}
         showToolbar={false}
@@ -168,24 +237,6 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
   )
 }
 
-function sourceDocToGrounded(node: SourceDoc): GroundedSource {
-  const children = node.children != null ? node.children.map(sourceDocToGrounded) : undefined
-  const kind: 'doc' | 'folder' = node.kind === 'stage' || node.kind === 'folder' ? 'folder' : 'doc'
-  const isFolder = kind === 'folder'
-  return {
-    id: node.id,
-    title: node.title,
-    subtitle: node.subtitle,
-    url: node.url,
-    kind,
-    children,
-    favicon: isFolder ? undefined : <FileText size={20} aria-hidden />,
-  }
-}
-
-function treeToSources(tree: SourceDoc[]): GroundedSource[] {
-  return tree.map(sourceDocToGrounded)
-}
 
 function CenterPanel() {
   const { sendAnswer, approve, reviseSummary, retry, resumeResearch, fillMissingOutlines } = useFlow()

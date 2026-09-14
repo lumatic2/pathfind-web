@@ -174,7 +174,7 @@ function summaryMarkdown(stage: StageSlot["stage"], status: StageRunStatus): str
       const grade = f.grade ? ` · ${f.grade}` : ""
       lines.push(`- ${f.name}${grade}`)
       if (f.channel != null) {
-        lines.push(`  - ${CHANNEL_LABELS[f.channel] ?? f.channel}`)
+        lines.push(`  - ${channelLabel[f.channel] ?? f.channel}`)
       }
       lines.push(`  - ${f.evidence}`)
       if (f.query.trim().length > 0) {
@@ -218,13 +218,13 @@ function findingDoc(stageNo: number, idx: number, f: Finding): SourceDoc {
     lines.push(`**근거 등급**: ${f.grade}`)
     lines.push("")
   }
-  const channelLabel = f.channel != null ? (CHANNEL_LABELS[f.channel] ?? f.channel) : "—"
-  lines.push(`종류: ${f.kind} · 단계: ${stageNo} · 출처: ${channelLabel}`)
+  const chLabel = f.channel != null ? (channelLabel[f.channel] ?? f.channel) : "—"
+  lines.push(`종류: ${f.kind} · 단계: ${stageNo} · 출처: ${chLabel}`)
   lines.push("")
   if (f.grade != null) {
     const parts: string[] = []
     parts.push(`근거 등급: ${f.grade}`)
-    if (f.channel != null) parts.push(`채널: ${channelLabel}`)
+    if (f.channel != null) parts.push(`채널: ${chLabel}`)
     lines.push(parts.join(", "))
     lines.push("")
   }
