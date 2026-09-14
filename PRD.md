@@ -55,6 +55,8 @@
 - **grill-me / grilling 패턴 (mattpocock/skills, 공개 레포)**: 정렬 인터뷰 로직. 서비스에 흡수된 단계로 쓰며, 특정 스킬명을 노출하지 않음.
 - **pathfind (예선 당선 스킬)**: 단계 분해·리서치·판단 로직. 서비스에서는 /api에서 pathfind의 데이터 경로(큰 단계 + 각 단계 verdict·findings·선택지)를 이식·변형해 사용. 필요 시 서비스에 pathfind 재적용을 제안하는 흐름도 포함.
 
+| 디자인 시스템 | 본인 소유 ui-dictionary(MIT); 앱 자산은 `https://ui.askewly.com/r/<name>.json`로 설치, 코드 자산 레지스트리 fetch → 프로젝트 토큰 재스타일. 원본 보존 + 서비스판 새 폴더. | 원본 pathfind-src commit: `6a8e6a4` (2026-09-11) |
+
 ## 7) 입력·출력
 
 **입력**

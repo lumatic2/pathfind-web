@@ -342,7 +342,7 @@ export type DemoUser = { name: string }
 function DemoTopbar({ title, onTitleChange, user, onSignIn, onSignOut }: { title: string; onTitleChange: (t: string) => void; user: DemoUser | null; onSignIn: () => void; onSignOut: () => void }) {
   return (
     <div className="flex w-full items-center justify-between gap-4 px-4">
-      // <EditableText as="h1" value={title} onChange={onTitleChange} fallback="제목 없는 노트북" aria-label="노트북 제목" data-shell-title className="min-w-0 max-w-[40%] truncate font-normal focus:overflow-visible focus:whitespace-normal" style={{ fontSize: 22, lineHeight: "36px" }} />
+      <EditableText as="h1" value={title} onChange={onTitleChange} fallback="제목 없는 노트북" aria-label="노트북 제목" data-shell-title className="min-w-0 max-w-[40%] truncate font-normal focus:overflow-visible focus:whitespace-normal" style={{ fontSize: 22, lineHeight: "36px" }} />
       <div className="flex shrink-0 items-center gap-3">
         <TopbarButton primary icon={<Plus aria-hidden />}>노트북 만들기</TopbarButton>
         <TopbarButton icon={<Copy aria-hidden />}>복사</TopbarButton>
@@ -442,7 +442,7 @@ function useDemoNotebook(empty: boolean, sourcePanel: Partial<Pick<GroundedSourc
       // 배지 슬롯 — 셸에서는 인용 사다리(hover 팝오버 → 소스 보기)가 배지를 그린다
       renderCitation={(c) => {
         const t = citationTargets[c.n]
-        // return t ? <CitationBadge citation={t} onShowSource={() => showSource(c.n)} /> : null
+        return t ? <CitationBadge citation={t} onShowSource={() => showSource(c.n)} /> : null
       }}
     />
   )
