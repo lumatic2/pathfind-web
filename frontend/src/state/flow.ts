@@ -25,14 +25,28 @@ function questionMeta(turn: GrillTurn) {
   return meta
 }
 
-function onDegrade(_newConcurrency: number): void {
-  // 상한 하향은 진행 중인 고급 단계가 자연스레 느려지는 것으로 드러나므로 별도 마커를 붙이지 않는다.
-}
 
 export function useFlow() {
   const { session, patch } = useSession()
   const sessionRef = useRef(session)
   sessionRef.current = session
+
+  /** 상한이 1로 내려갈 때 한 번만 불린다. degraded를 남기고 강등 말풍선을 붙인다. */
+  const onDegrade = useCallback((_newConcurrency: number) => {
+    patch({
+      degraded: true,
+      messages: [
+        ...sessionRef.current.messages,
+        {
+          id: msgId(),
+          role: 'assistant',
+          text: '요청이 몰려 한 번에 하나씩 조사합니다. 조금 느려도 결과는 그대로 쌓입니다.',
+          kind: 'progress',
+          suggestions: [],
+        },
+      ],
+    })
+  }, [patch])
 
   /** 단계 1개 조사. 요약·슬롯을 갱신하고 결과 줄을 진행한다. */
   async function runStage(index: number, summary: string, currentStage: Stage): Promise<void> {
@@ -40,9 +54,10 @@ export function useFlow() {
     const slot = latest.stages[index]
     if (slot == null) return
 
-    // 1) status → running
+    // 1) status → running + 마지막 활동 줄
     patch({
       stages: latest.stages.map((s, i) => (i === index ? { ...s, status: 'running' as const } : s)),
+      runActivity: `${index + 1}. ${currentStage.title} 자료를 찾는 중…`,
     })
 
     // 2) 서버 호출 (6분 타임아웃은 api.stage의 기본값과 같다)
@@ -297,6 +312,16 @@ export function useFlow() {
     })
   }, [patch])
 
+  const retry = useCallback(() => {
+    const current = sessionRef.current
+    const failedOrPending = current.stages.find((s) => s.status === 'failed' || s.status === 'pending')
+    if (failedOrPending == null) return
+    patch({ error: null })
+    const idx = current.stages.indexOf(failedOrPending)
+    if (idx < 0) return
+    runStage(idx, current.summary, failedOrPending.stage)
+  }, [patch])
+
   const startResearch = useCallback(() => {
     const current = sessionRef.current
 
@@ -422,5 +447,5 @@ export function useFlow() {
       })
   }, [patch])
 
-  return { sendAnswer, approve, reviseSummary, startResearch }
+  return { sendAnswer, approve, reviseSummary, startResearch, retry }
 }

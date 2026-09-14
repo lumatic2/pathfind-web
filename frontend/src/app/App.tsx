@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
@@ -66,6 +66,22 @@ export default function App() {
     </span>
   )
 
+  const researchActiveApp = session.phase === "researching" && session.stages.length > 0
+
+  const degradedChip =
+    researchActiveApp && session.degraded
+      ? (
+        <span className="research-degraded-chip">순차 조사로 전환됨</span>
+      )
+      : null
+
+  const topStatusSlot = (
+    <span className="center-top-status">
+      {quotaBadge}
+      {degradedChip}
+    </span>
+  )
+
   return (
     <div
       className="app-shell"
@@ -87,7 +103,7 @@ export default function App() {
             title={topTitle}
             onTitleChange={handleTitleChange}
             actions={[]}
-            statusSlot={quotaBadge}
+            statusSlot={topStatusSlot}
           />
         }
       />
@@ -130,7 +146,7 @@ function LeftPanel() {
 }
 
 function CenterPanel() {
-  const { sendAnswer, approve, reviseSummary } = useFlow()
+  const { sendAnswer, approve, reviseSummary, retry } = useFlow()
   const { session, patch } = useSession()
   const directInputLabel = "직접 입력"
 
@@ -149,8 +165,36 @@ function CenterPanel() {
       }
     : {}
 
+  const researchActive =
+    session.phase === "researching" && session.stages.length > 0
+  const doneCount = session.stages.filter((s) => s.status === "done").length
+  const totalCount = session.stages.length
+  const anyRunning = session.stages.some((s) => s.status === "running")
+
   const status: ChatStatus =
-    session.error != null ? "error" : session.busy ? "waiting" : "idle"
+    session.error != null ? "error" : researchActive && anyRunning ? "waiting" : session.busy ? "waiting" : "idle"
+
+  const researchFoot =
+    researchActive && totalCount > 0
+      ? (
+        <p className="research-foot">
+          <span className="research-foot-strong">{doneCount}/{totalCount} 단계 조사 중</span>
+          {' '}
+         보통 3에서 5분 걸립니다. 이 창을 열어 두시면 이어서 진행됩니다.
+        </p>
+      )
+      : null
+
+  const errorFoot =
+    session.error != null && researchActive
+      ? (
+        <p className="research-foot research-foot-error">
+          잠시 문제가 있었습니다. 다시 시도해 주세요.
+          {' '}
+          <button type="button" className="research-foot-retry" onClick={retry}>다시 시도</button>
+        </p>
+      )
+      : null
 
   const isBlankInterview =
     session.phase === "interview" &&
@@ -173,6 +217,7 @@ function CenterPanel() {
     id: m.id,
     role: m.role,
     text: m.text,
+    kind: m.kind,
     citations:
       m.citationTitles != null
         ? m.citationTitles.map((t, i) => ({
@@ -208,7 +253,38 @@ function CenterPanel() {
 
   const handleRetry = () => patch({ error: null })
 
-  const waitingLabel = session.pending != null ? "다음 질문을 고르는 중…" : undefined
+  const lastMsgTime = session.messages.length > 0
+    ? new Date(session.messages[session.messages.length - 1].id).getTime()
+    : 0
+
+  const silenceRef = useRef<{ lastMsgAt: number; showedLongStep: boolean }>({
+    lastMsgAt: 0,
+    showedLongStep: false,
+  })
+  silenceRef.current = { lastMsgAt: lastMsgTime, showedLongStep: silenceRef.current.showedLongStep }
+
+  const [onSilence, setOnSilence] = useState(false)
+  const waitingLabel: string | undefined =
+    session.pending != null
+      ? "다음 질문을 고르는 중…"
+      : researchActive && session.runActivity != null
+        ? onSilence
+          ? "조금 오래 걸리는 단계입니다. 계속 기다리는 중이에요."
+          : session.runActivity
+        : undefined
+
+  const renderAssistantMark = researchActive && session.runActivity != null
+    ? () => <span className="research-run-mark">{session.runActivity}</span>
+    : undefined
+
+  useEffect(() => {
+    const now = Date.now()
+    const elapsed = now - silenceRef.current.lastMsgAt
+    if (researchActive && elapsed >= 30000 && !silenceRef.current.showedLongStep) {
+      setOnSilence(true)
+      silenceRef.current = { ...silenceRef.current, showedLongStep: true }
+    }
+  }, [researchActive, onSilence])
 
   return (
     <div className="panel-center">
@@ -230,12 +306,15 @@ function CenterPanel() {
         onFeedback={() => {}}
         suggestionNotes={approvalNotes}
         waitingLabel={waitingLabel}
+        renderAssistantMark={renderAssistantMark}
       />
       {session.phase === "interview" && session.busy ? (
         <div className="interview-progress" aria-live="polite">
           몇 가지만 여쭤볼게요 {session.turnCount}/5
         </div>
       ) : null}
+      {researchFoot}
+      {errorFoot}
     </div>
   )
 }
