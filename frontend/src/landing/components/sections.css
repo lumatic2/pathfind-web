@@ -399,7 +399,7 @@
   /* 중심 맞춤은 `translate`, 연출(날아듦·역회전)은 `transform` — 두 속성이 서로를 안 덮는다 */
   translate: -50% -50%;
   transform-origin: center;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--muted-foreground);
 }
@@ -572,6 +572,12 @@
   font-size: var(--fs-lead);
 }
 .cta .btn { margin-top: var(--space-10); }
+
+@media (max-width: 767px) {
+  .trust { padding-top: calc(var(--orbit-drop) + 92vw + var(--space-8)); }
+  .cta__body { max-width: none; padding: var(--space-10) var(--space-8); }
+  .cta__figure { display: none; }
+}
 
 /* ────────────────────────────────────────────────────────
    StartHelp — 원본 `gl-start`

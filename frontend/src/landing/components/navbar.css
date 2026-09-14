@@ -186,4 +186,6 @@
 
 @media (max-width: 767px) {
   .nav__menu { display: none; }
+  .nav__end { gap: var(--space-4); }
+  .nav__end > .nav__link:not(.-marked) { display: none; }
 }
