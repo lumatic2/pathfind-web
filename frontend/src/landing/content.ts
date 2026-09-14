@@ -24,7 +24,7 @@ export const content = {
     /** 메가패널이 열리는 항목. `items` 가 패널 안 링크 */
     menus: [
       {
-        label: '어떻게 되나요',
+        label: '서비스 흐름',
         href: '#compare',
         size: 'lg' as const,
         items: [
