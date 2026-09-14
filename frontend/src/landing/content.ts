@@ -36,7 +36,7 @@ export const content = {
       },
     ],
     /** 패널 없는 단순 링크 */
-    links: [{ label: '누구에게 맞나요', href: '#start' }],
+    links: [{ label: '누구에게 맞나요', href: '#team' }],
     /** 오른쪽 끝 — 두 번째만 밑줄 강조 */
     end: [
       { label: '로그인', href: '#cta', marked: false },
@@ -157,7 +157,7 @@ export const content = {
         { label: '로드맵', icon: '/tile-7.png', left: 18, top: 50 },
       ],
     },
-    cta: { label: '누구에게 맞나요', href: '#start' },
+    cta: { label: '누구에게 맞나요', href: '#team' },
   },
 
   team: {
@@ -172,8 +172,11 @@ export const content = {
   },
 
   cta: {
-    title: '오늘 오후에 첫 로드맵을 받아 보세요.',
-    text: '모든 걸 처음부터 만들 필요는 없죠, 패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
+    title: ['오늘 오후에', '첫 로드맵을 받아 보세요.'],
+    text: [
+      '모든 걸 처음부터 만들 필요는 없죠.',
+      '패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
+    ],
     button: { label: '시작하기', href: '/app.html' },
     /** 오른쪽에 서는 인물 — 세로로 긴 투명 PNG, 아래를 물린다 */
     figure: { src: '/cta-figure.png', ratio: '760 / 1000' },
@@ -196,7 +199,7 @@ export const content = {
         links: [
           { label: '시작하기', href: '/app.html' },
           { label: '어떻게 되나요', href: '#compare' },
-          { label: '누구에게 맞나요', href: '#start' },
+          { label: '누구에게 맞나요', href: '#team' },
         ],
       },
       {

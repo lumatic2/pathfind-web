@@ -305,8 +305,8 @@ export function CtaCard() {
       <span className="cta__paper -p3" aria-hidden="true" />
 
       <div className="cta__body">
-        <h2 className="cta__title">{K.title}</h2>
-        <p className="cta__text">{K.text}</p>
+        <h2 className="cta__title">{lines(K.title)}</h2>
+        <p className="cta__text">{lines(K.text)}</p>
         <a className="btn btn--white" href={K.button.href}>
           {K.button.label} <span aria-hidden="true">→</span>
         </a>
