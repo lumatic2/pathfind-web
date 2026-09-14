@@ -3,13 +3,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
+import type { ChatEntry } from '../state/types'
 import type { ChatMessage, ChatStatus } from '../components/chat-conversation-panel'
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
+import { isFoldLine, isSearchLine } from './chatRelevance'
 import {
   NotebookWorkspaceShell,
   NotebookTopbar,
   MindmapPanel,
 } from '../components/notebook-workspace-shell'
+
+type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 
 const LEFT_TITLE = '조사 결과'
 const LEFT_EMPTY_TITLE = '조사 결과가 여기에 쌓입니다'
@@ -184,8 +188,8 @@ function CenterPanel() {
   const researchFoot =
     researchActive && totalCount > 0
       ? (
-        <p className="research-foot">
-          <span className="research-foot-strong">{doneCount}/{totalCount} 단계 조사 중</span>
+        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+          <span className="font-semibold text-foreground">{doneCount}/{totalCount} 단계 조사 중</span>
           {' '}
          보통 3에서 5분 걸립니다. 이 창을 열어 두시면 이어서 진행됩니다.
         </p>
@@ -195,10 +199,10 @@ function CenterPanel() {
   const errorFoot =
     session.error != null && researchActive
       ? (
-        <p className="research-foot research-foot-error">
+        <p className="mt-2 text-sm text-destructive leading-relaxed">
           잠시 문제가 있었습니다. 다시 시도해 주세요.
           {' '}
-          <button type="button" className="research-foot-retry" onClick={retry}>다시 시도</button>
+          <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={retry}>다시 시도</button>
         </p>
       )
       : null
@@ -220,20 +224,57 @@ function CenterPanel() {
         ? lastMessage.suggestions ?? []
         : session.pending?.exampleButtons ?? []
 
-  const chatMessages: ChatMessage[] = session.messages.map((m) => ({
-    id: m.id,
-    role: m.role,
-    text: m.text,
-    kind: m.kind,
-    citations:
-      m.citationTitles != null
-        ? m.citationTitles.map((t, i) => ({
-            n: i + 1,
-            title: t,
-            id: m.citationIds?.[i] ?? undefined,
-          }))
-        : undefined,
-  }))
+  const chatMessages: AppChatMessage[] = (() => {
+    const out: AppChatMessage[] = []
+    const buffer: ChatEntry[] = []
+
+    const entryToMessage = (m: ChatEntry): AppChatMessage => ({
+      id: m.id,
+      role: m.role,
+      text: m.text,
+      kind: m.kind,
+      citations:
+        m.citationTitles != null
+          ? m.citationTitles.map((t, i) => ({
+              n: i + 1,
+              title: t,
+              id: m.citationIds?.[i] ?? undefined,
+            }))
+          : undefined,
+    })
+
+    const flushBuffer = (attachLast: boolean) => {
+      if (buffer.length === 0) return
+      const steps = buffer.map((m) => ({
+        title: m.text,
+        kind: isSearchLine(m.text) ? ('search' as const) : ('think' as const),
+      }))
+      if (out.length > 0) {
+        out[out.length - 1] = {
+          ...out[out.length - 1],
+          reasoning: { label: `조사 과정 ${steps.length}줄`, steps },
+        }
+      } else if (attachLast && buffer.length > 0) {
+        const m = buffer[buffer.length - 1]
+        out.push({
+          ...entryToMessage(m),
+          reasoning: { label: `조사 과정 ${steps.length}줄`, steps },
+        })
+      }
+      buffer.length = 0
+    }
+
+    for (const m of session.messages) {
+      if (isFoldLine(m)) {
+        buffer.push(m)
+        continue
+      }
+      flushBuffer(false)
+      out.push(entryToMessage(m))
+    }
+    flushBuffer(true)
+    return out
+  })()
 
   const handleSend = (text: string) => {
     if (text === directInputLabel) return
