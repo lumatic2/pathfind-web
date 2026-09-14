@@ -33,11 +33,9 @@ MABC 2026 결선 산출물 레포. 예선 당선 스킬 `pathfind` 를 누구나
 
 `.gitignore`가 `.env*`·`*.tmp`·`node_modules/`·`.vercel/`·`AGENTS.override.md`·`.materials/`·`work/`·`roadmap/`를 막는지, `api/*.js`에 `solar-pro4` 모델 ID가 있는지 확인한다.
 
-레포 루트의 `HERMES.md`가 이 레포의 CLAUDE.md 역할이다. 글로벌 `~/.claude.md`는 없다(만들지 않는다).
-
 ## 로드맵
 
-`roadmap/`은 사용자가 관리하는 문서 폴더다. Hermes는 **사용자가 읽으라고 지정한 문서만** roadmap/ 안에서 읽는다. 기본으로 읽어들이지 않는다. 세션 하나에 작업 하나다. 내가 준 작업만 하고 커밋하면 그 세션은 끝이다.
+`roadmap/`은 사용자가 관리하는 문서 폴더다. Hermes는 **사용자가 읽으라고 지정한 문서만** roadmap/ 안에서 읽는다. 사용자가 명시적으로 말하지 않은 경우 해당 폴더를 읽지 않는다. 세션 하나에 작업 하나다. 내가 준 작업만 하고 커밋하면 그 세션은 끝이다.
 
 ## 만들 때 지키는 것
 
