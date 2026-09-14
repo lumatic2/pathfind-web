@@ -135,3 +135,21 @@
   outline: var(--focus-ring-width) solid var(--primary-foreground);
   outline-offset: var(--focus-ring-offset);
 }
+
+.ft__linkedin {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary-foreground);
+}
+.ft__linkedin:hover {
+  color: var(--primary-foreground);
+  text-decoration: none;
+}
+
+.ft__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}

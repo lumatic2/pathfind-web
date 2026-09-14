@@ -383,6 +383,30 @@ export function useFlow() {
           worker: (item) =>
             runStage(item.payload, current.summary, stages[item.payload].stage),
           onDegrade,
+        }).then(() => {
+          const completed = sessionRef.current
+          const failedCount = completed.stages.filter(
+            (s) => s.status === 'failed',
+          ).length
+          const text =
+            failedCount === 0
+              ? `조사를 마쳤습니다. 오른쪽 마인드맵에서 노드를 누르면(굵게) 제가 그 노드를 설명해 드립니다.`
+              : `조사를 마쳤습니다. 전체 슬롯 수에서 실패 수를 뺀 개수만큼 단계가 채워졌고 실패 수만큼은 자료를 못 찾았습니다(둘 다 굵게). 오른쪽 마인드맵에서 노드를 누르면 설명해 드립니다.`
+          patch({
+            messages: [
+              ...completed.messages,
+              {
+                id: msgId(),
+                role: 'assistant',
+                text,
+                kind: 'progress',
+                suggestions: [],
+              },
+            ],
+            busy: false,
+            phase: 'ready',
+            selectedId: null,
+          })
         })
       })
       .catch((err) => {
