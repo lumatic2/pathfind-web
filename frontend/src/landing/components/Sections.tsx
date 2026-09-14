@@ -275,7 +275,7 @@ export function Team() {
           >
             <span className="team__icon" aria-hidden="true" style={img(t.icon)} />
             <p className="team__text">
-              <b>{t.lead}</b> {t.rest}
+              <b>{t.lead}</b><br />{t.rest}
             </p>
           </div>
         ))}

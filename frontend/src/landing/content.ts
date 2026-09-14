@@ -39,7 +39,7 @@ export const content = {
     links: [{ label: '누구에게 맞나요', href: '#start' }],
     /** 오른쪽 끝 — 두 번째만 밑줄 강조 */
     end: [
-      { label: '무료 계정 없음', href: '#cta', marked: false },
+      { label: '로그인', href: '#cta', marked: false },
       { label: '시작하기', href: '/app.html', marked: true },
     ],
   },
@@ -47,7 +47,10 @@ export const content = {
   hero: {
     /** 줄바꿈은 배열 원소로 */
     title: ['거인의 어깨 위에서', '길을 찾는 방법'],
-    lede: '모든 걸 처음부터 만들 필요는 없죠, 패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
+    lede: [
+      '모든 걸 처음부터 만들 필요는 없죠.',
+      '패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
+    ],
     cta: { label: '시작하기', href: '/app.html' },
     /**
      * 패럴랙스 풍경 3판 — 원경 → 중경 → 근경.
@@ -177,7 +180,7 @@ export const content = {
   },
 
   start: {
-    title: ['처음이신가요?', '함께 정리합니다'],
+    title: ['처음 해보는 일인가요?', '패스파인더와 큰 그림을 그려봅시다'],
     links: [
       { label: ['인터뷰 다섯 번으로', '정리한다는 것'], href: '/app.html', tone: 'solid' as const },
       { label: ['결과가 이 브라우저에 남고', '파일로 내려받는다는 것'], href: '#cta', tone: 'quiet' as const },
