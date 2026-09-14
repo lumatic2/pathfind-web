@@ -90,6 +90,7 @@ async function callSolarWithRetry(messages, opts = {}) {
   const SOLAR_API_KEY = process.env.SOLAR_API_KEY;
   const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
   const SOLAR_MODEL = 'solar-pro4';
+  const maxRetries = opts.maxRetries ?? 2;
 
   if (!SOLAR_API_KEY) throw new Error('Solar API key not configured');
 
@@ -101,7 +102,7 @@ async function callSolarWithRetry(messages, opts = {}) {
     response_format: opts.forceParse ? undefined : { type: 'json_object' },
   };
 
-  for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const solarRes = await fetch(SOLAR_API_URL, {
       method: 'POST',
       headers: {
@@ -121,7 +122,7 @@ async function callSolarWithRetry(messages, opts = {}) {
     const errBody = await solarRes.text().catch(() => '');
     const status = solarRes.status;
 
-    if (status === 429 && attempt < opts.maxRetries) {
+    if (status === 429 && attempt < maxRetries) {
       console.warn(`Solar 429 rate limit (시도 ${attempt + 1}/${opts.maxRetries}), ${Math.pow(2, attempt)}초 대기 후 재시도...`);
       await sleep(Math.pow(2, attempt) * 1000);
       continue;
