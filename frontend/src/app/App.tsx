@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import { useSession } from '../state/store'
 import { useQuota } from '../state/quota'
+import { useFlow } from '../state/flow'
 import type { ChatMessage, ChatStatus } from '../components/chat-conversation-panel'
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import {
@@ -129,6 +130,8 @@ function LeftPanel() {
 }
 
 function CenterPanel() {
+  const { sendAnswer } = useFlow()
+  const { session } = useSession()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [status, setStatus] = useState<ChatStatus>("idle")
   const nextId = useRef(0)
@@ -139,8 +142,9 @@ function CenterPanel() {
   ]
   const directInputLabel = "직접 입력"
   const allSuggestions = [...exampleChips, directInputLabel]
+  const waitingLabel = "다음 질문을 고르는 중…"
 
-  const sendAnswer = (text: string) => {
+  const sendAnswerLocal = (text: string) => {
     nextId.current += 1
     setMessages((prev) => [
       ...prev,
@@ -151,7 +155,13 @@ function CenterPanel() {
       },
     ])
     setStatus("waiting")
+    sendAnswer(text)
   }
+
+  const showProgress = session.phase === "interview" && session.busy
+  const progressionLabel = showProgress
+    ? `몇 가지만 여쭤볼게요 ${session.turnCount}/5`
+    : null
 
   return (
     <div className="panel-center">
@@ -161,20 +171,26 @@ function CenterPanel() {
         title="로드맵 만들기"
         messages={messages}
         status={status}
-        onSend={sendAnswer}
+        onSend={sendAnswerLocal}
         onRetry={() => setStatus("idle")}
         emptyTitle={`무엇을 만들고 싶으세요?`}
         emptyHint="한 문단으로 적어 주세요. 몇 가지만 여쭙고 로드맵을 만들어 드립니다."
         suggestions={allSuggestions}
         onSuggestion={(s) => {
           if (s === directInputLabel) return
-          sendAnswer(s)
+          sendAnswerLocal(s)
         }}
         directInputLabel={directInputLabel}
         composerPlaceholder="오늘 어떤 로드맵을 그려볼까요"
         onCopy={(m) => navigator.clipboard?.writeText(m.text)}
         onFeedback={() => {}}
+        waitingLabel={waitingLabel}
       />
+      {progressionLabel ? (
+        <div className="interview-progress" aria-live="polite">
+          {progressionLabel}
+        </div>
+      ) : null}
     </div>
   )
 }
