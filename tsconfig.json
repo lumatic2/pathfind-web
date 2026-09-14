@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "paths": {
+      "@/*": ["./frontend/src/*"]
+    },
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["frontend/src"]
+}

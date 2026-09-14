@@ -327,7 +327,7 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
             <AlertCircleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-destructive" />
             <div className="min-w-0 flex-1">
               <p className="break-keep text-sm text-foreground">The assistant could not respond. Your message was not lost.</p>
-              <Button className="mt-1 h-auto p-0" size="sm" type="button" variant="link" onClick={onRetry}>
+              <Button className="mt-1 h-auto p-0 text-foreground/70 hover:text-foreground underline-offset-2 hover:underline" size="sm" type="button" variant="default" onClick={onRetry}>
                 Retry
               </Button>
             </div>
