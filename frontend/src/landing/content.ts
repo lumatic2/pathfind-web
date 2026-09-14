@@ -227,7 +227,7 @@ export const content = {
         links: [{ label: 'askewly.com', href: 'https://askewly.com' }],
       },
     ],
-    copyright: '© 2026 askewly Pathfinder.',
+    copyright: 'Made By Luka',
     terms: [{ label: '조사 자료의 저작권은 각 출처에 있습니다.', href: '#cta' }],
   },
 };

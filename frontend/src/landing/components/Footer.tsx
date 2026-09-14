@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Logo } from './Logo';
 import { content } from '../content';
+import { Linkedin } from 'lucide-react';
 import './footer.css';
 
 /**
@@ -79,7 +80,18 @@ export function Footer() {
             두 칸으로 줄이면 가운데가 비어 줄이 양끝으로 찢어진다. */}
         <div className="ft__bottom">
           <span className="ft__logo"><Logo /></span>
-          <span className="ft__copy">{content.footer.copyright}</span>
+          <span className="ft__copy">
+            {content.footer.copyright}
+            <a
+              href="https://www.linkedin.com/in/askewly/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="LinkedIn"
+              className="ft__linkedin"
+            >
+              <Linkedin size={20} />
+            </a>
+          </span>
           <span className="ft__terms">
             {content.footer.terms.map((t) => <a key={t.label} href={t.href}>{t.label}</a>)}
           </span>
