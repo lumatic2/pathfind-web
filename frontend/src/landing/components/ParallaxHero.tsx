@@ -121,7 +121,12 @@ export function ParallaxHero() {
           {H.title.map((line, i) => <span key={i}>{i > 0 && <br />}{line}</span>)}
         </h1>
         <p className="hero__lede" data-reveal style={{ '--reveal-y': '50px', '--reveal-delay': '0.15s' } as React.CSSProperties}>
-          {typeof H.lede === 'string' ? H.lede : H.lede.map((line, i) => <span key={i}>{i > 0 && <br />}{line}</span>)}
+          {H.lede.map((line, i) => (
+            <span key={i}>
+              {i > 0 && <br />}
+              {line}
+            </span>
+          ))}
         </p>
         {/* 버튼은 문구 확대(×1.2)의 대상이 아니다 — 크기 그대로 (2026-09-13 사용자: 「버튼 빼고」는 편집 대상 제외라는 뜻) */}
         <div className="hero__actions" data-reveal style={{ '--reveal-y': '50px', '--reveal-delay': '0.3s' } as React.CSSProperties}>

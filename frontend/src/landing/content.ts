@@ -132,8 +132,8 @@ export const content = {
   ],
 
   compare: {
-    title: ['찾은 것과 만들 것을', '한 화면에서 가릅니다'],
-    lede: '혼자 찾을 때와 Pathfinder 로 찾을 때를 나란히 봅니다.',
+    title: ['가져다 쓸 것과 직접 만들 것을', '정리해드립니다'],
+    lede: '여러분의 돈과 시간을 절약하세요!',
     left: {
       heading: '혼자 찾을 때',
       /** 흩어진 도구 타일 — 위치는 패널 대비 %. `icon` 은 투명 PNG */
