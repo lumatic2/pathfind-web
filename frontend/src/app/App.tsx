@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 
 import { useSession } from '../state/store'
-import { useQuota } from '../state/quota'
+import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
 import type { ChatMessage, ChatStatus } from '../components/chat-conversation-panel'
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
@@ -130,9 +130,24 @@ function LeftPanel() {
 }
 
 function CenterPanel() {
-  const { sendAnswer } = useFlow()
+  const { sendAnswer, approve, reviseSummary } = useFlow()
   const { session, patch } = useSession()
   const directInputLabel = "직접 입력"
+
+  const lastMessage = session.messages[session.messages.length - 1]
+  const isApproval = lastMessage?.kind === "summary-approval"
+  const lastUserText = session.messages
+    .filter((m) => m.role === "user")
+    .at(-1)?.text
+  const editIntent = lastUserText === "고칠 게 있어요"
+
+  const remaining = readQuota().remaining
+  const approvalNotes: Record<string, string> = isApproval
+    ? {
+        "맞아요, 이대로 조사해 주세요": remaining > 0 ? "로드맵 1회 소진" : "",
+        "고칠 게 있어요": "요약·큰 그림 수정",
+      }
+    : {}
 
   const status: ChatStatus =
     session.error != null ? "error" : session.busy ? "waiting" : "idle"
@@ -142,14 +157,17 @@ function CenterPanel() {
     session.turnCount === 0 &&
     session.messages.length === 0
 
-  const suggestions: string[] = isBlankInterview
-    ? [
-        "동네 카페 사장님이 단골을 기억하게 돕는 앱을 만들고 싶어요",
-        "학교 동아리 회비를 자동으로 정산하는 도구가 필요해요",
-        "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
-        directInputLabel,
-      ]
-    : session.pending?.exampleButtons ?? []
+  const suggestions: string[] =
+    isBlankInterview
+      ? [
+          "동네 카페 사장님이 단골을 기억하게 돕는 앱을 만들고 싶어요",
+          "학교 동아리 회비를 자동으로 정산하는 도구가 필요해요",
+          "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
+          directInputLabel,
+        ]
+      : isApproval
+        ? lastMessage.suggestions ?? []
+        : session.pending?.exampleButtons ?? []
 
   const chatMessages: ChatMessage[] = session.messages.map((m) => ({
     id: m.id,
@@ -165,9 +183,27 @@ function CenterPanel() {
         : undefined,
   }))
 
-  const sendAnswerLocal = (text: string) => {
+  const handleSend = (text: string) => {
     if (text === directInputLabel) return
+    if (isApproval && !editIntent) {
+      reviseSummary()
+    }
     sendAnswer(text)
+  }
+
+  const handleSuggestion = (s: string) => {
+    if (s === directInputLabel) return
+    if (isApproval) {
+      if (s === "맞아요, 이대로 조사해 주세요") {
+        approve()
+        return
+      }
+      if (s === "고칠 게 있어요") {
+        reviseSummary()
+        return
+      }
+    }
+    sendAnswer(s)
   }
 
   const handleRetry = () => patch({ error: null })
@@ -182,16 +218,17 @@ function CenterPanel() {
         title="로드맵 만들기"
         messages={chatMessages}
         status={status}
-        onSend={sendAnswerLocal}
+        onSend={handleSend}
         onRetry={handleRetry}
         emptyTitle="무엇을 만들고 싶으세요?"
         emptyHint="한 문단으로 적어 주세요. 몇 가지만 여쭙고 로드맵을 만들어 드립니다."
         suggestions={suggestions}
-        onSuggestion={sendAnswerLocal}
+        onSuggestion={handleSuggestion}
         directInputLabel={directInputLabel}
         composerPlaceholder="오늘 어떤 로드맵을 그려볼까요"
         onCopy={(m) => navigator.clipboard?.writeText(m.text)}
         onFeedback={() => {}}
+        suggestionNotes={approvalNotes}
         waitingLabel={waitingLabel}
       />
       {session.phase === "interview" && session.busy ? (

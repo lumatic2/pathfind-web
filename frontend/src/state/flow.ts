@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 
 import { useSession } from './store'
 import { grill } from '../lib/api'
+import { consumeQuota, readQuota } from './quota'
 import type { GrillResponse, GrillTurn } from './types'
 
 let nextId = 1
@@ -98,19 +99,43 @@ export function useFlow() {
               turnCount: res.turnCount,
             })
           } else {
+            const remaining = readQuota().remaining
+            const chipConfirm =
+              remaining > 0
+                ? {
+                    label: "맞아요, 이대로 조사해 주세요",
+                    note: "로드맵 1회 소진",
+                  }
+                : null
+            const chipEdit = {
+              label: "고칠 게 있어요",
+              note: "요약·큰 그림 수정",
+            }
+
+            const approvalSuggestions: string[] = [
+              ...(chipConfirm ? [chipConfirm.label] : []),
+              chipEdit.label,
+              "직접 입력",
+            ]
+
+            const guidanceLine = remaining > 0
+              ? `이렇게 이해했습니다. 맞나요?\n\n${res.summary}\n\n이러면 조사를 시작할까요?\n\n**남은 ${remaining}회 중 1회를 씁니다.**`
+              : `이렇게 이해했습니다. 맞나요?\n\n${res.summary}\n\n**로드맵 2회를 모두 쓰셨습니다.**\n만든 로드맵은 계속 보실 수 있고, 마인드맵과 ROADMAP.md도 그대로 내려받을 수 있어요.`
+
+            const latest = sessionRef.current
             patch({
               messages: [
-                ...sessionRef.current.messages,
+                ...latest.messages,
                 {
                   id: msgId(),
-                  role: 'assistant',
-                  text: res.summary ?? '',
-                  kind: 'summary-approval',
-                  suggestions: [],
+                  role: "assistant",
+                  text: guidanceLine,
+                  kind: "summary-approval",
+                  suggestions: approvalSuggestions,
                 },
               ],
-              summary: res.summary ?? '',
-              phase: 'confirm',
+              summary: res.summary ?? "",
+              phase: "confirm",
               busy: false,
             })
           }
@@ -125,5 +150,48 @@ export function useFlow() {
     [patch],
   )
 
-  return { sendAnswer }
+  const approve = useCallback(() => {
+    const current = sessionRef.current
+    if (current.phase !== "confirm") return
+    if (current.pending == null) return
+    if (readQuota().remaining === 0) return
+
+    consumeQuota()
+    patch({
+      phase: "skeleton",
+      pending: null,
+    })
+    startResearch()
+  }, [patch])
+
+  const reviseSummary = useCallback(() => {
+    const current = sessionRef.current
+    patch({
+      messages: [
+        ...current.messages,
+        {
+          id: msgId(),
+          role: "user",
+          text: "고칠 게 있어요",
+          kind: "chat",
+          suggestions: [],
+        },
+        {
+          id: msgId(),
+          role: "assistant",
+          text: "어디를 고칠까요? 바꿀 내용을 적어 주세요.",
+          kind: "question",
+          suggestions: [],
+        },
+      ],
+      phase: "interview",
+      pending: null,
+    })
+  }, [patch])
+
+  const startResearch = useCallback(() => {
+    patch({ phase: "skeleton" })
+  }, [patch])
+
+  return { sendAnswer, approve, reviseSummary, startResearch }
 }
