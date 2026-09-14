@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { FileText } from 'lucide-react'
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
@@ -170,7 +171,16 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
 function sourceDocToGrounded(node: SourceDoc): GroundedSource {
   const children = node.children != null ? node.children.map(sourceDocToGrounded) : undefined
   const kind: 'doc' | 'folder' = node.kind === 'stage' || node.kind === 'folder' ? 'folder' : 'doc'
-  return { id: node.id, title: node.title, subtitle: node.subtitle, url: node.url, kind, children }
+  const isFolder = kind === 'folder'
+  return {
+    id: node.id,
+    title: node.title,
+    subtitle: node.subtitle,
+    url: node.url,
+    kind,
+    children,
+    favicon: isFolder ? undefined : <FileText size={20} aria-hidden />,
+  }
 }
 
 function treeToSources(tree: SourceDoc[]): GroundedSource[] {
