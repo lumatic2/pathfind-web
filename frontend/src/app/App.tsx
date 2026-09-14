@@ -1,0 +1,178 @@
+import { useCallback, useState } from 'react'
+
+import { useSession } from '../state/store'
+import { useQuota, QUOTA_TOTAL } from '../state/quota'
+import {
+  NotebookWorkspaceShell,
+  NotebookTopbar,
+  MindmapPanel,
+} from '../components/notebook-workspace-shell'
+
+const LEFT_TITLE = '조사 결과'
+const LEFT_EMPTY_TITLE = '조사 결과가 여기에 쌓입니다'
+const LEFT_EMPTY_BODY =
+  '승인하면 단계마다 자료를 찾아 마크다운 한 장씩 쌓아 둡니다'
+const LEFT_COLLAPSE_LABEL = '조사 결과 패널 접기'
+const LEFT_EXPAND_LABEL = '조사 결과 패널 펼치기'
+
+const CENTER_GREETING = '무엇을 만들고 싶으세요'
+const CENTER_BODY =
+  '한 문단으로 적어 주세요, 몇 가지만 여쭙고 로드맵을 만들어 드립니다'
+const CENTER_PLACEHOLDER = '오늘 어떤 로드맵을 그려볼까요'
+
+const RIGHT_TITLE = '로드맵'
+const RIGHT_EMPTY_TITLE = '로드맵이 여기에 그려집니다'
+const RIGHT_EMPTY_BODY =
+  '인터뷰가 끝나고 승인하면 단계 골격이 먼저 서고 조사 결과가 아래로 붙습니다'
+
+const QUOTA_TOOLTIP =
+  '로드맵 하나에 에이전트가 몇 분 동안 웹을 조사합니다, 이 브라우저에서 2번까지 돌려 보실 수 있어요'
+
+function titleForSession(session: ReturnType<typeof useSession>['session']): string {
+  if (session.mapTitle != null && session.mapTitle.trim().length > 0) {
+    return session.mapTitle
+  }
+  if (session.bigPicture != null && session.bigPicture.title.trim().length > 0) {
+    return session.bigPicture.title
+  }
+  return '제목 없는 로드맵'
+}
+
+export default function App() {
+  const { session, patch } = useSession()
+  const quota = useQuota()
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightCollapsed, setRightCollapsed] = useState(false)
+
+  const topTitle = titleForSession(session)
+
+  const handleTitleChange = useCallback(
+    (next: string) => {
+      patch({ mapTitle: next.trim().length > 0 ? next : null })
+    },
+    [patch],
+  )
+
+  const quotaBadge = (
+    <span
+      className="app-quota-badge"
+      title={QUOTA_TOOLTIP}
+      aria-label={`남은 로드맵 ${quota.remaining}회`}
+    >
+      남은 로드맵 {quota.remaining}회
+    </span>
+  )
+
+  return (
+    <div
+      className="app-shell"
+      data-phase={session.phase}
+      data-stage-count={session.stages.length}
+      data-notebook-shell
+    >
+      <NotebookWorkspaceShell
+        ratios={[22, 43, 35]}
+        left={<LeftPanel />}
+        center={<CenterPanel />}
+        right={<RightPanel />}
+        leftCollapsed={leftCollapsed}
+        onLeftCollapsedChange={setLeftCollapsed}
+        rightCollapsed={rightCollapsed}
+        onRightCollapsedChange={setRightCollapsed}
+        topbar={
+          <NotebookTopbar
+            title={topTitle}
+            onTitleChange={handleTitleChange}
+            actions={[]}
+            statusSlot={quotaBadge}
+          />
+        }
+      />
+    </div>
+  )
+}
+
+function LeftPanel() {
+  return (
+    <div className="panel-left">
+      <MindmapPanel
+        layout="roadmap"
+        mapTitle={LEFT_TITLE}
+        sourcesLabel=""
+        onShowSources={undefined}
+        onShare={undefined}
+        onMore={undefined}
+        collapsed={false}
+        onCollapsedChange={undefined}
+        labels={{
+          title: LEFT_TITLE,
+          collapse: LEFT_COLLAPSE_LABEL,
+          expand: LEFT_EXPAND_LABEL,
+          emptyTitle: LEFT_EMPTY_TITLE,
+          emptyBody: LEFT_EMPTY_BODY,
+          share: '',
+          fullscreen: '',
+          backToPanel: '',
+          more: '',
+        }}
+        root={null}
+        expandedIds={[]}
+        onExpandedChange={undefined}
+        selectedId={null}
+        onSelectedChange={undefined}
+        onNodeSelect={undefined}
+      />
+    </div>
+  )
+}
+
+function CenterPanel() {
+  return (
+    <div className="panel-center">
+      <div className="center-empty">
+        <h2 className="center-empty__title">{CENTER_GREETING}</h2>
+        <p className="center-empty__body">{CENTER_BODY}</p>
+        <input
+          className="center-empty__composer"
+          placeholder={CENTER_PLACEHOLDER}
+          readOnly
+          aria-label="작곡창"
+        />
+      </div>
+    </div>
+  )
+}
+
+function RightPanel() {
+  return (
+    <div className="panel-right">
+      <MindmapPanel
+        layout="roadmap"
+        mapTitle={RIGHT_TITLE}
+        sourcesLabel=""
+        onShowSources={undefined}
+        onShare={undefined}
+        onMore={undefined}
+        collapsed={false}
+        onCollapsedChange={undefined}
+        labels={{
+          title: RIGHT_TITLE,
+          collapse: '',
+          expand: '',
+          emptyTitle: RIGHT_EMPTY_TITLE,
+          emptyBody: RIGHT_EMPTY_BODY,
+          share: '',
+          fullscreen: '',
+          backToPanel: '',
+          more: '',
+        }}
+        root={null}
+        expandedIds={[]}
+        onExpandedChange={undefined}
+        selectedId={null}
+        onSelectedChange={undefined}
+        onNodeSelect={undefined}
+      />
+    </div>
+  )
+}
