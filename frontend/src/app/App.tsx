@@ -7,6 +7,11 @@ import type { ChatEntry } from '../state/types'
 import type { ChatMessage, ChatStatus } from '../components/chat-conversation-panel'
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
+import { renderMarkdown } from '../components/chat-conversation-panel'
+import { sourceTree } from '../state/derive'
+import type { SourceDoc } from '../state/types'
+import type { GroundedSource } from '../components/grounded-source-panel'
+import { GroundedSourcePanel } from '../components/grounded-source-panel'
 import {
   NotebookWorkspaceShell,
   NotebookTopbar,
@@ -95,7 +100,7 @@ export default function App() {
     >
       <NotebookWorkspaceShell
         ratios={[22, 43, 35]}
-        left={<LeftPanel />}
+        left={<LeftPanel collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
         center={<CenterPanel />}
         right={<RightPanel />}
         leftCollapsed={leftCollapsed}
@@ -115,38 +120,61 @@ export default function App() {
   )
 }
 
-function LeftPanel() {
+function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCollapsedChange: (v: boolean) => void }) {
+  const { session, patch } = useSession()
+  const tree = sourceTree(session)
+  const stageFolderIds = tree
+    .filter((n): n is SourceDoc => n.kind === 'stage' && n.children != null)
+    .map((n) => n.id)
+  const expanded = session.sourceExpandedIds ?? stageFolderIds
+  const sources = treeToSources(tree)
+
   return (
     <div className="panel-left">
-      <MindmapPanel
-        layout="roadmap"
-        mapTitle={LEFT_TITLE}
-        sourcesLabel=""
-        onShowSources={undefined}
-        onShare={undefined}
-        onMore={undefined}
-        collapsed={false}
-        onCollapsedChange={undefined}
+      <GroundedSourcePanel
+        sources={sources}
+        selectedIds={[]}
+        onSelectedChange={() => {}}
+        selectable={false}
+        collapsed={collapsed}
+        onCollapsedChange={onCollapsedChange}
         labels={{
           title: LEFT_TITLE,
           collapse: LEFT_COLLAPSE_LABEL,
           expand: LEFT_EXPAND_LABEL,
           emptyTitle: LEFT_EMPTY_TITLE,
           emptyBody: LEFT_EMPTY_BODY,
-          share: '',
-          fullscreen: '',
-          backToPanel: '',
-          more: '',
+          add: '',
+          searchPlaceholder: '',
+          selectAll: '',
+          backToList: '',
+          guide: '',
+          emptyLink: '',
+          menu: '',
+          openInNewTab: '',
+          search: '',
+          sort: '',
+          label: '',
         }}
-        root={null}
-        expandedIds={[]}
-        onExpandedChange={undefined}
-        selectedId={null}
-        onSelectedChange={undefined}
-        onNodeSelect={undefined}
+        expandedIds={expanded}
+        onExpandedChange={(ids) => patch({ sourceExpandedIds: ids })}
+        showAdd={false}
+        showSearch={false}
+        showToolbar={false}
+        showMenu={false}
       />
     </div>
   )
+}
+
+function sourceDocToGrounded(node: SourceDoc): GroundedSource {
+  const children = node.children != null ? node.children.map(sourceDocToGrounded) : undefined
+  const kind: 'doc' | 'folder' = node.kind === 'stage' || node.kind === 'folder' ? 'folder' : 'doc'
+  return { id: node.id, title: node.title, subtitle: node.subtitle, url: node.url, kind, children }
+}
+
+function treeToSources(tree: SourceDoc[]): GroundedSource[] {
+  return tree.map(sourceDocToGrounded)
 }
 
 function CenterPanel() {
