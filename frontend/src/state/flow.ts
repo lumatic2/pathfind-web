@@ -11,7 +11,7 @@ import {
   type PoolItem,
 } from '../lib/api'
 import { consumeQuota, readQuota } from './quota'
-import { normalizeVerdict } from './derive'
+import { normalizeVerdict, channelTally, channelShort } from './derive'
 import type { Finding, GrillResponse, GrillTurn, StageSlot, Stage } from './types'
 
 let nextId = 1
