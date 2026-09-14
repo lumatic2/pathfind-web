@@ -6,6 +6,8 @@
 import { available as naverAvailable, searchNaver, name as NAVER_NAME } from './channels/naver.js';
 import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from './channels/github.js';
 import { lawAvailable, searchLaw, NAME as LAW_NAME } from './channels/law.js';
+import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './channels/public-data.js';
+import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './channels/kosis.js';
 
 // ---------- 상수 ----------
 
@@ -41,15 +43,15 @@ const CHANNELS = [
   },
   {
     name: 'public_data',
-    available: false, // 모듈 없음 → 항상 스킵
+    available: publicDataAvailable(),
     label: '공공데이터',
-    search: null,
+    search: publicDataAvailable() ? searchPublicData : null,
   },
   {
     name: 'stats',
-    available: false, // 모듈 없음 → 항상 스킵
+    available: kosisAvailable(),
     label: '통계',
-    search: null,
+    search: kosisAvailable() ? searchKosis : null,
   },
 ];
 
@@ -424,6 +426,14 @@ async function runChannelSearch(channelName, query) {
     if (channelName === 'law') {
       const results = await searchLaw(query, MAX_RESULTS_PER_CHANNEL);
       return results.map(r => ({ ...r, channel: 'law' }));
+    }
+    if (channelName === 'stats') {
+      const results = await searchKosis(query, MAX_RESULTS_PER_CHANNEL);
+      return results.map(r => ({ ...r, channel: 'stats' }));
+    }
+    if (channelName === 'public_data') {
+      const results = await searchPublicData(query);
+      return results.map(r => ({ ...r, channel: 'public_data' }));
     }
     return [];
   } catch (e) {
@@ -921,7 +931,7 @@ export async function POST(request) {
     const scopeCalls = calls + toolCallCount;
     const scope = {
       claimType: parsed?.claimType || '기술',
-      channels: [...calledChannels],
+      channels: [...new Set([...plannedFinal, ...calledChannels])],
       calls: scopeCalls,
       queries: queries.map((q) => `${q.channel}:${q.query}`),
       planned: plannedFinal,
@@ -974,7 +984,7 @@ export async function POST(request) {
     };
 
     return new Response(JSON.stringify({ stage: stagePayload }), {
-      headers: stageHeaders(source, [...calledChannels], forceMode),
+      headers: stageHeaders(source, [...new Set([...plannedFinal, ...calledChannels])], forceMode),
     });
   } catch (err) {
     console.error('stage.js 오류:', err.message);
