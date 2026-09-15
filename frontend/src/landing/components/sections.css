@@ -561,7 +561,7 @@
 }
 
 .team__text {
-  margin-top: var(--space-8);
+  margin-top: var(--space-4);
   font-size: var(--fs-item);
   font-weight: 600;
   line-height: var(--lh-quote);
@@ -671,7 +671,7 @@
 }
 
 /* 표제는 공통 h2 한 단 아래 — 우리 둘째 줄이 원본보다 길어서 50px 로는 열 안에 안 선다 */
-.start__title { font-size: var(--fs-start); max-width: none; }
+.start__title { max-width: none; }
 
 /* 지도 상자 — 높이는 뿌리·단계·소주제·항목 네 줄(부품 LEVEL_PITCH 92 × 3 + 노드 36 + 여백)이 1× 로 서는 값.
    부품이 첫 표시에서 트리 전체를 상자에 맞추므로(StartMap) 좁은 폭에서는 배율이 내려갈 뿐 잘리지 않는다. */
