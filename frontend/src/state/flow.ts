@@ -426,15 +426,19 @@ export function useFlow() {
 
         const n = stages.length
 
-        // 3) 진행 말풍선: bigPicture.intro + 단계 n개
+        // 3) 진행 말풍선: bigPicture.intro + 단계 n개 + 단계 목록
         const afterPathfind = sessionRef.current
+        const stageListLines = stages.map((s, i) => {
+          const desc = s.stage.desc ?? ''
+          return `- ${i + 1}. ${s.stage.title}${desc ? ` · ${desc}` : ''}`
+        }).join('\n')
         patch({
           messages: [
             ...afterPathfind.messages,
             {
               id: msgId(),
               role: 'assistant',
-              text: [res.bigPicture.intro, '', `단계를 ${n}개로 나눴습니다. 이제 단계마다 자료를 찾습니다.`].join(
+              text: [res.bigPicture.intro, '', `단계를 ${n}개로 나눴습니다. 이제 단계마다 자료를 찾습니다.`, '', stageListLines].join(
                 '\n',
               ),
               kind: 'progress',

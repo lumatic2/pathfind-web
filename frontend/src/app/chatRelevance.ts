@@ -21,7 +21,7 @@ const EVENT_PHRASES = [
   '연결이 끊겨 이어서 조사합니다',
   '오래 걸리는 단계',
   '단계로 이뤄지는지',
-  '단계 n개로 나눴습니다',
+  '단계로 나눴습니다',
 ] as const
 
 export function isEventLine(text: string): boolean {
