@@ -22,14 +22,16 @@ export function available() {
 
 /**
  * 네이버 검색 OpenAPI로 검색.
- * query: 검색어, kind: webkr | blog | news, display: 기본값 3.
+ * query: 검색어, kind: webkr | blog | cafearticle, display: 기본값 3. 기본 kind는 webkr.
  * 요청 타임아웃 10초. 실패·타임아웃은 빈 배열 반환, 예외 없음.
- * 반환: Result[] = { id, title, url, snippet, host }
+ * 반환: Result[] = { id, title, url, snippet, host, form }
+ * blog 결과는 form: 'blog', cafearticle 결과는 form: 'cafe', webkr 결과는 form: undefined(생략).
  */
 export async function searchNaver(query, kind = 'webkr', display = 3) {
   const id = process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_CLIENT_SECRET;
   if (!id || !secret) return [];
+  if (kind !== 'webkr' && kind !== 'blog' && kind !== 'cafearticle') return [];
 
   const params = new URLSearchParams({ query, display: String(display), start: '1' });
   const url = `https://openapi.naver.com/v1/search/${kind}.json?${params.toString()}`;
@@ -62,13 +64,16 @@ export async function searchNaver(query, kind = 'webkr', display = 3) {
       } catch {
         host = '';
       }
-      return {
+      const result = {
         id: `naver-${kind}-${idx}`,
         title,
         url: rawUrl,
         snippet,
         host,
       };
+      if (kind === 'blog') result.form = 'blog';
+      else if (kind === 'cafearticle') result.form = 'cafe';
+      return result;
     });
   } catch {
     clearTimeout(timer);
