@@ -38,11 +38,7 @@
   --danger-foreground: oklch(0.586 0.253 17.585);
   --danger-solid: oklch(0.586 0.253 17.585);
   --danger-solid-hover: oklch(0.645 0.246 16.439);
-  --askewly-violet: #6F2DBD;
-  --askewly-orchid: #A663CC;
-  --askewly-lavender: #B298DC;
-  --askewly-sky: #B8D0EB;
-  --askewly-mint: #B9FAF8;
+
   --path-violet: #6F2DBD;
   --path-orchid: #A663CC;
   --path-lavender: #B298DC;
