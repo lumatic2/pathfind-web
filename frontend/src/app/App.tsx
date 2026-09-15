@@ -78,6 +78,7 @@ export default function App() {
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [footerAlert, setFooterAlert] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [newDialogOpen, setNewDialogOpen] = useState(false)
   const [leftPanelKey, setLeftPanelKey] = useState(0)
   const [archiveItems, setArchiveItems] = useState<SavedRoadmap[]>([])
   const pendingArchiveIdRef = useRef<string | null>(null)
@@ -176,7 +177,12 @@ export default function App() {
     [archiveCurrent, replace],
   )
 
-  const handleNewRoadmap = useCallback(() => {
+  const handleNewRoadmapAsk = useCallback(() => {
+    setNewDialogOpen(true)
+  }, [])
+
+  const handleNewRoadmapConfirm = useCallback(() => {
+    setNewDialogOpen(false)
     if (quota.remaining === 0) {
       setFooterAlert(
         '2회를 모두 쓰셨습니다. 만든 패스는 계속 보실 수 있고, 마인드맵과 PATH.md 도 그대로 내려받을 수 있어요',
@@ -306,7 +312,7 @@ export default function App() {
                           {
                             id: 'new-roadmap',
                             label: '새 패스',
-                            onClick: handleNewRoadmap,
+                            onClick: handleNewRoadmapAsk,
                           },
                         ]}
             statusSlot={topStatusSlot}
@@ -326,6 +332,11 @@ export default function App() {
         confirmDeleteSecond={confirmDeleteSecond}
         onDeleteCancel={handleDeleteCancel}
         onDeleteConfirm={handleDeleteConfirm}
+      />
+      <NewPathDialog
+        open={newDialogOpen}
+        onOpenChange={setNewDialogOpen}
+        onConfirm={handleNewRoadmapConfirm}
       />
     </div>
   )
@@ -1208,6 +1219,40 @@ function CitationBadge({ citation, doc, bodyNode, open, onOpenChange, onOpen }: 
         )}
       </PopoverContent>
     </Popover>
+  )
+}
+
+function NewPathDialog({ open, onOpenChange, onConfirm }: { open: boolean; onOpenChange: (v: boolean) => void; onConfirm: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md" data-new-dialog>
+        <DialogHeader>
+          <DialogTitle>새 패스를 열시겠어요?</DialogTitle>
+          <DialogDescription>
+            현재 패스는 목록에 남고 화면은 처음부터 시작합니다.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              취소
+            </button>
+          </DialogClose>
+          <DialogClose asChild>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="inline-flex items-center justify-center rounded-md border border-primary bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              새 패스 열기
+            </button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
