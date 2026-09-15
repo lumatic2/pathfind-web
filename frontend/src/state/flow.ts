@@ -19,6 +19,8 @@ import { consumeQuota, readQuota } from './quota'
 import { normalizeVerdict, channelTally, channelShort } from './derive'
 import type { Finding, GrillChoice, GrillResponse, GrillTurn, StageSlot, Stage } from './types'
 
+const CONCURRENCY = 3
+
 let nextId = 1
 
 function msgId(): string {
@@ -450,7 +452,7 @@ export function useFlow() {
         }))
         runPool({
           items,
-          concurrency: 3,
+          concurrency: CONCURRENCY,
           worker: (item) =>
             runStage(item.payload, current.summary, stages[item.payload].stage),
           onDegrade,
@@ -526,7 +528,7 @@ export function useFlow() {
 
     runPool({
       items,
-      concurrency: 3,
+      concurrency: CONCURRENCY,
       worker: (item) =>
         runStage(item.payload, current.summary, current.stages[item.payload].stage),
       onDegrade,

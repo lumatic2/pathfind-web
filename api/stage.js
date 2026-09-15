@@ -3,6 +3,7 @@
 // 변경: 기존 단일 web_search 2회 상한 → 채널 5종(나이버·GitHub·법령·공공데이터·통계) 중
 //       단계 텍스트 키워드로 코드 규칙 채널 선택 → 프리서치 병렬 병렬 → 분석 호출.
 
+import { sendError, logCall } from './_lib/http.js';
 import { available as naverAvailable, searchNaver, name as NAVER_NAME } from './channels/naver.js';
 import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from './channels/github.js';
 import { lawAvailable, searchLaw, NAME as LAW_NAME } from './channels/law.js';
@@ -436,22 +437,20 @@ async function runChannelSearch(channelName, query) {
   if (!ch || !ch.search) return { results: [], calls: 0 };
   try {
     if (channelName === 'web') {
-      const plannedForWeb = plannedFinal.filter((n) => n !== 'web');
-      if (plannedForWeb.length <= 2) {
-        const [webResults, blogResults, cafeResults] = await Promise.all([
-          searchNaver(query, 'webkr', MAX_RESULTS_PER_CHANNEL),
-          searchNaver(query, 'blog', MAX_RESULTS_PER_CHANNEL),
-          searchNaver(query, 'cafearticle', MAX_RESULTS_PER_CHANNEL),
-        ]);
-        const results = [
-          ...webResults.map((r) => ({ ...r, channel: 'web' })),
-          ...blogResults.map((r) => ({ ...r, channel: 'web_review' })),
-          ...cafeResults.map((r) => ({ ...r, channel: 'web_review' })),
-        ];
-        return { results, calls: 3 };
+      // 웹은 서브타입 3종을 한 단계 안에서 직렬로 돈다 (외부 API 429 회피).
+      const results = [];
+      const webSubtypes = ['webkr', 'blog', 'cafearticle'];
+      for (let i = 0; i < webSubtypes.length; i++) {
+        const subResults = await searchNaver(query, webSubtypes[i], MAX_RESULTS_PER_CHANNEL);
+        results.push(
+          ...subResults.map((r, idx) => {
+            const ch =
+              i === 0 ? 'web' : 'web_review';
+            return { ...r, channel: ch };
+          }),
+        );
       }
-      const webResults = await searchNaver(query, 'webkr', MAX_RESULTS_PER_CHANNEL);
-      return { results: webResults.map((r) => ({ ...r, channel: 'web' })), calls: 1 };
+      return { results, calls: 3 };
     }
     if (channelName === 'oss') {
       const results = await searchGithub(query, MAX_RESULTS_PER_CHANNEL);
@@ -836,19 +835,20 @@ export async function POST(request) {
     const queries = await generateQueries(stage, summary, plannedFinal);
     const queryMap = new Map(queries.map((q) => [q.channel, q.query]));
 
-    // 3) 프리서치: 규칙 채널 병렬 실행
+    // 3) 프리서치: 규칙 채널을 한 단계 안에서 직렬로 돈다 (외부 API 429 회피).
     const preResults = [];
     let calls = 0;
-    const prePromises = plannedFinal.map(async (ch) => {
+    for (const ch of plannedFinal) {
+      if (calls >= MAX_CALLS_PER_STAGE) break; // 단계당 호출 상한 도달
       const q = queryMap.get(ch) || stage.title;
-      const { results } = await runChannelSearch(ch, q);
-      return { channel: ch, results, query: q };
-    });
-    const preResultsList = await Promise.all(prePromises);
-    for (const { channel, results, query } of preResultsList) {
-      preResults.push(...results.slice(0, MAX_RESULTS_PER_CHANNEL).map((r) => ({ ...r, query })));
+      const { results, calls: chCalls } = await runChannelSearch(ch, q);
+      const slotsLeft = MAX_CALLS_PER_STAGE - calls;
+      const takeCalls = Math.min(chCalls, slotsLeft);
+      preResults.push(
+        ...results.slice(0, Math.min(MAX_RESULTS_PER_CHANNEL, slotsLeft)).map((r) => ({ ...r, query: q })),
+      );
+      calls += takeCalls;
     }
-    calls += preResultsList.reduce((acc, item) => acc + item.calls, 0);
 
     const webReviewUsed = preResults.some((r) => r.channel === 'web_review');
 
@@ -881,13 +881,12 @@ export async function POST(request) {
       );
     }
 
-    // 도구 호출 처리 (상한 MAX_CALLS_PER_STAGE)
+    // 도구 호출 처리 (프리서치를 포함한 단계당 호출 상한 MAX_CALLS_PER_STAGE).
     const toolMessages = messages.slice();
-    let toolCallCount = 0;
     const toolResults = [];
     let toolResult = analysisResult;
 
-    while (toolCallCount < MAX_CALLS_PER_STAGE) {
+    while (calls < MAX_CALLS_PER_STAGE) {
       const tcs = toolResult?.toolCalls;
       if (!tcs?.length) break;
 
@@ -914,8 +913,6 @@ export async function POST(request) {
         // 낱말 상한 적용
         const clamped = clampWords(q, tc.function.name === 'law_search' || tc.function.name === 'stats' ? 2 : tc.function.name === 'public_data' ? 3 : 4);
         calls++;
-        toolCallCount++;
-
         const enriched = results.map((r, idx) => ({
           ...r,
           id: `${chname}-${idx}`,
@@ -961,19 +958,14 @@ export async function POST(request) {
     for (const f of findings) calledChannels.add(f.channel);
 
     // scope
-    const scopeCalls = calls + toolCallCount;
-    const scopePlanned = webReviewUsed
-      ? [...new Set([...plannedFinal, 'web_review'])]
-      : plannedFinal;
-    const scopeCalled = webReviewUsed
-      ? [...new Set([...calledChannels, 'web_review'])]
-      : calledChannels;
     const scope = {
       claimType: parsed?.claimType || '기술',
-      channels: [...new Set([...scopePlanned, ...scopeCalled])],
-      calls: scopeCalls,
+      channels: [...new Set([...plannedFinal, ...calledChannels, ...(webReviewUsed ? ['web_review'] : [])])],
+      calls,
       queries: queries.map((q) => `${q.channel}:${q.query}`),
-      planned: scopePlanned,
+      planned: webReviewUsed
+        ? [...new Set([...plannedFinal, 'web_review'])]
+        : plannedFinal,
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findings.length);
