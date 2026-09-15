@@ -832,3 +832,144 @@ export function mindmapLegend() {
     },
   ]
 }
+
+const VERDICT_TO_HUMAN: Record<Verdict, string> = {
+  "가져다 써도 됨": "이미 나와 있는 것을 가져다 쓰면 됩니다",
+  "직접 해야 함": "직접 만들어야 하는 부분입니다",
+  "섞어야 함": "가져다 쓸 것과 직접 만들 것이 섞여 있습니다",
+  "선례를 못 찾음": "참고할 자료를 찾지 못했습니다",
+}
+
+const CHANNEL_HUMAN: Record<string, string> = {
+  web: "웹",
+  oss: "GitHub",
+  public_data: "공공데이터",
+  stats: "통계",
+  law: "법령",
+}
+
+/**
+ * 채널 집계를 사람 말로 편다. 예: [{channel:'web',count:2},{channel:'law',count:1}]
+ * → "웹에서 자료 2건 · 법령에서 자료 1건"
+ */
+function channelTallyHuman(tally: { channel: string; count: number }[]): string {
+  if (tally.length === 0) return ""
+  return tally
+    .map((t) => {
+      const name = CHANNEL_HUMAN[t.channel] ?? t.channel
+      return `${name}에서 자료 ${t.count}건`
+    })
+    .join(" · ")
+}
+
+/**
+ * 저장된 결과 줄·진행 줄을 사람 말로 바꿔 돌려준다.
+ * 결과 줄도 진행 줄도 아니면 입력 그대로 돌려준다.
+ *
+ * 결과 줄 저장 형식(flow.ts runStage §8):
+ *   `${번호}. ${제목}\n\n**${verdict}**${tal리Suffix}${마커Suffix}`
+ *   tallySuffix = ` (웹 2·법령 1)` 형태, markerSuffix = ` [1, 2]` 형태
+ *
+ * 진행 줄 저장 형식:
+ *   `${번호}. ${제목} · ${상태}` — 이음표(·)로 제목과 상태를 잇는다
+ */
+export function displayStageResult(text: string, stage?: Stage): string {
+  // 결과 줄: "번호. 제목\n\n**계약값** (채널집계)[마커]" — 두 문단+α로 폰다
+  const resultRe =
+    /^(\d+)\. (.+)\n\n\*\*(가져다 써도 됨|직접 해야 함|섞어야 함|선례를 못 찾음)\*\*\s*(\(.*?\))?(\[.*?\])?$/
+  const resultMatch = text.match(resultRe)
+  if (resultMatch) {
+    const [, numStr, title, verdict, tallyRaw] = resultMatch
+    const first = `${numStr}. ${title}`
+    const humanVerdict = VERDICT_TO_HUMAN[verdict as Verdict]
+    let second = `**${humanVerdict}**`
+    if (tallyRaw) {
+      const inner = tallyRaw.slice(1, -1).trim()
+      if (inner.length > 0) {
+        const items = inner.split("·").map((s) => s.trim()).filter(Boolean)
+        const parts = items.map((item) => {
+          const m = item.match(/^(.+?) (\d+)$/)
+          if (m) {
+            const chName = CHANNEL_HUMAN[m[1]] ?? m[1]
+            return `${chName}에서 자료 ${m[2]}건`
+          }
+          return item
+        })
+        if (parts.length > 0) second += ` ${parts.join(" · ")}`
+      }
+    }
+    const out = [first, second]
+    if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
+      out.push(stage.verdictReason.trim())
+    }
+    return out.join("\n\n")
+  }
+
+  // 진행 줄: "번호. 제목 · 상태" — 이음표를 두고 한 줄로 편다
+  const progressRe = /^(\d+)\. (.+) · (.+)$/
+  const progressMatch = text.match(progressRe)
+  if (progressMatch) {
+    const [, numStr, title, status] = progressMatch
+    return `${numStr}. ${title} · ${status}`
+  }
+
+  return text
+}
+
+/**
+ * 왼쪽 패널 문서 트리에서 인용 하나를 자료 문서(SourceDoc)로 되찾는다.
+ * 인용 id가 있으면 findDoc으로 찾고, 없거나 못 찾으면 트리를 어느 깊이든 훑어
+ * kind가 finding이고 제목(트리 안 title, 앞뒤 공백 제거)이 인용 title과 같은 문서를 찾는다.
+ * 어느 경로도 예외를 던지지 않는다 — 답변 렌더가 죽으면 안 된다.
+ */
+export function resolveCitation(
+  tree: SourceDoc[] | null | undefined,
+  citation: { n: number; title: string; id?: string },
+  index?: { byTitle: Map<string, SourceDoc> },
+): SourceDoc | null {
+  if (!tree || tree.length === 0) return null
+  try {
+    if (citation.id) {
+      const byId = findDoc(tree, citation.id)
+      if (byId) return byId
+    }
+    const idx = index ?? findingIndex(tree)
+    const title = citation.title.trim()
+    return idx.byTitle.get(title) ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * sourceTree 결과 트리를 한 번 훑어, 문서 id와 문서 제목(트리 안 title, trim)으로
+ * 자료를 찾을 수 있는 맵 두 개를 만든다. resolveCitation이 재사용할 수 있다.
+ */
+export function findingIndex(
+  tree: SourceDoc[] | null | undefined,
+): { byId: Map<string, SourceDoc>; byTitle: Map<string, SourceDoc> } {
+  const byId = new Map<string, SourceDoc>()
+  const byTitle = new Map<string, SourceDoc>()
+  if (!tree) return { byId, byTitle }
+  walkForCitations(tree, byId, byTitle)
+  return { byId, byTitle }
+}
+
+function walkForCitations(
+  nodes: SourceDoc[],
+  byId: Map<string, SourceDoc>,
+  byTitle: Map<string, SourceDoc>,
+): void {
+  for (const node of nodes) {
+    if (node.kind === "finding") {
+      if (node.id) byId.set(node.id, node)
+      const t = node.title.trim()
+      if (t.length > 0 && !byTitle.has(t)) {
+        byTitle.set(t, node)
+      }
+    }
+    if (node.children) {
+      walkForCitations(node.children, byId, byTitle)
+    }
+  }
+}
