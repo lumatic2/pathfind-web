@@ -385,7 +385,7 @@ export function useFlow() {
         {
           id: msgId(),
           role: 'assistant',
-          text: '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
+          text: current.pending?.opening ?? '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
           kind: 'progress',
           suggestions: [],
         },
