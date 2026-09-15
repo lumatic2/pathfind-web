@@ -184,27 +184,36 @@ export const content: {
       ],
     },
     right: {
-      heading: 'Pathfinder 로',
+      heading: '패스파인더와 함께',
       hub: 'Pathfinder',
-      /** 네 방위 스포크 — 위 → 오른쪽 → 아래 → 왼쪽 순 */
+      /** 네 방위 스포크 — 위 → 오른쪽 → 아래 → 왼쪽 순.
+       *  좌표 기준은 **정사각 궤도 칸**(`.band__orbit`)이고 반지름 40% 가 파선 원과 같은 값이다.
+       *  네 값이 어긋나면 아이콘이 원에서 떠 보인다 — 10/90 대칭을 깨지 않는다. */
       spokes: [
-        { label: '인터뷰', icon: '/tile-2.png', left: 50, top: 8 },
-        { label: '조사', icon: '/tile-6.png', left: 82, top: 50 },
-        { label: '판정', icon: '/tile-1.png', left: 50, top: 92 },
-        { label: '패스', icon: '/tile-7.png', left: 18, top: 50 },
+        { label: '인터뷰', icon: '/tile-2.png', left: 50, top: 10 },
+        { label: '조사', icon: '/tile-6.png', left: 90, top: 50 },
+        { label: '판정', icon: '/tile-1.png', left: 50, top: 90 },
+        { label: '패스', icon: '/tile-7.png', left: 10, top: 50 },
       ],
     },
-    cta: { label: '누구에게 맞나요', href: '#team' },
+    /** 버튼이 아니라 아래로 잇는 힌트 — 문구도 이어지는 말투로 */
+    cta: { label: '그럼 누구에게 필요할까요?', href: '#team' },
   },
 
   team: {
-    title: ['새 일을 시작하는 분께', '맞습니다'],
-    /** 2×2 — `lead` 가 강조색 */
+    title: ['새 일을 시작하는 분께', '필요합니다'],
+    /** 2×2 — `lead` 가 강조색.
+     *  네 칸은 「~하는 분」과 「~할 때」를 섞는다(2026-09-15 사용자 결정) — 제목이 둘을 다 받는다.
+     *  칸마다 **서로 다른 값 하나**를 맡는다: 순서 / 이미 있는 것 / 놓치면 곤란한 것 / 낮은 문턱.
+     *  종전 1·3 칸은 같은 말을 해 하나가 놀았고, 「갈라 범위를 잡는다」는 어색한 한국어였다.
+     *  아이콘은 이 넷을 위해 새로 뽑았다(2026-09-15, GPT Image 2). 기존 그림체에서 실측한 색 다섯으로 고정했다 —
+     *  먹선 #14110D · 흰 면 #FCFCFC · 연라벤더 #D8C7EE · 보라 #A05FCA · 진보라 #6F2DBD.
+     *  파일 이름은 번호가 아니라 뜻이다 — 칸 순서가 바뀌어도 어느 그림인지 읽힌다. */
     items: [
-      { icon: '/svc-map.png', lead: '처음 해 보는 일', rest: '어디서부터 손대야 할지 막막할 때, 단계로 나눠 드립니다.' },
-      { icon: '/svc-parts.png', lead: '동네 가게 준비', rest: '임대차·허가·설비처럼 챙길 것이 많은 일을 정리합니다.' },
-      { icon: '/svc-shop.png', lead: '작은 서비스 만들기', rest: '이미 있는 것과 직접 만들 것을 갈라 범위를 잡습니다.' },
-      { icon: '/svc-interview.png', lead: 'AI 가 익숙하지 않은 분', rest: '어려운 말 없이, 하려는 일부터 한 문단으로 시작합니다.' },
+      { icon: '/svc-map.png', lead: '어디부터 손대야 할지 막막할 때', rest: '첫걸음부터 마무리까지 그림으로 보여드립니다.' },
+      { icon: '/svc-parts.png', lead: '직접 다 만들 생각이었다면', rest: '이미 있는 부품을 찾아, 직접 만들 일을 줄여 드립니다.' },
+      { icon: '/svc-shop.png', lead: '자영업을 준비하는 분', rest: '임대차·허가·위생처럼 빠뜨리면 곤란한 것을 미리 짚어 드립니다.' },
+      { icon: '/svc-interview.png', lead: 'AI가 낯선 분', rest: '클릭만으로 인터뷰를 진행하고 아이디어를 시각화해보세요.' },
     ],
   },
 
