@@ -12,6 +12,7 @@ import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './
 import { reviewFindings } from './_lib/review-findings.js';
 import { selectFindings } from './_lib/select-findings.js';
 import { renumberBody, countCitationMarks, stripCitationMarks, attachNumbersByMaterialName } from './_lib/citation-marks.js';
+import { topicWords } from './_lib/topic-query.js';
 
 // ---------- 상수 ----------
 
@@ -995,16 +996,49 @@ export async function POST(request) {
     // 3) 프리서치: 규칙 채널을 한 단계 안에서 직렬로 돈다 (외부 API 429 회피).
     const preResults = [];
     let calls = 0;
+    const topicSummary = topicWords(summary) || [];
+    const TOPIC_TARGET_CHANNELS = new Set(['law', 'stats', 'public_data']);
+
     for (const ch of plannedFinal) {
       if (calls >= MAX_CALLS_PER_STAGE) break; // 단계당 호출 상한 도달
       const q = queryMap.get(ch) || stage.title;
-      const { results, calls: chCalls } = await runChannelSearch(ch, q, stage);
+      let results = [];
+      let chCalls = 0;
+      const { results: chResults, calls: chSearchCalls } = await runChannelSearch(ch, q, stage);
+      results = chResults;
+      chCalls = chSearchCalls;
       const slotsLeft = MAX_CALLS_PER_STAGE - calls;
       const takeCalls = Math.min(chCalls, slotsLeft);
       preResults.push(
         ...results.slice(0, Math.min(MAX_RESULTS_PER_CHANNEL, slotsLeft)).map((r) => ({ ...r, query: q })),
       );
       calls += takeCalls;
+
+      // 계획된 법령·통계·공공데이터 검색어에 주제 낱말이 하나도 없을 때, 주제어로 한 번 더
+      if (
+        TOPIC_TARGET_CHANNELS.has(ch) &&
+        topicSummary.length > 0 &&
+        calls < MAX_CALLS_PER_STAGE
+      ) {
+        const kwTokens = (q || '')
+          .split(/[^\uAC00-\uD7A3]+/)
+          .map((w) => w.trim())
+          .filter(Boolean);
+        const hasTopic = kwTokens.some((kw) => topicSummary.includes(kw));
+        if (!hasTopic) {
+          const topicQuery = topicSummary.slice(0, 2).join(' ');
+          const { results: topicResults, calls: topicCalls } = await runChannelSearch(ch, topicQuery, stage);
+          const topicSlotsLeft = MAX_CALLS_PER_STAGE - calls;
+          const topicTake = Math.min(topicCalls, topicSlotsLeft);
+          preResults.push(
+            ...topicResults.slice(0, Math.min(MAX_RESULTS_PER_CHANNEL, topicSlotsLeft)).map(
+              (r) => ({ ...r, query: topicQuery }),
+            ),
+          );
+          calls += topicTake;
+          logCall('stage.topicSupplement', 0, 0, { channel: ch, query: topicQuery });
+        }
+      }
     }
 
     const webReviewUsed = preResults.some((r) => r.channel === 'web_review');
