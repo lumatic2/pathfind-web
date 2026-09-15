@@ -31,6 +31,7 @@ export function isEventLine(text: string): boolean {
 /** 접을 줄 판별 */
 export function isFoldLine(entry: ChatEntry): boolean {
   if (entry.role !== 'assistant') return false
+  if (entry.id && entry.id.startsWith('stage-result-')) return false
   if (entry.kind === 'question') return false
   if (entry.kind === 'summary-approval') return false
   if (isResultLine(entry.text)) return false

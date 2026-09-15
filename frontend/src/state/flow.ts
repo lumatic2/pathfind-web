@@ -157,7 +157,7 @@ export function useFlow() {
         // 실패해도 단계 상태는 done 그대로
       })
 
-    // 8) 결과 줄 (kind progress)
+    // 8) 결과 줄 (kind progress) — 미리 깔아둔 stage-result-${index} 자리를 덮는다
     const top = findings.slice(0, 3)
     const citationTitles = top.map((f) => (typeof f === 'object' && f != null ? (f as { name?: string }).name ?? '' : ''))
     const citationIds = top.map((_f, i) => `stage-${index}-finding-${i}`)
@@ -169,20 +169,38 @@ export function useFlow() {
       : ''
     const text = `${index + 1}. ${merged.title}\n\n**${verdict}**${tallySuffix}${markerSuffix}`
 
-    patch({
-      messages: [
-        ...latest.messages,
-        {
-          id: msgId(),
-          role: 'assistant',
-          text,
-          kind: 'progress',
-          suggestions: [],
-          citationTitles,
-          citationIds,
-        },
-      ],
-    })
+    const placeholderId = `stage-result-${index}`
+    const currentMessages = sessionRef.current.messages
+    const existingIdx = currentMessages.findIndex((m) => m.id === placeholderId)
+
+    if (existingIdx >= 0) {
+      const nextMessages = [...currentMessages]
+      nextMessages[existingIdx] = {
+        id: placeholderId,
+        role: 'assistant',
+        text,
+        kind: 'progress',
+        suggestions: [],
+        citationTitles,
+        citationIds,
+      }
+      patch({ messages: nextMessages })
+    } else {
+      patch({
+        messages: [
+          ...currentMessages,
+          {
+            id: placeholderId,
+            role: 'assistant',
+            text,
+            kind: 'progress',
+            suggestions: [],
+            citationTitles,
+            citationIds,
+          },
+        ],
+      })
+    }
   }
 
   const sendAnswer = useCallback(
@@ -445,7 +463,19 @@ export function useFlow() {
           ],
         })
 
-        // 5) 단계 조사 풀 실행
+        // 5) 단계 결과 자리 표시: 단계 수만큼 stage-result-${i} 진행 말풍선을 미리 깐다
+        const placeholderMessages: typeof afterSkeleton.messages = stages.map((s, i) => ({
+          id: `stage-result-${i}`,
+          role: 'assistant',
+          text: `${i + 1}. ${s.stage.title}\n\n자료를 찾는 중…`,
+          kind: 'progress',
+          suggestions: [],
+        }))
+        patch({
+          messages: [...afterSkeleton.messages, ...placeholderMessages],
+        })
+
+        // 6) 단계 조사 풀 실행
         const items: PoolItem<number>[] = stages.map((s, i) => ({
           key: `stage-${i}`,
           payload: i,
