@@ -67,7 +67,7 @@ function titleForSession(session: ReturnType<typeof useSession>['session']): str
 }
 
 export default function App() {
-  const { session, patch, replace } = useSession()
+  const { session, patch, replace, reset } = useSession()
   const sessionRef = useRef(session)
   sessionRef.current = session
   const quota = useQuota()
@@ -75,6 +75,7 @@ export default function App() {
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [footerAlert, setFooterAlert] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [leftPanelKey, setLeftPanelKey] = useState(0)
   const [archiveItems, setArchiveItems] = useState<SavedRoadmap[]>([])
   const pendingArchiveIdRef = useRef<string | null>(null)
 
@@ -95,9 +96,9 @@ export default function App() {
     <span
       className="app-quota-badge"
       title={QUOTA_TOOLTIP}
-      aria-label={`남은 패스 ${quota.remaining}회`}
+      aria-label={`남은 횟수 ${quota.remaining}회`}
     >
-      남은 패스 {quota.remaining}회
+      남은 횟수 {quota.remaining}회
     </span>
   )
 
@@ -172,6 +173,18 @@ export default function App() {
     [archiveCurrent, replace],
   )
 
+  const handleNewRoadmap = useCallback(() => {
+    if (quota.remaining === 0) {
+      setFooterAlert(
+        '2회를 모두 쓰셨습니다. 만든 패스는 계속 보실 수 있고, 마인드맵과 PATH.md 도 그대로 내려받을 수 있어요',
+      )
+      return
+    }
+    archiveCurrent()
+    pendingArchiveIdRef.current = null
+    reset()
+  }, [quota.remaining, archiveCurrent, reset])
+
   const handleRename = useCallback(
     (id: string, next: string) => {
       renameRoadmap(id, next)
@@ -241,7 +254,7 @@ export default function App() {
     >
       <NotebookWorkspaceShell
         ratios={[22, 43, 35]}
-        left={<LeftPanel ref={leftPanelRef} collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
+        left={<LeftPanel key={leftPanelKey} ref={leftPanelRef} collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
         center={<CenterPanel renderCitation={renderCitation} onRoadmapDownload={handleRoadmapDownload} />}
         right={<RightPanel />}
         leftCollapsed={leftCollapsed}
@@ -269,6 +282,11 @@ export default function App() {
                               loadArchive()
                               setDialogOpen(true)
                             },
+                          },
+                          {
+                            id: 'new-roadmap',
+                            label: '새 패스',
+                            onClick: handleNewRoadmap,
                           },
                         ]}
             statusSlot={topStatusSlot}
