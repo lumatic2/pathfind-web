@@ -47,10 +47,10 @@ export const content: {
   cta: { title: string[]; text: string[]; button: { label: string; href: string }; figure: Asset };
   start: { title: string[]; map: { root: string; stages: Array<{ label: string; children: Array<{ label: string; children?: string[] }> }> }; links: Array<{ label: string[]; href: string; tone: 'solid' | 'quiet' }> };
   footer: {
-    tagline: string;
-    columns: Array<{ title: string; href: string; links: Array<{ label: string; href: string }> }>;
+    powered: { label: 'Powered by', alt: 'Upstage', href: 'https://www.upstage.ai' },
+    columns: Array<{ title: string; href?: string; links: Array<{ label: string; href: string }> }>;
     copyright: string;
-    terms: Array<{ label: string; href: string }>;
+    terms: Array<{ label: string }>;
   };
 } = {
   brand: {
@@ -246,44 +246,38 @@ export const content: {
   },
 
   footer: {
-    tagline: 'Solar Pro 4 로 만들었습니다.',
+    powered: { label: 'Powered by', alt: 'Upstage', href: 'https://www.upstage.ai' },
     columns: [
       {
         title: '서비스',
         href: '#compare',
         links: [
           { label: '시작하기', href: '/app.html' },
-          { label: '어떻게 되나요', href: '#compare' },
-          { label: '누구에게 맞나요', href: '#team' },
+          { label: '무엇을 해 주나요', href: '#compare' },
+          { label: '누구에게 필요한가요', href: '#team' },
         ],
       },
       {
         title: '조사하는 곳',
-        href: '#quote',
         links: [
-          { label: '네이버 개발자', href: 'https://developers.naver.com' },
+          { label: '네이버 검색', href: 'https://search.naver.com' },
+          { label: 'GitHub', href: 'https://github.com' },
           { label: '국가법령정보센터', href: 'https://www.law.go.kr' },
-          { label: 'KOSIS', href: 'https://kosis.kr' },
+          { label: '국가통계포털 KOSIS', href: 'https://kosis.kr' },
           { label: '공공데이터포털', href: 'https://www.data.go.kr' },
         ],
       },
       {
-        title: '만든 것',
-        href: '#cta',
+        title: '쓴 것',
         links: [
-          { label: 'Upstage', href: 'https://upstage.ai' },
+          { label: 'Solar Pro 4', href: 'https://www.upstage.ai/solar-llms' },
           { label: 'Hermes Agent', href: 'https://github.com/nousresearch/hermes-agent' },
-          { label: 'ui.askewly.com', href: 'https://ui.askewly.com' },
+          { label: 'askewly 디자인 시스템', href: 'https://ui.askewly.com' },
         ],
       },
-      {
-        title: '만든 곳',
-        href: '#cta',
-        links: [{ label: 'askewly.com', href: 'https://askewly.com' }],
-      },
     ],
-    copyright: 'Made By Luka',
-    terms: [{ label: '조사 자료의 저작권은 각 출처에 있습니다.', href: '#cta' }],
+    copyright: '© 2026 askewly · Made by Luka',
+    terms: [{ label: '자료의 권리와 이용 조건은 각 출처를 따릅니다.' }],
   },
 };
 
