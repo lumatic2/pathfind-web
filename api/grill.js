@@ -6,9 +6,16 @@ const SYSTEM_PROMPT = `당신은 사용자의 아이디어를 명료화하는 �
 - questionTitle: 한 줄 질문 제목, 24자 이내.
 - questionBody: 선택지를 고르는 기준 한두 문장.
 - suggestion: 추천 방향 한 줄.
-- exampleButtons: 서로 다른 방향 2~3개를 각각 25자 안팎 완결된 구로. 마지막은 항상 "직접 입력"입니다. done이면 exampleButtons는 빈 배열입니다.
+- exampleButtons: 객체 배열. 각 객체는 { label, why, recommended }를 가집니다.
+  - label: 서로 다른 방향 2~3개를 각각 25자 안팎 완결된 구.
+  - why: 그 버튼을 고르면 좋은 점을 한 줄로. "도록", "라서", "기 때문에", "니까" 중 하나로 끝나는 까닭 문구.
+  - recommended: 정확히 하나만 true. 가장 추천하는 방향 하나에 true, 나머지는 false.
+  - 마지막 항목은 항상 label이 "직접 입력"이고 why는 빈 문자열(""), recommended는 false.
+  - 모델이 exampleButtons를 문자열 배열로 답하면, 각 문자열을 { label: 문자열, why: "", recommended: false }로 감싼 것으로 간주합니다.
+- opening: 주제에 맞는 조사 시작 한 줄. 단계마다 무엇을 먼저 찾을지 방향을 잡는 문장.
 - 진행 중이면 done은 false.
-- 종료면 done true, summary는 지금까지의 대화를 바탕으로 사용자의 아이디어를 3~5문장으로 정리한 글.
+- 종료면 done true, summary는 3~5문장 요약 문단 뒤에 빈 줄, "### 정한 것", 빈 줄, 목록(-)이 오는 마크다운 뼈대.
+  - opening이 비어 있으면 서버가 기본 문구 "이제 단계마다 자료를 찾겠습니다"를 넣습니다.
 
 종료 규칙:
 - 요청의 turnCount가 5 이상이면 질문을 만들지 말고, 지금까지 대화로 3~5문장 요약을 done true, summary로만 내놓습니다.
@@ -17,13 +24,88 @@ const SYSTEM_PROMPT = `당신은 사용자의 아이디어를 명료화하는 �
 언어: 한국어. 쌍따옴표는 반각만 사용합니다.`;
 
 function buildHistoryMessages(history) {
-  return history.flatMap((h) => [
-    {
-      role: 'user',
-      content: `[질문]\n제목: ${h.questionTitle}\n\n${h.questionBody}\n\n[추천] ${h.suggestion}\n\n[예시 버튼]\n${h.exampleButtons.map((b, i) => `${i + 1}. ${b}`).join('\n')}`,
-    },
-    { role: 'assistant', content: `[내 답변] ${h.answer}` },
-  ]);
+  return history.flatMap((h) => {
+    const buttons = Array.isArray(h.exampleButtons)
+      ? h.exampleButtons.map((b, i) => {
+          if (typeof b === 'string') return `${i + 1}. ${b}`;
+          const label = typeof b.label === 'string' ? b.label : '';
+          const why = typeof b.why === 'string' && b.why.trim() ? ` (${b.why})` : '';
+          const mark = b.recommended === true ? ' ★' : '';
+          return `${i + 1}. ${label}${why}${mark}`;
+        }).join('\n')
+      : '';
+    return [
+      {
+        role: 'user',
+        content: `[질문]\n제목: ${h.questionTitle}\n\n${h.questionBody}\n\n[추천] ${h.suggestion}\n\n[예시 버튼]\n${buttons}`,
+      },
+      { role: 'assistant', content: `[내 답변] ${h.answer}` },
+    ];
+  });
+}
+
+function normalizeExampleButtons(buttons, done) {
+  if (done) return [];
+
+  if (!Array.isArray(buttons) || buttons.length === 0) {
+    return [{ label: '직접 입력', why: '', recommended: true }];
+  }
+
+  const parsed = buttons
+    .map((b) => {
+      if (typeof b === 'string') {
+        return { label: b.trim(), why: '', recommended: false };
+      }
+      if (typeof b === 'object' && b !== null) {
+        const label = typeof b.label === 'string' ? b.label.trim() : '';
+        const why = typeof b.why === 'string' ? b.why.trim() : '';
+        const recommended = b.recommended === true;
+        return { label, why, recommended };
+      }
+      return null;
+    })
+    .filter((b) => b && typeof b.label === 'string' && b.label);
+
+  if (parsed.length === 0) {
+    return [{ label: '직접 입력', why: '', recommended: true }];
+  }
+
+  const last = parsed[parsed.length - 1];
+  if (last.label !== '직접 입력') {
+    parsed.push({ label: '직접 입력', why: '', recommended: false });
+  } else {
+    last.why = '';
+    last.recommended = false;
+  }
+
+  if (!parsed.some((b) => b.recommended === true)) {
+    parsed[0].recommended = true;
+  }
+
+  let found = false;
+  for (const b of parsed) {
+    if (b.recommended === true) {
+      if (found) {
+        b.recommended = false;
+      } else {
+        found = true;
+      }
+    }
+  }
+
+  if (parsed.length > 4) {
+    const withoutDirect = parsed.filter((b) => b.label !== '직접 입력');
+    if (withoutDirect.length > 3) {
+      withoutDirect.length = 3;
+      const kept = [...withoutDirect, { label: '직접 입력', why: '', recommended: false }];
+      if (!kept.some((b) => b.recommended === true)) {
+        kept[0].recommended = true;
+      }
+      return kept;
+    }
+  }
+
+  return parsed;
 }
 
 function polish(content) {
@@ -64,15 +146,6 @@ function polish(content) {
   return null;
 }
 
-function cleanExampleButtons(buttons, done) {
-  if (!Array.isArray(buttons)) return done ? [] : ['직접 입력'];
-  const cleaned = [...new Set(buttons.filter((b) => typeof b === 'string' && b.trim()))]
-    .map((b) => b.trim());
-  if (done) return [];
-  if (cleaned.length > 4) cleaned.length = 4;
-  if (!cleaned.includes('직접 입력')) cleaned.push('직접 입력');
-  return cleaned;
-}
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -85,6 +158,8 @@ function fallbackSummary(history) {
   if (!answers) return '인터뷰를 통해 정리된 아이디어를 요약해 주세요.';
   return `지금까지 나눈 답변입니다.\n\n${answers}`;
 }
+
+const DEFAULT_OPENING = '이제 단계마다 자료를 찾겠습니다.';
 
 async function callSolarWithRetry(messages, opts = {}) {
   const SOLAR_API_KEY = process.env.SOLAR_API_KEY;
@@ -123,7 +198,9 @@ async function callSolarWithRetry(messages, opts = {}) {
     const status = solarRes.status;
 
     if (status === 429 && attempt < maxRetries) {
-      console.warn(`Solar 429 rate limit (시도 ${attempt + 1}/${opts.maxRetries}), ${Math.pow(2, attempt)}초 대기 후 재시도...`);
+      console.warn(
+        `Solar 429 rate limit (시도 ${attempt + 1}/${opts.maxRetries}), ${Math.pow(2, attempt)}초 대기 후 재시도...`,
+      );
       await sleep(Math.pow(2, attempt) * 1000);
       continue;
     }
@@ -160,14 +237,20 @@ export async function POST(request) {
       const summaryMessages = [
         { role: 'system', content: SYSTEM_PROMPT },
         ...buildHistoryMessages(history),
-        { role: 'user', content: '인터뷰가 5턴으로 끝났습니다. 지금까지의 대화를 바탕으로 사용자의 아이디어를 3~5문장으로 요약해 주세요. JSON 형식({ "done": true, "summary": "..." })으로만 출력하세요. 다른 텍스트 금지.' },
+        {
+          role: 'user',
+          content:
+            '인터뷰가 5턴으로 끝났습니다. 지금까지의 대화를 바탕으로 사용자의 아이디어를 3~5문장으로 요약해 주세요. 요약 문단 뒤에 빈 줄, "### 정한 것", 빈 줄, 목록(-)을 이어 붙인 마크다운 뼈대로 출력하세요. JSON 형식({ "done": true, "summary": "...", "opening": "..." })으로만 출력하세요. 다른 텍스트 금지.',
+        },
       ];
       try {
         const summaryContent = await callSolarWithRetry(summaryMessages, { maxRetries: 2 });
         const parsed = polish(summaryContent) || {};
-        const summary = parsed.summary
-          ? String(parsed.summary)
-          : fallbackSummary(history);
+        const summary = parsed.summary ? String(parsed.summary) : fallbackSummary(history);
+        const opening =
+          typeof parsed.opening === 'string' && parsed.opening.trim()
+            ? parsed.opening.trim()
+            : DEFAULT_OPENING;
 
         return new Response(
           JSON.stringify({
@@ -177,6 +260,7 @@ export async function POST(request) {
             exampleButtons: [],
             done: true,
             summary,
+            opening,
             turnCount: turnCount + 1,
           }),
           {
@@ -184,7 +268,7 @@ export async function POST(request) {
               'Content-Type': 'application/json',
               'x-grill-source': 'solar',
             },
-          }
+          },
         );
       } catch (e) {
         // Solar 호출 실패 시에도 종료 처리 — history 답 기반 폴백 요약
@@ -196,6 +280,7 @@ export async function POST(request) {
             exampleButtons: [],
             done: true,
             summary: fallbackSummary(history),
+            opening: DEFAULT_OPENING,
             turnCount: turnCount + 1,
           }),
           {
@@ -203,7 +288,7 @@ export async function POST(request) {
               'Content-Type': 'application/json',
               'x-grill-source': 'fallback:no-summary',
             },
-          }
+          },
         );
       }
     }
@@ -234,15 +319,28 @@ export async function POST(request) {
     const parsed = polish(content);
 
     // 파싱 실패: 500 대신 200 + 다시 여쭤볼게요 질문
-    if (!parsed || (typeof parsed !== 'object')) {
+    if (!parsed || typeof parsed !== 'object') {
       return new Response(
         JSON.stringify({
           questionTitle: '조금 더 여쭤볼게요',
           questionBody: '아까 나눈 이야기를 바탕으로, 가장 먼저 확인하고 싶은 한 가지를 골라 주세요.',
           suggestion: '지금까지 나온 답변을 한 문장으로 정리해 방향을 좁혀 보세요.',
-          exampleButtons: ['핵심 목표 다시 묻기', '대상 사용자 좁히기', '직접 입력'],
+          exampleButtons: [
+            {
+              label: '핵심 목표 다시 묻기',
+              why: '핵심 목표를 다시 확인하면 방향이 선명해지기 때문입니다',
+              recommended: true,
+            },
+            {
+              label: '대상 사용자 좁히기',
+              why: '누구를 위한 것인지 정하면 범위를 줄이기 쉽기 때문입니다',
+              recommended: false,
+            },
+            { label: '직접 입력', why: '', recommended: false },
+          ],
           done: false,
           summary: '',
+          opening: DEFAULT_OPENING,
           turnCount: turnCount + 1,
         }),
         {
@@ -250,12 +348,15 @@ export async function POST(request) {
             'Content-Type': 'application/json',
             'x-grill-source': 'fallback:parse',
           },
-        }
+        },
       );
     }
 
     const isEnd = parsed.done === true || turnCount >= 5;
-    const buttons = cleanExampleButtons(parsed.exampleButtons, isEnd);
+    const buttons = normalizeExampleButtons(parsed.exampleButtons, isEnd);
+    const summary = parsed.summary || '';
+    const opening =
+      typeof parsed.opening === 'string' && parsed.opening.trim() ? parsed.opening.trim() : DEFAULT_OPENING;
 
     return new Response(
       JSON.stringify({
@@ -264,7 +365,8 @@ export async function POST(request) {
         suggestion: parsed.suggestion || '',
         exampleButtons: buttons,
         done: isEnd,
-        summary: parsed.summary || '',
+        summary,
+        opening,
         turnCount: turnCount + 1,
       }),
       {
@@ -272,7 +374,7 @@ export async function POST(request) {
           'Content-Type': 'application/json',
           'x-grill-source': 'solar',
         },
-      }
+      },
     );
   } catch (err) {
     console.error('grill.js 오류:', err.message);
