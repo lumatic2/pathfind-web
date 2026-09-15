@@ -18,7 +18,7 @@ export type Finding = {
   note: string
   url: string
   grade?: "E1" | "E2" | "E3" | "E4" | "E5"
-  channel?: "web" | "oss" | "public_data" | "stats" | "law"
+  channel?: "web" | "oss" | "public_data" | "stats" | "law" | "web_review"
 }
 
 // 단계 조사할 때 서버가 쓰는 검색 범위. planned 는 코드 규칙이 미리 돌린 채널, channels 는 결과가 온 채널이라 다를 수 있다.
