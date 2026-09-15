@@ -170,6 +170,28 @@
 
 ---
 
+## 사용 자산과 출처
+
+화면에 쓴 아이콘과 글꼴.
+
+- 아이콘: lucide (https://lucide.dev)
+- 글꼴: Noto Sans KR (https://fonts.google.com/noto/specimen/Noto+Sans+KR)
+
+조사에 쓰는 바깥 공개 API 다섯. 주소는 아래와 같다.
+
+- 네이버 검색 (https://developers.naver.com)
+- GitHub (https://docs.github.com/en/rest)
+- 공공데이터포털 (https://www.data.go.kr)
+- KOSIS (https://kosis.kr)
+- 국가법령정보센터 (https://open.law.go.kr)
+
+우리가 만든 것이라 출처를 밖에 둘 필요가 없는 것들.
+
+- 화면 부품: ui.askewly.com 레지스트리 설치본 — 우리 것.
+- 화면 갈무리와 도식: 직접 만든 것.
+
+---
+
 ## 버전·업그레이드 방침
 
 이 PRD는 version 1.0. 구현·데모 과정에서 더 쉽고 나은 길이 발견되면 이 PRD를 수정한다(규정상 “안 읽고 만들면 엉뚱한 것 나온다” 주의는 유지 — 수정 시 A-1 걸음과 정합 재확인).
