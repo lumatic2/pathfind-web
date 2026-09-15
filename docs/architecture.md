@@ -67,5 +67,5 @@ Vercel 서버리스 (api/*.js)
 ## 참조
 
 - 서버 API 계약: `docs/api-contract.md` (엔드포인트 4개, 공통 오류, 호출 순서, verdict 4종)
-- render.py 위치: `pathfind-src/scripts/render.py`, `pathfind-src/scripts/service_render.py`.
+- render.py 위치: `pathfind-src/scripts/render.py`.
   현재 서비스는 render.py를 거치지 않고 Solar가 직접 JSON/마크다운을 반환하는 구조.
