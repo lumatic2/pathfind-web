@@ -976,7 +976,7 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
   const constraint = useMemo(
     () => ({
       width: Math.min(28 * 16, window.innerWidth - 16),
-      height: Math.max(22 * 16, Math.min(32 * 16, window.innerHeight - 24)),
+      height: Math.min(32 * 16, Math.max(22 * 16, window.innerHeight - 24)),
     }),
     [],
   )
@@ -998,61 +998,72 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
     return () => window.removeEventListener('resize', recompute)
   }, [open, constraint.height])
 
-  const clear = () => {
-    if (timer.current !== null) window.clearTimeout(timer.current)
-    timer.current = null
-  }
-
-  useEffect(() => clear, [])
-
-  const openAs = (by: 'hover' | 'focus' | 'key') => {
-    clear()
-    openedBy.current = by
-    onOpenChange(citation.n)
-  }
-
-  const scheduleClose = () => {
-    clear()
-    timer.current = window.setTimeout(() => {
-      openedBy.current = null
-      onOpenChange(null)
-    }, 220)
-  }
-
   const onPointerEnter = (e: React.PointerEvent) => {
     if (e.pointerType !== 'mouse' || open) return
-    clear()
-    timer.current = window.setTimeout(() => openAs('hover'), 120)
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    timer.current = null
+    timer.current = window.setTimeout(() => {
+      openedBy.current = 'hover'
+      onOpenChange(citation.n)
+    }, 120)
   }
 
   const onPointerLeave = () => {
     if (openedBy.current === 'key') return
-    if (!open) clear()
-    else scheduleClose()
+    if (!open) {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = null
+    } else {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = null
+      timer.current = window.setTimeout(() => {
+        openedBy.current = null
+        onOpenChange(null)
+      }, 220)
+    }
   }
 
   const onTriggerPointerEnter = () => {
     if (!open || openedBy.current === 'key') return
-    clear()
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    timer.current = null
   }
 
   const onFocus = () => {
-    if (!open) openAs('focus')
+    if (!open) {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = null
+      openedBy.current = 'focus'
+      onOpenChange(citation.n)
+    }
   }
 
   const onBlur = (e: React.FocusEvent) => {
     if (contentRef.current?.contains(e.relatedTarget as Node | null)) return
-    if (openedBy.current === 'focus') scheduleClose()
+    if (openedBy.current === 'focus') {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = null
+      timer.current = window.setTimeout(() => {
+        openedBy.current = null
+        onOpenChange(null)
+      }, 220)
+    }
   }
 
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (open && openedBy.current !== 'key') {
       e.preventDefault()
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = null
       openedBy.current = 'key'
       contentRef.current?.querySelector<HTMLElement>('a,button')?.focus()
       return
     }
-    if (!open) openedBy.current = 'key'
+    if (!open) {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      timer.current = null
+      openedBy.current = 'key'
+    }
     if (doc) onOpen(doc.id)
     onOpenChange(citation.n)
   }
@@ -1061,7 +1072,7 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
     <Popover
       open={open}
       onOpenChange={(v) => {
-        clear()
+        if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
         if (!v) {
           openedBy.current = null
           onOpenChange(null)
@@ -1098,9 +1109,17 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
         sideOffset={8}
         collisionPadding={0}
         aria-labelledby="citation-popover-head"
-        onPointerEnter={clear}
+        onPointerEnter={() => {
+          if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+        }}
         onPointerLeave={() => {
-          if (openedBy.current === 'hover') scheduleClose()
+          if (openedBy.current === 'hover') {
+            if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+            timer.current = window.setTimeout(() => {
+              openedBy.current = null
+              onOpenChange(null)
+            }, 220)
+          }
         }}
         className="flex w-auto flex-col overflow-hidden rounded-lg border-0 bg-popover p-0 text-foreground shadow-md"
         style={{ width: constraint.width, height: constraint.height }}
@@ -1109,8 +1128,16 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
           id="citation-popover-head"
           data-citation-popover-head
           className="shrink-0 px-4 py-3 text-sm font-medium"
-          onPointerEnter={clear}
-          onPointerLeave={scheduleClose}
+          onPointerEnter={() => {
+            if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+          }}
+          onPointerLeave={() => {
+            if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+            timer.current = window.setTimeout(() => {
+              openedBy.current = null
+              onOpenChange(null)
+            }, 220)
+          }}
         >
           {citation.title}
         </div>
@@ -1118,8 +1145,16 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
           data-citation-popover-body
           tabIndex={0}
           className="min-h-0 flex-1 overflow-y-auto px-4 text-base leading-6 outline-none [&>p]:mb-2"
-          onPointerEnter={clear}
-          onPointerLeave={scheduleClose}
+          onPointerEnter={() => {
+            if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+          }}
+          onPointerLeave={() => {
+            if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+            timer.current = window.setTimeout(() => {
+              openedBy.current = null
+              onOpenChange(null)
+            }, 220)
+          }}
         >
           {doc ? (
             <>
@@ -1139,8 +1174,16 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
               data-citation-show-source
               onClick={() => onOpen(doc.id)}
               className="text-sm text-foreground underline underline-offset-4 outline-none ring-ring ring-offset-2 ring-offset-popover hover:text-muted-foreground focus-visible:ring-2"
-              onPointerEnter={clear}
-              onPointerLeave={scheduleClose}
+              onPointerEnter={() => {
+                if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+              }}
+              onPointerLeave={() => {
+                if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null }
+                timer.current = window.setTimeout(() => {
+                  openedBy.current = null
+                  onOpenChange(null)
+                }, 220)
+              }}
             >
               소스 보기
             </button>
