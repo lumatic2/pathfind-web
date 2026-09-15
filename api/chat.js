@@ -122,6 +122,7 @@ function buildPrompt({ summary, bigPicture, stages, history }) {
   lines.push('  "answer": "답변",');
   lines.push('  "evidenceStageNos": [1, 2],');
   lines.push('  "citationNumbers": [1, 3],');
+  lines.push('  "citationNames": [{"n": 1, "name": "자료 이름"}, {"n": 3, "name": "자료 이름"}],');
   lines.push('  "furtherResearch": "더 조사할 내용이 있으면 한 줄로, 없으면 빈 문자열",');
   lines.push('  "followUpQuestions": ["후속 질문 1", "후속 질문 2", "후속 질문 3"]');
   lines.push('}');
@@ -129,7 +130,8 @@ function buildPrompt({ summary, bigPicture, stages, history }) {
   lines.push('규칙:');
   lines.push('- answer는 자료에 근거한 내용으로 작성하세요.');
   lines.push('- evidenceStageNos는 근거로 사용한 단계 번호 목록입니다.');
-  lines.push('- citationNumbers는 위 자료 번호를 인용한 목록입니다.');
+  lines.push('- citationNumbers는 위 자료 번호를 인용한 목록입니다. 역호환을 위해 항상 함께 내세요.');
+  lines.push('- citationNames는 인용한 각 자료의 번호(n)와 자료 이름(name)을 담은 객체 배열입니다. name은 요청에 주어진 자료 목록의 이름과 정확히 일치해야 하며, 공백 포함 차이까지 대비해 양쪽을 trim한 값이 같아야 합니다. 이름이 일치하지 않으면 서버가 그 인용을 버립니다.');
   lines.push('- followUpQuestions는 2~3개입니다.');
   lines.push('- 한국어만 사용하세요.');
 
@@ -176,24 +178,66 @@ function parseChatResponse(content) {
 
 // ---------- 코드 판정: 근거·인용 검증 + 인용 재매김 ----------
 
-function validateAndRenumber(answer, evidenceStageNos, citationNumbers, stages, furtherResearch) {
+function validateAndRenumber(answer, evidenceStageNos, citationNumbers, citationNames, stages, furtherResearch) {
   // 실제 단계 번호 집합
   const actualStageNos = new Set(stages.map(s => s.no));
   const validStageNos = (evidenceStageNos || [])
     .filter(n => typeof n === 'number' && actualStageNos.has(n));
 
-  // 자료 번호 → 정보 매핑
+  // 자료 번호 → 정보 매핑 / 자료 이름 → 정보 매핑
   const materialMap = new Map();
+  const nameToInfo = new Map();
   const materials = buildMaterialList(stages);
   for (const m of materials) {
     materialMap.set(m.number, m);
+    const t = (m.name || '').trim();
+    if (t && !nameToInfo.has(t)) nameToInfo.set(t, m);
   }
 
-  const validCitationNumbers = (citationNumbers || [])
-    .filter(n => typeof n === 'number' && materialMap.has(n));
+  let dropped = 0;
+  let orderedNumbers = [];
+
+  if (Array.isArray(citationNames) && citationNames.length > 0) {
+    // 새 모양: n 번호 + name 자료 이름 객체 배열로 인용 검증
+    const seen = new Set();
+    for (const item of citationNames) {
+      if (!item || typeof item !== 'object') { dropped++; continue; }
+      const rawName = typeof item.name === 'string' ? item.name : '';
+      const nameTrim = rawName.trim();
+      const info = nameToInfo.get(nameTrim);
+      if (!info) { dropped++; continue; }
+      if (seen.has(info.number)) continue;
+      seen.add(info.number);
+      orderedNumbers.push(info.number);
+    }
+  } else {
+    // 옛 모양: citationNumbers만으로 검증 (버리지 않음)
+    dropped = 0;
+    const validCitationNumbers = (citationNumbers || [])
+      .filter(n => typeof n === 'number' && materialMap.has(n));
+
+    if (validCitationNumbers.length === 0) {
+      // 아래 빈 인용 처리를 위해 orderedNumbers는 빈 배열 유지
+    } else {
+      const mentionedNumbers = [];
+      const seen = new Set();
+      const regex = /자료\s*(\d+)/g;
+      let match;
+      while ((match = regex.exec(answer)) !== null) {
+        const num = parseInt(match[1], 10);
+        if (validCitationNumbers.includes(num) && !seen.has(num)) {
+          mentionedNumbers.push(num);
+          seen.add(num);
+        }
+      }
+
+      const unmentionedNumbers = validCitationNumbers.filter(n => !seen.has(n));
+      orderedNumbers = [...mentionedNumbers, ...unmentionedNumbers];
+    }
+  }
 
   // 둘 다 비어 있으면 "이번 조사에는 없습니다" 경로
-  if (validStageNos.length === 0 && validCitationNumbers.length === 0) {
+  if (validStageNos.length === 0 && orderedNumbers.length === 0) {
     const fallbackAnswer = furtherResearch
       ? `${NO_EVIDENCE_ANSWER} ${furtherResearch}`
       : `${NO_EVIDENCE_ANSWER} ${NO_EVIDENCE_HELPFUL}`;
@@ -203,24 +247,9 @@ function validateAndRenumber(answer, evidenceStageNos, citationNumbers, stages, 
       citationTitles: [],
       citationIds: [],
       hasEvidence: false,
+      dropped,
     };
   }
-
-  // 인용 번호를 답변 등장 순서로 재매김
-  const mentionedNumbers = [];
-  const seen = new Set();
-  const regex = /자료\s*(\d+)/g;
-  let match;
-  while ((match = regex.exec(answer)) !== null) {
-    const num = parseInt(match[1], 10);
-    if (validCitationNumbers.includes(num) && !seen.has(num)) {
-      mentionedNumbers.push(num);
-      seen.add(num);
-    }
-  }
-
-  const unmentionedNumbers = validCitationNumbers.filter(n => !seen.has(n));
-  const orderedNumbers = [...mentionedNumbers, ...unmentionedNumbers];
 
   const citationTitles = [];
   const citationIds = [];
@@ -238,6 +267,7 @@ function validateAndRenumber(answer, evidenceStageNos, citationNumbers, stages, 
     citationTitles,
     citationIds,
     hasEvidence: true,
+    dropped,
   };
 }
 
@@ -265,6 +295,7 @@ function fallbackResponse(answer, reason) {
     citationIds: [],
     followUpQuestions: DEFAULT_FOLLOW_UPS,
     hasEvidence: false,
+    dropped: 0,
     fallback: true,
   }), {
     status: 200,
@@ -336,6 +367,9 @@ export async function POST(request) {
     let answer = typeof parsed.answer === 'string' ? parsed.answer : '';
     let evidenceStageNos = Array.isArray(parsed.evidenceStageNos) ? parsed.evidenceStageNos : [];
     let citationNumbers = Array.isArray(parsed.citationNumbers) ? parsed.citationNumbers : [];
+    let citationNames = Array.isArray(parsed.citationNames)
+      ? parsed.citationNames.filter(c => c && typeof c === 'object')
+      : [];
     let furtherResearch = typeof parsed.furtherResearch === 'string' ? parsed.furtherResearch : '';
     let followUpQuestions = Array.isArray(parsed.followUpQuestions) ? parsed.followUpQuestions : [];
 
@@ -343,9 +377,10 @@ export async function POST(request) {
     if (force === 'empty') {
       evidenceStageNos = [];
       citationNumbers = [];
+      citationNames = [];
     }
 
-    const result = validateAndRenumber(answer, evidenceStageNos, citationNumbers, stages, furtherResearch);
+    const result = validateAndRenumber(answer, evidenceStageNos, citationNumbers, citationNames, stages, furtherResearch);
 
     const finalFollowUps = followUpQuestions.length > 0
       ? followUpQuestions.slice(0, 3)
@@ -358,6 +393,7 @@ export async function POST(request) {
       citationIds: result.citationIds,
       followUpQuestions: finalFollowUps,
       hasEvidence: result.hasEvidence,
+      dropped: result.dropped,
       fallback: false,
     }), {
       status: 200,
