@@ -2,7 +2,7 @@
 // 계약: docs/api-contract.md / roadmap/M05-조사결과패널/M05-스텝5.md
 
 import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
-import { logCall } from './_lib/http.js';
+import { logCall, sendError } from './_lib/http.js';
 
 const MAX_ITEMS_BEFORE_MODEL = 3; // 미만이면 모델 안 부름
 const OUTLINE_MAX_TOKENS = 1024;
@@ -160,27 +160,18 @@ function makeOkResponse(topics, source) {
 
 export async function POST(request) {
   if (!isPost(request)) {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(405, 'Method not allowed');
   }
 
   const force = (request.headers.get(FORCE_HEADER) || '').trim().toLowerCase();
   const body = await parseBody(request).catch(() => null);
   if (!body || typeof body !== 'object') {
-    return new Response(JSON.stringify({ error: '요청 본문이 JSON이 아닙니다' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(400, '요청 본문이 JSON이 아닙니다');
   }
 
   const stage = body.stage;
   if (!stage || typeof stage !== 'object') {
-    return new Response(JSON.stringify({ error: 'stage가 없습니다' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(400, 'stage가 없습니다');
   }
 
   const items = buildStageItems(stage);

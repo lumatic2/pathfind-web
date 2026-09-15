@@ -2,6 +2,7 @@
 // 명세: roadmap/M05-조사결과패널/M05-스텝7.md
 // 계약 값: docs/api-contract.md §1~§6 (finding 스키마, verdict 4종, solar-pro4, 키 process.env)
 import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
+import { logCall, sendError } from './_lib/http.js';
 
 const SYSTEM_PROMPT = `당신은 사용자가 조사한 자료 하나를 설명하는 어시스턴트입니다.
 아래 "자료" 정보를 받아 설명 markdown을 위한 다섯 값만 JSON으로 출력합니다.
@@ -200,10 +201,7 @@ function parseModelJson(content) {
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { 'Content-Type': 'application/json' } },
-    );
+    return sendError(405, 'Method not allowed');
   }
 
   const force = (request.headers.get('x-card-force') || '').trim().toLowerCase();
@@ -218,10 +216,7 @@ export async function POST(request) {
   const { finding, stage, summary } = body || {};
 
   if (!finding || !finding.name) {
-    return new Response(
-      JSON.stringify({ error: 'finding.name 필요' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } },
-    );
+    return sendError(400, 'finding.name 필요');
   }
 
   // 시험 스위치: nokey → 키 없이 호출해 NO_KEY 분기 확인
@@ -279,6 +274,7 @@ export async function POST(request) {
     }
 
     const markdown = buildMarkdown(finding, stage, modelOut);
+    logCall('source-card.POST', 0, 200, { 'x-card-source': 'solar' });
     return new Response(
       JSON.stringify({ markdown, degraded: false }),
       {
@@ -290,6 +286,7 @@ export async function POST(request) {
       },
     );
   } catch (err) {
+    logCall('source-card.POST', 0, 200, { 'x-card-source': 'fallback:error' });
     const msg = String(err.message || '');
     const is429 = msg.toLowerCase().includes('429') || msg.toLowerCase().includes('rate limit');
 

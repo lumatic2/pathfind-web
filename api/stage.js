@@ -470,7 +470,7 @@ async function runChannelSearch(channelName, query) {
     }
     return { results: [], calls: 0 };
   } catch (e) {
-    console.warn(`채널 ${channelName} 검색 중 오류:`, e.message);
+    logCall('stage.runChannelSearch', 0, 0, {});
     return { results: [], calls: 0 };
   }
 }
@@ -629,7 +629,7 @@ ${(stage.tasks || []).map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n'
       })
       .filter(Boolean);
   } catch (e) {
-    console.warn('쿼리 생성 호출 실패:', e.message);
+    logCall('stage.generateQueries', 0, 0, {});
     // 단계 제목에서 같은 상한으로 대체
     const fallbackWords = clampWords(stage.title, 3);
     if (!fallbackWords) return [];
@@ -772,10 +772,7 @@ function parseSolarJson(content) {
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(405, 'Method not allowed');
   }
 
   const forceMode = (request.headers.get('x-stage-force') || '').trim().toLowerCase();
@@ -811,10 +808,7 @@ export async function POST(request) {
     const { stageIndex, stage, summary } = body;
 
     if (!stage || !stage.title) {
-      return new Response(JSON.stringify({ error: 'stage.title 필요' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return sendError(400, 'stage.title 필요');
     }
 
     // 1) 채널 선택 (코드 규칙)
@@ -862,7 +856,7 @@ export async function POST(request) {
     try {
       analysisResult = await callSolar(messages, { tools: tools.length ? tools : false, tool_choice: 'auto', maxTokens: MAX_TOKENS_ANALYSIS });
     } catch (e) {
-      console.warn('분석 호출 실패:', e.message);
+      logCall('stage.analysis', 0, 200, {});
       // 모델 오류 → 200 폴백
       return new Response(
         JSON.stringify({
@@ -943,7 +937,7 @@ export async function POST(request) {
 
         toolResult = await callSolar(toolMessages, { tools: false, maxTokens: MAX_TOKENS_ANALYSIS });
       } catch (e) {
-        console.warn('도구 실행 중 오류:', e.message);
+        logCall('stage.toolRun', 0, 0, {});
         break;
       }
     }
@@ -1018,11 +1012,8 @@ export async function POST(request) {
       headers: stageHeaders(source, [...new Set([...plannedFinal, ...calledChannels])], forceMode),
     });
   } catch (err) {
-    console.error('stage.js 오류:', err.message);
-    return new Response(JSON.stringify({ error: err.message || '서버 오류' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    logCall('stage.POST', 0, 500, request.headers);
+    return sendError(500, '서버 오류');
   }
 }
 
@@ -1036,10 +1027,7 @@ async function runLegacyFallback(request, source) {
     const { stageIndex, stage, summary } = body;
 
     if (!stage || !stage.title) {
-      return new Response(JSON.stringify({ error: 'stage.title 필요' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return sendError(400, 'stage.title 필요');
     }
 
     // 기존 절차 그대로: 도구 없이 판단 → 선례를 못 찾음
@@ -1067,10 +1055,7 @@ async function runLegacyFallback(request, source) {
       { headers: stageHeaders(source, [], request.headers.get('x-stage-force') || '') }
     );
   } catch (err) {
-    console.error('폴백 처리 중 오류:', err.message);
-    return new Response(JSON.stringify({ error: err.message || '서버 오류' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    logCall('stage.legacyFallback', 0, 500, {});
+    return sendError(500, '서버 오류');
   }
 }

@@ -4,6 +4,7 @@
 // 최대 실행 시간: Vercel 함수 maxDuration 90초 (vercel.json 확인 완료).
 
 import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
+import { logCall, sendError } from './_lib/http.js';
 
 const CHAT_MAX_TOKENS = 2048;
 const FORCE_HEADER = 'x-chat-force';
@@ -310,10 +311,7 @@ function fallbackResponse(answer, reason) {
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(405, 'Method not allowed');
   }
 
   const force = (request.headers.get(FORCE_HEADER) || '').toLowerCase();
@@ -322,10 +320,7 @@ export async function POST(request) {
   try {
     body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ error: '요청 본문이 JSON이 아닙니다' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(400, '요청 본문이 JSON이 아닙니다');
   }
 
   const { summary = '', bigPicture = null, stages = [], history = [] } = body;
@@ -361,6 +356,7 @@ export async function POST(request) {
     const parsed = parseChatResponse(content);
 
     if (!parsed) {
+      logCall('chat.POST', 0, 200, { 'x-chat-source': 'fallback:parse' });
       return fallbackResponse(buildFallbackAnswer(stages), 'parse');
     }
 
@@ -386,6 +382,7 @@ export async function POST(request) {
       ? followUpQuestions.slice(0, 3)
       : [...DEFAULT_FOLLOW_UPS];
 
+    logCall('chat.POST', 0, 200, { 'x-chat-source': 'solar' });
     return new Response(JSON.stringify({
       answer: result.answer,
       evidenceStageNos: result.evidenceStageNos,
@@ -404,11 +401,14 @@ export async function POST(request) {
     });
   } catch (err) {
     if (err.code === 'NO_KEY') {
+      logCall('chat.POST', 0, 200, { 'x-chat-source': 'fallback:nokey' });
       return fallbackResponse(buildFallbackAnswer(stages), 'nokey');
     }
     if (force === '429' || err.message.includes('429')) {
+      logCall('chat.POST', 0, 200, { 'x-chat-source': 'fallback:429' });
       return fallbackResponse(buildFallbackAnswer(stages), '429');
     }
+    logCall('chat.POST', 0, 200, { 'x-chat-source': 'fallback:error' });
     return fallbackResponse(buildFallbackAnswer(stages), 'error');
   }
 }

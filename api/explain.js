@@ -2,7 +2,7 @@
 // 새로 추가. 계약: docs/api-contract.md (solar-pro4, 키 process.env, max_tokens 명시)
 // 노드 id 규칙: docs/app-state.md §2 (s<no>, s<no>-t<i>, s<no>-finding-<i>, s<no>-task-<i>, s<no>-todo-<i>)
 // 판정 표시: 단계 노드 설명에서만 화면 문구 4개 중 하나만. 계약 값 원문은 이 파일 밖으로 안 냄.
-import { logCall } from './_lib/http.js';
+import { logCall, sendError } from './_lib/http.js';
 
 const SOLAR_MODEL = 'solar-pro4';
 const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
@@ -553,10 +553,7 @@ function buildUserPrompt(node, stage, summary, findingLabels) {
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(405, 'Method not allowed');
   }
 
   const force = (request.headers.get(FORCE_HEADER) || '').trim().toLowerCase();
@@ -566,17 +563,11 @@ export async function POST(request) {
   try {
     body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ error: '요청 본문이 JSON이 아닙니다' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(400, '요청 본문이 JSON이 아닙니다');
   }
 
   if (!body || typeof body !== 'object') {
-    return new Response(JSON.stringify({ error: '요청 본문이 없습니다' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(400, '요청 본문이 없습니다');
   }
 
   const node = body.node;
@@ -584,18 +575,12 @@ export async function POST(request) {
   const summary = typeof body.summary === 'string' ? body.summary : '';
 
   if (!node || typeof node.id !== 'string') {
-    return new Response(JSON.stringify({ error: 'node.id 필요' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(400, 'node.id 필요');
   }
 
   const type = nodeType(node);
   if (!type) {
-    return new Response(JSON.stringify({ error: '알 수 없는 노드 종류' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(400, '알 수 없는 노드 종류');
   }
 
   if (isNokeyTest) {

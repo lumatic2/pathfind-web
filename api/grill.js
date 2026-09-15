@@ -1,3 +1,5 @@
+import { sendError, logCall } from './_lib/http.js';
+
 const SYSTEM_PROMPT = `당신은 사용자의 아이디어를 명료화하는 인터뷰어입니다.
 막연한 생각을 구체적인 계획으로 정리하도록 돕습니다.
 
@@ -198,9 +200,7 @@ async function callSolarWithRetry(messages, opts = {}) {
     const status = solarRes.status;
 
     if (status === 429 && attempt < maxRetries) {
-      console.warn(
-        `Solar 429 rate limit (시도 ${attempt + 1}/${opts.maxRetries}), ${Math.pow(2, attempt)}초 대기 후 재시도...`,
-      );
+      logCall('grill.retry', 0, status, {});
       await sleep(Math.pow(2, attempt) * 1000);
       continue;
     }
@@ -213,17 +213,11 @@ async function callSolarWithRetry(messages, opts = {}) {
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(405, 'Method not allowed');
   }
 
   if (!process.env.SOLAR_API_KEY) {
-    return new Response(JSON.stringify({ error: 'Solar API key not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(500, 'Solar API key not configured');
   }
 
   const force = (request.headers.get('x-grill-force') || '').trim().toLowerCase();
@@ -377,10 +371,7 @@ export async function POST(request) {
       },
     );
   } catch (err) {
-    console.error('grill.js 오류:', err.message);
-    return new Response(JSON.stringify({ error: err.message || '서버 오류' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    logCall('grill.POST', 0, 500, request.headers);
+    return sendError(500, '서버 오류');
   }
 }

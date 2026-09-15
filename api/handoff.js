@@ -1,3 +1,5 @@
+import { sendError, logCall } from './_lib/http.js';
+
 // /api/handoff — handoff 마크다운 최종본
 // 계약: docs/api-contract.md §4. 단계 리서치 결과를 모아 최종 handoff 마크다운을 만든다.
 // 앱 우측 하단 "handoff 다운로드·복사" 버튼이 이 엔드포인트를 부른다.
@@ -131,13 +133,7 @@ function computeMaxTokens(bodyText, stageCount) {
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      {
-        status: 405,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    return sendError(405, 'Method not allowed');
   }
 
   try {
@@ -145,23 +141,11 @@ export async function POST(request) {
     const { bigPicture, stages = [], summary = '' } = body || {};
 
     if (!bigPicture || typeof bigPicture !== 'object') {
-      return new Response(
-        JSON.stringify({ error: 'bigPicture 필요' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      return sendError(400, 'bigPicture 필요');
     }
 
     if (!bigPicture.title) {
-      return new Response(
-        JSON.stringify({ error: 'bigPicture.title 필요' }),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+      return sendError(400, 'bigPicture.title 필요');
     }
 
     const title = bigPicture.title;
@@ -351,14 +335,8 @@ export async function POST(request) {
       }
     );
   } catch (err) {
-    console.error('handoff.js 오류:', err.message);
-    return new Response(
-      JSON.stringify({ error: err.message || '서버 오류' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    logCall('handoff.POST', 0, 500, request.headers);
+    return sendError(500, '서버 오류');
   }
 }
 

@@ -1,3 +1,5 @@
+import { sendError, logCall } from './_lib/http.js';
+
 // 긴 프롬프트는 별도 상수로 분리 (가독성)
 // pathfind 원본 스킬 이식: SKILL.md §단계 분해 (서비스화 수정 포함, 2026-09-12)
 
@@ -113,7 +115,7 @@ async function callSolar(messages, temperature = 0.7, maxRetries = 3) {
 
     // 429 Rate Limit - exponential backoff with retry
     if (status === 429 && attempt < effectiveMaxRetries) {
-      console.warn(`Solar 429 rate limit (시도 ${attempt + 1}/${effectiveMaxRetries}), 재시연 대기...`);
+      logCall('pathfind.retry', 0, status, {});
       const delay = Math.pow(2, attempt) * 1000;
       await new Promise(resolve => setTimeout(resolve, delay));
       continue;
@@ -143,27 +145,18 @@ function validateBigPicture(data) {
 
 export async function POST(request) {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(405, 'Method not allowed');
   }
 
   if (!process.env.SOLAR_API_KEY) {
-    return new Response(JSON.stringify({ error: 'Solar API key not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return sendError(500, 'Solar API key not configured');
   }
 
   try {
     const body = await request.json().catch(() => ({}));
     const { summary, initialQuestion } = body || {};
     if (!summary && !initialQuestion) {
-      return new Response(JSON.stringify({ error: 'summary 또는 initialQuestion 필요' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return sendError(400, 'summary 또는 initialQuestion 필요');
     }
 
     // 1단계: 큰 그림 생성 (Solar)
@@ -185,10 +178,7 @@ export async function POST(request) {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    console.error('pathfind.js 오류:', err.message);
-    return new Response(JSON.stringify({ error: err.message || '서버 오류' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    logCall('pathfind.POST', 0, 500, request.headers);
+    return sendError(500, '서버 오류');
   }
 }
