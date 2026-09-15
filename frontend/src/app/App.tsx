@@ -9,7 +9,7 @@ import type { ChatMessage, ChatStatus } from '../components/chat-conversation-pa
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
 import { renderMarkdown } from '../components/chat-conversation-panel'
-import { sourceTree, mindmapTree } from '../state/derive'
+import { sourceTree, mindmapTree, mindmapLegend } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { sourceCard } from '../lib/api'
 import type { GroundedSource } from '../components/grounded-source-panel'
@@ -552,7 +552,32 @@ function RightPanel() {
         selectedId={session.selectedId}
         onSelectedChange={(id) => patch({ selectedId: id })}
         onNodeSelect={undefined}
+        legend={<MindmapLegend />}
       />
+    </div>
+  )
+}
+
+function MindmapLegend() {
+  const items = mindmapLegend()
+  return (
+    <div className="flex flex-wrap items-center gap-4 text-sm text-foreground">
+      {items.map((item) => (
+        <span key={item.label} className="inline-flex items-center gap-2">
+          <span
+            className="inline-block rounded-full"
+            style={{
+              width: 8,
+              height: 8,
+              color: item.color,
+              backgroundColor: item.hollow ? 'transparent' : 'currentColor',
+              boxShadow: item.hollow ? `0 0 0 1.5px currentColor inset` : undefined,
+            }}
+            aria-hidden
+          />
+          {item.label}
+        </span>
+      ))}
     </div>
   )
 }
