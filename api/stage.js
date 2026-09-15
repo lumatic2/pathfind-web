@@ -1009,17 +1009,29 @@ export async function POST(request) {
 
     // ---------- 스텝34: 규칙 통과 자료 모델 재확인 (통계·공공데이터만) ----------
     const modelReviewedIds = new Set();
+    let modelReviewStatus = 'unavailable'; // 'unavailable' | 'empty' | 'applied' | 'failed'
     const hasStatsOrPublicData = plannedFinal.some((n) => n === 'stats' || n === 'public_data');
     if (hasStatsOrPublicData) {
       const reviewed = preResults.filter((r) => r.channel === 'stats' || r.channel === 'public_data');
       if (reviewed.length > 0) {
-        const reviewIds = await modelReviewPass(stage, reviewed);
-        if (Array.isArray(reviewIds)) {
-          for (const id of reviewIds) {
-            if (typeof id === 'string' && id) modelReviewedIds.add(id);
+        try {
+          const reviewIds = await modelReviewPass(stage, reviewed);
+          if (!Array.isArray(reviewIds)) {
+            // 형식이 틀리면 규칙 결과로 돌아간다 — ID는 추가하지 않음
+            modelReviewStatus = 'failed';
+          } else if (reviewIds.length === 0) {
+            // 빈 배열 = 통계·공공데이터에서 고르고 남은 자료가 없다는 뜻
+            modelReviewStatus = 'empty';
+          } else {
+            for (const id of reviewIds) {
+              if (typeof id === 'string' && id) modelReviewedIds.add(id);
+            }
+            modelReviewStatus = 'applied';
           }
+        } catch (e) {
+          logCall('stage.modelReview', 0, 0, { err: String(e) });
+          modelReviewStatus = 'failed';
         }
-        // 모델 호출이 비어 있거나 실패해도 단계는 계속 간다 — 아래 조립부에서 반영
       }
     }
 
@@ -1151,10 +1163,28 @@ export async function POST(request) {
     // 모델 findings 조립 (카탈로그 없는 id 버림)
     const parsed = parseSolarJson(toolResult.content || '');
     const findings = assembleFindings(parsed, catalog);
-    // 스텝34: 규칙 통과 후 모델 재확인에서 고른 id만 남긴다(통계·공공데이터)
-    const reviewedFindings = findings.filter(
-      (f) => !modelReviewedIds.size || modelReviewedIds.has(f.id),
-    );
+
+    // 스텝34: 모델 재확인은 통계·공공데이터 찾음에만 적용한다.
+    // 다른 채널(웹·OSS·법령)은 모델 재심 결과를 받지 않고 규칙·카탈로그 결과 그대로 남긴다.
+    const TARGET_CHANNELS = new Set(['stats', 'public_data']);
+    function isTargetChannel(f) {
+      return TARGET_CHANNELS.has(f.channel);
+    }
+
+    let reviewedFindings;
+    if (modelReviewStatus === 'applied') {
+      // 모델 재심 ID가 있으면 통계·공공데이터는 그 ID만 남기고, 나머지 채널은 원본 그대로
+      reviewedFindings = [
+        ...findings.filter((f) => isTargetChannel(f) && modelReviewedIds.has(f.id)),
+        ...findings.filter((f) => !isTargetChannel(f)),
+      ];
+    } else if (modelReviewStatus === 'empty') {
+      // 모델이 빈 배열 = 통계·공공데이터에서 고르고 남은 자료가 없음 → 해당 채널 findings 비움
+      reviewedFindings = findings.filter((f) => !isTargetChannel(f));
+    } else {
+      // 'unavailable'(호출 안 함) 또는 'failed'(호출 실패·형식 틀림) → 규칙 결과로 돌아간다
+      reviewedFindings = findings;
+    }
     const findingsAfterReview = reviewedFindings.length ? reviewedFindings : findings;
     const calledChannels = new Set();
     for (const f of findingsAfterReview) calledChannels.add(f.channel);
