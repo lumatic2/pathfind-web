@@ -4,11 +4,11 @@
 //       단계 텍스트 키워드로 코드 규칙 채널 선택 → 프리서치 병렬 병렬 → 분석 호출.
 
 import { sendError, logCall } from './_lib/http.js';
-import { available as naverAvailable, searchNaver, name as NAVER_NAME } from './channels/naver.js';
-import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from './channels/github.js';
-import { lawAvailable, searchLaw, NAME as LAW_NAME } from './channels/law.js';
-import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './channels/public-data.js';
-import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './channels/kosis.js';
+import { available as naverAvailable, searchNaver, name as NAVER_NAME } from './_channels/naver.js';
+import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from './_channels/github.js';
+import { lawAvailable, searchLaw, NAME as LAW_NAME } from './_channels/law.js';
+import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './_channels/public-data.js';
+import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 
 // ---------- 상수 ----------
 
