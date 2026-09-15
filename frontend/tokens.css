@@ -14,7 +14,7 @@
 
   /* --- 기본 팔레트 (DESIGN.md Light 표) --- */
   --surface:            #ffffff;
-  --accent:             #6F2DBD;
+  --accent:             #c7ecdb;
   --accent-soft:        #f4f1f8;
   --text:               #0a0a0a;
   --text-secondary:     #5a5a5a;
@@ -35,20 +35,27 @@
   --input:              var(--surface);
   --muted:              var(--surface);
   --muted-foreground:   var(--text-secondary);
-  --primary:            var(--accent);
+  --primary:            #6F2DBD;
   --primary-foreground: var(--on-accent);
-  --ring:               var(--accent);
+  --ring:               #6F2DBD;
   --radius:             6px;
   --popover:            var(--surface);
   --destructive:        #b22222;
+  /* shadcn 표준 이름 6개 — 2026-09-14 랜딩 이식 때 추가. 값은 전부 위 토큰의 별칭(새 색 없음). */
+  --card-foreground:    var(--text);
+  --popover-foreground: var(--text);
+  --secondary:          var(--accent-soft);
+  --secondary-foreground: var(--text);
+  --accent-foreground:  var(--text);
+  --destructive-foreground: #ffffff;
   --info-foreground:    var(--text);
-  --info-link:          var(--accent);
+  --info-link:          #1b9aaa;
   --info-surface:       var(--accent-soft);
   --success-foreground: #10b981;
   --success-surface:    #f0fdf4;
   --emphasis-foreground: var(--text);
   --emphasis-surface:   var(--accent-soft);
-  --emphasis-solid:     var(--accent);
+  --emphasis-solid:     #2f6fd0;
   --danger-foreground:  #b22222;
   --tile-bg:            var(--surface);
 }
