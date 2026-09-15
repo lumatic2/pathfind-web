@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { prefersReducedMotion, wireTimeline, type Step } from '../lib/choreography';
 import { avatarVars, content, img } from '../content';
+import { StartMap } from './StartMap';
 import './sections.css';
 
 /**
@@ -334,20 +335,7 @@ export function StartHelp() {
       <h2 className="start__title" data-reveal style={{ '--reveal-y': '50%' } as React.CSSProperties}>
         {lines(S.title)}
       </h2>
-      <div className="start__links">
-        {S.links.map((l, i) => (
-          <a
-            key={l.href + i}
-            className={`start__link -${l.tone}`}
-            href={l.href}
-            data-reveal
-            style={{ '--reveal-y': '30px', '--reveal-delay': `${i * 0.05}s` } as React.CSSProperties}
-          >
-            <span className="start__label">{lines(l.label)}</span>
-            <span className="start__arrow" aria-hidden="true">→</span>
-          </a>
-        ))}
-      </div>
+      <StartMap />
     </div>
   );
 }

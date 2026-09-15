@@ -1,0 +1,16 @@
+/* StartHelp 로드맵 예시 — `components/mindmap-spine-tree.tsx` 부품이 Tailwind 유틸리티로 그려진다.
+   랜딩 번들은 Tailwind 를 싣지 않으므로 여기서 **프리플라이트(리셋) 없이** 테마와 유틸리티만 얹는다.
+   유틸리티는 그 부품 파일 하나에서만 뽑는다(`source(none)` + `@source`) — 랜딩의 `.container` 같은
+   이름이 Tailwind 유틸리티와 겹쳐 조용히 덮이는 일을 막는다. 색 이름은 랜딩 `tokens.css` 의 semantic 변수로 잇는다. */
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../components/mindmap-spine-tree.tsx";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+}

@@ -45,7 +45,7 @@ export const content: {
   };
   team: { title: string[]; items: Array<{ icon: string; lead: string; rest: string }> };
   cta: { title: string[]; text: string[]; button: { label: string; href: string }; figure: Asset };
-  start: { title: string[]; links: Array<{ label: string[]; href: string; tone: 'solid' | 'quiet' }> };
+  start: { title: string[]; map: { root: string; stages: Array<{ label: string; children: Array<{ label: string; children?: string[] }> }> }; links: Array<{ label: string[]; href: string; tone: 'solid' | 'quiet' }> };
   footer: {
     tagline: string;
     columns: Array<{ title: string; href: string; links: Array<{ label: string; href: string }> }>;
@@ -221,6 +221,15 @@ export const content: {
 
   start: {
     title: ['처음 해보는 일인가요?', '패스파인더와 큰 그림을 그려봅시다'],
+    /** 자라나는 로드맵 예시 — 뿌리 아래 단계, 단계 아래 소주제, 소주제 아래 항목. 라벨은 18자 안(마인드맵 라벨 규칙). */
+    map: {
+      root: '동네 카페 단골 앱',
+      stages: [
+        { label: '무엇을 만드나', children: [{ label: '단골 기억 기능', children: ['방문 기록', '취향 메모'] }, { label: '사장님 화면' }] },
+        { label: '먼저 살펴볼 것', children: [{ label: '비슷한 앱 사례' }, { label: '개인정보 규정' }] },
+        { label: '만드는 순서', children: [{ label: '첫 시제품', children: ['화면 스케치', '2주 실험'] }, { label: '손님 테스트' }] },
+      ] as { label: string; children: { label: string; children?: string[] }[] }[],
+    },
     links: [
       { label: ['인터뷰 다섯 번으로', '정리한다는 것'], href: '/app.html', tone: 'solid' as const },
       { label: ['결과가 이 브라우저에 남고', '파일로 내려받는다는 것'], href: '#cta', tone: 'quiet' as const },
