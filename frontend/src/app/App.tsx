@@ -36,6 +36,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog'
 import { EditableText } from '@/components/editable-text'
+import { PathPreviewDialog } from './PathPreviewDialog'
 
 type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 
@@ -81,6 +82,10 @@ export default function App() {
   const [newDialogOpen, setNewDialogOpen] = useState(false)
   const [leftPanelKey, setLeftPanelKey] = useState(0)
   const [archiveItems, setArchiveItems] = useState<SavedRoadmap[]>([])
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
+  const [previewText, setPreviewText] = useState<string | null>(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
   const pendingArchiveIdRef = useRef<string | null>(null)
 
   const loadArchive = useCallback(() => {
@@ -126,17 +131,43 @@ export default function App() {
   const [openCitationN, setOpenCitationN] = useState<number | null>(null)
 
   const { buildRoadmap } = useFlow()
-  const waitingForRoadmapRef = useRef(false)
+  const previewBuildingRef = useRef(false)
 
   const handleRoadmapDownload = useCallback(() => {
+    setPreviewDialogOpen(true)
+  }, [])
+
+  const handlePreviewOpen = useCallback(() => {
     const md = session.exportState.roadmapMarkdown
     if (md != null && md.trim().length > 0) {
-      downloadText('PATH.md', md)
+      setPreviewText(md)
       return
     }
-    waitingForRoadmapRef.current = true
-    buildRoadmap()
-  }, [session.exportState.roadmapMarkdown, buildRoadmap])
+    if (previewBuildingRef.current) return
+    previewBuildingRef.current = true
+    setPreviewBusy(true)
+  }, [session.exportState.roadmapMarkdown])
+
+  const handlePreviewDownload = useCallback(() => {
+    const md = previewText
+    if (md != null && md.trim().length > 0) {
+      downloadText('PATH.md', md)
+    }
+  }, [previewText])
+
+  const handlePreviewClose = useCallback(() => {
+    setPreviewDialogOpen(false)
+    setPreviewText(null)
+    setPreviewBusy(false)
+    setPreviewError(null)
+    previewBuildingRef.current = false
+  }, [])
+
+  const handlePreviewRetry = useCallback(() => {
+    setPreviewError(null)
+    previewBuildingRef.current = true
+    setPreviewBusy(true)
+  }, [])
 
   const archiveCurrent = useCallback(() => {
     const current = sessionRef.current
@@ -232,15 +263,6 @@ export default function App() {
     }
   }, [session.phase, archiveCurrent])
 
-  useEffect(() => {
-    if (session.exportState.roadmapMarkdown != null && session.exportState.roadmapMarkdown.trim().length > 0) {
-      if (waitingForRoadmapRef.current) {
-        downloadText('PATH.md', session.exportState.roadmapMarkdown)
-        waitingForRoadmapRef.current = false
-      }
-    }
-  }, [session.exportState.roadmapMarkdown])
-
   const renderCitation = useCallback((citation: ChatCitation, index: number) => {
     const doc = resolveCitation(sourceTree(session), citation)
     let bodyNode: React.ReactNode | null = null
@@ -281,7 +303,7 @@ export default function App() {
       <NotebookWorkspaceShell
         ratios={[22, 43, 35]}
         left={<LeftPanel key={leftPanelKey} ref={leftPanelRef} collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
-        center={<CenterPanel renderCitation={renderCitation} onRoadmapDownload={handleRoadmapDownload} />}
+        center={<CenterPanel renderCitation={renderCitation} onPreviewOpen={handlePreviewOpen} />}
         right={<RightPanel />}
         leftCollapsed={leftCollapsed}
         onLeftCollapsedChange={setLeftCollapsed}
@@ -295,7 +317,7 @@ export default function App() {
                           {
                             id: 'path',
                             label: session.exportState.busy ? '만드는 중' : 'PATH.md',
-                            onClick: handleRoadmapDownload,
+                            onClick: handlePreviewOpen,
                             disabled:
                               session.phase !== 'ready' ||
                               session.stages.filter((s) => s.status === 'done').length === 0 ||
@@ -337,6 +359,15 @@ export default function App() {
         open={newDialogOpen}
         onOpenChange={setNewDialogOpen}
         onConfirm={handleNewRoadmapConfirm}
+      />
+      <PathPreviewDialog
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        text={previewText}
+        busy={previewBusy}
+        error={previewError}
+        onRetry={handlePreviewRetry}
+        onDownload={handlePreviewDownload}
       />
     </div>
   )
@@ -539,7 +570,7 @@ const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedC
   )
 })
 
-function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (citation: ChatCitation, index: number) => React.ReactNode; onRoadmapDownload?: () => void }) {
+function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (citation: ChatCitation, index: number) => React.ReactNode; onPreviewOpen?: () => void }) {
   const { sendAnswer, approve, reviseSummary, retry, resumeResearch, fillMissingOutlines, sendChat } = useFlow()
   const { session, patch } = useSession()
   const resumeRef = useRef(false)
@@ -798,7 +829,7 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
   const handleSuggestion = (s: string) => {
     if (s === directInputLabel) return
     if (s === 'PATH.md 내려받기') {
-      onRoadmapDownload?.()
+      onPreviewOpen?.()
       return
     }
     if (session.phase === "ready") {
