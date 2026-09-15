@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { FileText } from 'lucide-react'
 import { useSession } from '../state/store'
@@ -9,7 +9,7 @@ import type { ChatMessage, ChatStatus } from '../components/chat-conversation-pa
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
 import { renderMarkdown } from '../components/chat-conversation-panel'
-import { sourceTree } from '../state/derive'
+import { sourceTree, mindmapTree } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { sourceCard } from '../lib/api'
 import type { GroundedSource } from '../components/grounded-source-panel'
@@ -23,24 +23,24 @@ import {
 type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 
 const LEFT_TITLE = '조사 결과'
-const LEFT_EMPTY_TITLE = '조사 결과가 여기에 쌓입니다'
+const LEFT_EMPTY_TITLE = '조사 결과물이 여기에 정리됩니다'
 const LEFT_EMPTY_BODY =
-  '승인하면 단계마다 자료를 찾아 마크다운 한 장씩 쌓아 둡니다'
+  '인터뷰 이후 조사를 시작해보세요'
 const LEFT_COLLAPSE_LABEL = '조사 결과 패널 접기'
 const LEFT_EXPAND_LABEL = '조사 결과 패널 펼치기'
 
-const CENTER_GREETING = '무엇을 만들고 싶으세요'
+const CENTER_GREETING = '무엇을 시작하려 하세요'
 const CENTER_BODY =
-  '한 문단으로 적어 주세요, 몇 가지만 여쭙고 로드맵을 만들어 드립니다'
-const CENTER_PLACEHOLDER = '오늘 어떤 로드맵을 그려볼까요'
+  '그 길을 먼저 걸었던 사람들의 발자취를 살펴보세요. 간단한 인터뷰 후 말씀하신 것을 정리합니다'
+const CENTER_PLACEHOLDER = '시작하려는 일을 한 문단으로 적어 주세요'
 
-const RIGHT_TITLE = '로드맵'
-const RIGHT_EMPTY_TITLE = '로드맵이 여기에 그려집니다'
+const RIGHT_TITLE = '패스'
+const RIGHT_EMPTY_TITLE = '패스가 여기에 그려집니다'
 const RIGHT_EMPTY_BODY =
-  '인터뷰가 끝나고 승인하면 단계 골격이 먼저 서고 조사 결과가 아래로 붙습니다'
+  '인터뷰가 끝나고 조사를 시작하면 단계 골격이 먼저 서고 조사 결과가 아래로 붙습니다'
 
 const QUOTA_TOOLTIP =
-  '로드맵 하나에 에이전트가 몇 분 동안 웹을 조사합니다, 이 브라우저에서 2번까지 돌려 보실 수 있어요'
+  '패스 하나를 만들 때마다 몇 분 동안 웹을 조사합니다. 이 브라우저에서 2번까지 해 보실 수 있어요'
 
 function titleForSession(session: ReturnType<typeof useSession>['session']): string {
   if (session.mapTitle != null && session.mapTitle.trim().length > 0) {
@@ -49,7 +49,7 @@ function titleForSession(session: ReturnType<typeof useSession>['session']): str
   if (session.bigPicture != null && session.bigPicture.title.trim().length > 0) {
     return session.bigPicture.title
   }
-  return '제목 없는 로드맵'
+  return '제목 없는 패스'
 }
 
 export default function App() {
@@ -71,9 +71,9 @@ export default function App() {
     <span
       className="app-quota-badge"
       title={QUOTA_TOOLTIP}
-      aria-label={`남은 로드맵 ${quota.remaining}회`}
+      aria-label={`남은 패스 ${quota.remaining}회`}
     >
-      남은 로드맵 {quota.remaining}회
+      남은 패스 {quota.remaining}회
     </span>
   )
 
@@ -267,7 +267,7 @@ function CenterPanel() {
   const remaining = readQuota().remaining
   const approvalNotes: Record<string, string> = isApproval
     ? {
-        "맞아요, 이대로 조사해 주세요": remaining > 0 ? "로드맵 1회 소진" : "",
+        "맞아요, 이대로 조사해 주세요": "횟수 1회 소진",
         "고칠 게 있어요": "요약·큰 그림 수정",
       }
     : {}
@@ -308,10 +308,27 @@ function CenterPanel() {
     session.turnCount === 0 &&
     session.messages.length === 0
 
+  const pendingButtons = session.pending?.exampleButtons ?? []
+  const pendingLabels: string[] = []
+  const pendingReasons: Record<string, string> = {}
+  let pendingRecommended: string | undefined
+
+  for (const b of pendingButtons) {
+    if (typeof b === "string") {
+      pendingLabels.push(b)
+    } else {
+      const label = b.label
+      pendingLabels.push(label)
+      if (b.why != null) pendingReasons[label] = b.why
+      if (b.recommended) pendingRecommended = label
+    }
+  }
+  pendingLabels.sort((a, b) => (a === pendingRecommended ? -1 : 0) - (b === pendingRecommended ? -1 : 0))
+
   const suggestions: string[] =
     isBlankInterview
       ? [
-          "동네 카페 사장님이 단골을 기억하게 돕는 앱을 만들고 싶어요",
+          "퇴직하고 동네에서 원데이 목공 클래스를 열어 보고 싶어요",
           "학교 동아리 회비를 자동으로 정산하는 도구가 필요해요",
           "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
           directInputLabel,
@@ -319,7 +336,7 @@ function CenterPanel() {
       : session.phase === "ready"
         ? lastMessage.suggestions == null
           ? [
-              "이 로드맵에서 먼저 할 일은",
+              "이 패스에서 먼저 할 일은",
               "직접 만들 것만 순서대로 정리해 줘",
               "PATH.md 내려받기",
               directInputLabel,
@@ -333,11 +350,16 @@ function CenterPanel() {
             : lastMessage.suggestions.map((s): string =>
                 typeof s === "string" ? s : (s as GrillChoice).label
               )
-          : session.pending?.exampleButtons == null
-            ? []
-            : session.pending.exampleButtons.map((s): string =>
-                typeof s === "string" ? s : (s as GrillChoice).label
-              )
+          : pendingLabels.length > 0
+            ? pendingLabels
+            : []
+
+  const suggestionReasons = isApproval ? {} : pendingReasons
+  const recommendedSuggestion = isApproval ? undefined : pendingRecommended
+  const suggestionsPrompt =
+    session.pending?.exampleButtons != null
+      ? `이대로 조사를 시작할까요? 남은 ${remaining}회 중 1회를 씁니다`
+      : undefined
 
   const chatMessages: AppChatMessage[] = (() => {
     const out: AppChatMessage[] = []
@@ -464,26 +486,29 @@ function CenterPanel() {
       <ChatConversationPanel
         variant="grounded"
         className="h-full max-w-none rounded-none border-0 bg-card"
-        title="로드맵 만들기"
+        title="패스 만들기"
         messages={chatMessages}
         status={status}
         onSend={handleSend}
         onRetry={handleRetry}
-        emptyTitle="무엇을 만들고 싶으세요?"
-        emptyHint="한 문단으로 적어 주세요. 몇 가지만 여쭙고 로드맵을 만들어 드립니다."
+        emptyTitle="무엇을 시작하려 하세요"
+        emptyHint="그 길을 먼저 걸었던 사람들의 발자취를 살펴보세요. 간단한 인터뷰 후 말씀하신 것을 정리합니다."
         suggestions={suggestions}
         onSuggestion={handleSuggestion}
         directInputLabel={directInputLabel}
-        composerPlaceholder="오늘 어떤 로드맵을 그려볼까요"
+        composerPlaceholder="시작하려는 일을 한 문단으로 적어 주세요"
         onCopy={(m) => navigator.clipboard?.writeText(m.text)}
         onFeedback={() => {}}
         suggestionNotes={approvalNotes}
+        suggestionReasons={suggestionReasons}
+        recommendedSuggestion={recommendedSuggestion}
+        suggestionsPrompt={suggestionsPrompt}
         waitingLabel={waitingLabel}
         renderAssistantMark={renderAssistantMark}
       />
       {session.phase === "interview" && session.busy ? (
         <div className="interview-progress" aria-live="polite">
-          몇 가지만 여쭤볼게요 {session.turnCount}/5
+          {session.turnCount === 1 ? "조사 시작 확인" : `몇 가지만 여쭤볼게요, 지금 턴 ${session.turnCount}/5`}
         </div>
       ) : null}
       {researchFoot}
@@ -493,11 +518,17 @@ function CenterPanel() {
 }
 
 function RightPanel() {
+  const { session, patch } = useSession()
+  const root = useMemo(() => mindmapTree(session), [session])
+
+  const expandedIds = session.expandedIds?.length > 0 ? session.expandedIds : ['root']
+
   return (
     <div className="panel-right">
       <MindmapPanel
-        layout="roadmap"
-        mapTitle={RIGHT_TITLE}
+        layout="fan"
+        mapTitle={session.mapTitle ?? undefined}
+        onMapTitleChange={(title) => patch({ mapTitle: title.trim().length > 0 ? title : null })}
         sourcesLabel=""
         onShowSources={undefined}
         onShare={undefined}
@@ -515,11 +546,11 @@ function RightPanel() {
           backToPanel: '',
           more: '',
         }}
-        root={null}
-        expandedIds={[]}
-        onExpandedChange={undefined}
-        selectedId={null}
-        onSelectedChange={undefined}
+        root={root}
+        expandedIds={expandedIds}
+        onExpandedChange={(ids) => patch({ expandedIds: ids })}
+        selectedId={session.selectedId}
+        onSelectedChange={(id) => patch({ selectedId: id })}
         onNodeSelect={undefined}
       />
     </div>
