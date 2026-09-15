@@ -31,7 +31,7 @@ export const content = {
           { label: '인터뷰', href: '#compare', desc: '하려는 일을 묻고 정리합니다' },
           { label: '조사', href: '#compare', desc: '이미 있는 것을 찾습니다' },
           { label: '판정', href: '#compare', desc: '가져다 쓸지 직접 할지 가릅니다' },
-          { label: '로드맵', href: '#compare', desc: '단계별로 그려 드립니다' },
+          { label: '패스', href: '#compare', desc: '단계별로 그려 드립니다' },
         ],
       },
     ],
@@ -154,7 +154,7 @@ export const content = {
         { label: '인터뷰', icon: '/tile-2.png', left: 50, top: 8 },
         { label: '조사', icon: '/tile-6.png', left: 82, top: 50 },
         { label: '판정', icon: '/tile-1.png', left: 50, top: 92 },
-        { label: '로드맵', icon: '/tile-7.png', left: 18, top: 50 },
+        { label: '패스', icon: '/tile-7.png', left: 18, top: 50 },
       ],
     },
     cta: { label: '누구에게 맞나요', href: '#team' },
@@ -172,7 +172,7 @@ export const content = {
   },
 
   cta: {
-    title: ['오늘 오후에', '첫 로드맵을 받아 보세요.'],
+    title: ['오늘 오후에', '첫 패스를 받아 보세요.'],
     text: [
       '모든 걸 처음부터 만들 필요는 없죠.',
       '패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
