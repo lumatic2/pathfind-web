@@ -23,8 +23,13 @@
 | 상태 | 상황 |
 | --- | --- |
 | 400 | 요청 본문 누락·형식 오류·필수 필드 없음 |
+| 413 | 본문 길이 초과(표시 8000자 / 실제 65536바이트) |
+| 422 | `"summary"가 공백뿐` 또는 설계 형식·가짜 자료 식별자 |
 | 405 | POST 아님 |
 | 500 | 서버 내부 오류(Solar 호출 실패 포함). 구현 세부를 노출하지 않는다. |
+| 502 | 상류 연결·응답 실패 |
+| 503 | 필요한 설정 누락 |
+| 504 | 시간 소진 |
 | 429 | (서비스 수준) Solar가 429를 돌려주면 서버는 백오프 재시도 후 → 500 계열로 실패 보고. 클라이언트 재시도 로직은 앱이 담당. |
 
 ---
@@ -76,10 +81,12 @@ pathfind 스킬의 "생각 명료화 인터뷰"를 한 턴씩 돌려준다. 좌 
 
 ---
 
-## 2. `/api/pathfind` — 큰 그림 + handoff 초안
+## 2. `/api/pathfind` — 큰 그림 + handoff 초안 + 선행 조사
 
 인터뷰 요약을 받아 단계별 큰 그림(stages)과 handoff 마크다운 초안을 한 번에 만든다.
 우측 로드맵 골격(단계 카드 흐름)을 여기서 처음 받는다.
+
+선행 조사(planning) 모드가 활성화되면 사례와 방법을 먼저 검색하고, 사용자 목표와 조건에 맞는 단계를 제안한다. 검색에서 확인한 사실과 모델이 제안한 단계를 구분한다. 자료가 단계와 순서를 직접 증명해야 한다는 조건은 없다. 전문 추출이나 별도 의미 검증 호출은 넣지 않는다.
 
 ### 요청
 
@@ -90,6 +97,9 @@ pathfind 스킬의 "생각 명료화 인터뷰"를 한 턴씩 돌려준다. 좌 
 }
 ```
 
+- `summary`는 공백뿐인 문자열을 거절하고 413으로 응답한다. 표시 기준 최대 8000자, 원본 본문은 실제 바이트 기준 65536까지 받는다.
+- 전체 서버 처리 105초 안에 응답하고 마지막 5초는 응답 여유로 남긴다. 검색어 생성 8초, 검색 묶음 15초, 단계 설계 40초, 형식 수정 25초가 각 상한이며 남은 전체 시간이 더 짧으면 그 시간을 쓴다. 클라이언트는 이 요청만 120초로 둔다.
+
 ### 응답
 
 ```json
@@ -97,6 +107,20 @@ pathfind 스킬의 "생각 명료화 인터뷰"를 한 턴씩 돌려준다. 좌 
   "bigPicture": {
     "title": "string (24자 이내)",
     "intro": "string (프로젝트 큰 그림 한 문장)",
+    "planning": {
+      "version": 1,
+      "mode": "research-informed",
+      "researchedAt": "string (조사 완료 날짜와 시각)",
+      "requestId": "string (요청 식별자)",
+      "basisSummary": "string (전체 단계 제안 이유, 400자 이내)",
+      "sources": [{ "id": "string", "title": "string", "url": "string", "snippet": "string", "queries": [""], "channel": "string", "accessedAt": "string", "readScope": "search-snippet" }],
+      "researchNotes": [{ "sourceId": "string", "excerpt": "string" }],
+      "stageBasis": [{ "stageNo": "number", "basis": "adaptation", "reason": "string (사용자 맞춤 제안 이유)", "sourceIds": [], "support": [] }],
+      "trace": [{ "query": "string", "channel": "string", "status": "success | empty | error", "count": "number", "elapsedMs": "number" }],
+      "warnings": ["string"],
+      "events": [{ "name": "request_received | search_finished | design_finished | response_ready", "elapsedMs": "number (음수 아님, 앞보다 작아지지 않음)" }],
+      "groundingChecks": []
+    },
     "stages": [
       {
         "no": "number",
@@ -116,9 +140,16 @@ pathfind 스킬의 "생각 명료화 인터뷰"를 한 턴씩 돌려준다. 좌 
 }
 ```
 
-- `stages` 배열 길이는 보통 5~7개.
-- `bigPicture` 필드는 프론트가 로드맵을 그릴 수 있게 최소한으로 고정한다. 뒷단 `stage` 호출로 findings/url을 보강한다.
-- verdicts 4종은 아래 §6으로 고정한다.
+- `bigPicture.planning`은 선택 항목이다. `version`은 1을 쓴다(이 계약의 첫 버전).
+- `stages` 배열 길이는 4~7개. `no`는 1부터 연속이다. 초기 `tasks`와 `choices`는 빈 배열이어도 된다.
+- 단계 제안(모델 설계)과 자료에서 확인한 사실(실제 서빙된 sources)은 구분한다. `stageBasis.reason`은 사용자 조건에 맞춘 제안 이유고, `sources`·`researchNotes`·`trace`·`events`는 실제 검색 결과에서만 채운다. 모델은 서버가 준 `source.id`만 인용하고 새 주소나 인용문을 만들어 쓰지 않는다.
+- `basisSummary`는 전체 단계 제안 이유이며 표시 기준 400자 이내다. 첫 한계(`warnings[0]`)는 180자 이내로 둔다.
+- 모델이 요청하는 설계 모양은 `title`·`intro`·`basisSummary`·`steps`·`referenceIds`·`limitations`이다. `limitations`가 문자열이면 한 항목으로, 생략이면 빈 배열로 정상화한다. 서버는 모델의 단계를 `bigPicture.stages`와 `planning.stageBasis`로 바꿔 넣는다.
+- `sources`의 주소와 발췌, `researchNotes`의 excerpt는 서버가 저장한 원자료에서 가져온다. 존재하지 않는 `source.id`는 422로 거절한다.
+- `trace`는 실제 검색 호출 여섯 개(검색어 생성 2개 × 채널 webkr·blog·cafearticle × 각 최대 5결과, 채널 순위를 번갈아 최대 15자료)의 `query`·`channel`·`status`·`count`·`elapsedMs`를 보존한다. 제목은 300자, 발췌는 800자까지이며 중복 주소는 합친다. 주소 본문은 읽지 않는다.
+- 성공한 검색이 있지만 자료가 없거나 모델이 직접 참고한 자료가 없으면 인터뷰 기반 초안이라는 경고를 두고 계속한다. 모든 검색이 연결 실패한 것은 빈 자료 성공으로 바꾸지 않는다. 검색 실패를 가짜 출처로 덮지 않는다.
+- `events`는 `request_received`·`search_finished`·`design_finished`·`response_ready` 순서이며 시간은 음수가 아니고 앞보다 작아지지 않는다. 하지 않은 의미 검증 사건은 기록하지 않는다.
+- `groundingChecks`는 빈 배열이다.
 
 ---
 
@@ -213,7 +244,7 @@ pathfind 스킬의 "생각 명료화 인터뷰"를 한 턴씩 돌려준다. 좌 
 
 시크릿 창 첫 방문 기준 최소 완주 흐름:
 
-1. 앱 진입 → `/api/grill` 첫 턴 (question 또는 초기 문단)
+1. 앱 진입 → `/api/pathfind` (선행 조사 포함 큰 그림과 단계 제안) 또는 `/api/grill` 첫 턴 (question 또는 초기 문단)
 2. 좌 대화: 답변 또는 예시 버튼 → `/api/grill` 반복 (최대 5턴)
 3. 인터뷰 종료(`done=true`, summary) → `/api/pathfind` → 우측에 단계 카드 골격 렌더링
 4. 단계 순서대로 `/api/stage` 순차 호출 → 각 카드에 findings·url·verdict·options·todos 채움
