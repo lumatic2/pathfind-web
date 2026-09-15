@@ -680,6 +680,54 @@ export function useFlow() {
     })
   }, [patch])
 
+  const buildRoadmap = useCallback(() => {
+    const current = sessionRef.current
+    if (current.bigPicture == null || current.exportState.busy) return
+
+    patch({
+      exportState: { ...current.exportState, busy: true, title: null, roadmapMarkdown: null },
+    })
+
+    handoff({
+      bigPicture: current.bigPicture,
+      stages: current.stages
+        .filter((s) => s.status === 'done')
+        .map((s) => s.stage),
+      summary: current.summary,
+    })
+      .then((res) => {
+        if (!res.handoffMarkdown.startsWith('#')) {
+          patch({
+            exportState: {
+              roadmapMarkdown: null,
+              title: current.exportState.title,
+              busy: false,
+            },
+            error: 'PATH.md를 만들지 못했습니다. 다시 시도해 주세요.',
+          })
+          return
+        }
+        patch({
+          exportState: {
+            roadmapMarkdown: res.handoffMarkdown,
+            title: res.title ?? current.exportState.title,
+            busy: false,
+          },
+          error: null,
+        })
+      })
+      .catch(() => {
+        patch({
+          exportState: {
+            roadmapMarkdown: null,
+            title: current.exportState.title,
+            busy: false,
+          },
+          error: 'PATH.md를 만들지 못했습니다. 다시 시도해 주세요.',
+        })
+      })
+  }, [patch])
+
   return {
     sendAnswer,
     approve,
@@ -690,5 +738,6 @@ export function useFlow() {
     fillMissingOutlines,
     sendChat,
     downloadRoadmap,
+    buildRoadmap,
   }
 }
