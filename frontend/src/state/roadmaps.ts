@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from "./types"
+import { STORAGE_KEYS, Session } from "./types"
 
 export type SavedRoadmap = {
   id: string
@@ -50,6 +50,17 @@ function persist(items: Stored[]): void {
   }
 }
 
+function parseStoredSession(raw: string): Session | null {
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed == null || typeof parsed !== "object") return null
+    if ((parsed as Record<string, unknown>).version !== 5) return null
+    return parsed as Session
+  } catch {
+    return null
+  }
+}
+
 function titleOf(session: unknown): string {
   if (session == null) return "제목 없는 로드맵"
   if (typeof session !== "object") return "제목 없는 로드맵"
@@ -95,7 +106,8 @@ function findingCountOf(session: unknown): number {
 
 export function listRoadmaps(): SavedRoadmap[] {
   const all = loadAll()
-  const sorted = all.slice().sort(
+  const valid = all.filter((it) => parseStoredSession(it.session) != null)
+  const sorted = valid.slice().sort(
     (a, b) =>
       (b.savedAt < a.savedAt ? -1 : b.savedAt > a.savedAt ? 1 : 0) ||
       (b.id < a.id ? -1 : b.id > a.id ? 1 : 0),
@@ -152,4 +164,70 @@ export function getRoadmap(id: string): SavedRoadmap | null {
   const all = loadAll()
   const found = all.find((it) => it.id === id)
   return found ? (found as SavedRoadmap) : null
+}
+
+export function newRoadmapId(): string {
+  return crypto.randomUUID ? crypto.randomUUID() : String(Date.now())
+}
+
+export function deleteRoadmap(id: string): boolean {
+  const all = loadAll()
+  const before = all.length
+  const next = all.filter((it) => it.id !== id)
+  if (next.length === before) return false
+  persist(next)
+  return true
+}
+
+export function renameRoadmap(id: string, title: string): boolean {
+  if (title === "") return false
+  const all = loadAll()
+  const idx = all.findIndex((it) => it.id === id)
+  if (idx < 0) return false
+  const item = all[idx]
+  item.title = title
+  const parsed = parseStoredSession(item.session)
+  if (parsed != null) {
+    parsed.mapTitle = title
+    item.session = JSON.stringify(parsed)
+  }
+  persist(all)
+  return true
+}
+
+export function toCurrentSession(item: SavedRoadmap): Session {
+  const parsed = parseStoredSession(item.session)
+  if (parsed != null) {
+    parsed.id = item.id
+    parsed.busy = false
+    parsed.error = null
+    if (parsed.mapTitle == null || parsed.mapTitle === "") {
+      parsed.mapTitle = "제목 없는 패스"
+    }
+    return parsed
+  }
+  return {
+    version: 5,
+    phase: "interview",
+    turnCount: 0,
+    history: [],
+    pending: null,
+    summary: "",
+    bigPicture: null,
+    stages: [],
+    messages: [],
+    mapTitle: "제목 없는 패스",
+    expandedIds: [],
+    selectedId: null,
+    runId: null,
+    runStatus: null,
+    runCursor: 0,
+    runActivity: null,
+    researchPath: null,
+    degraded: false,
+    error: null,
+    busy: false,
+    exportState: { roadmapMarkdown: null, title: null, busy: false },
+    id: item.id,
+  }
 }
