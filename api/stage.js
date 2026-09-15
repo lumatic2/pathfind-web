@@ -756,44 +756,46 @@ function composeReason(leading, points) {
  * @returns {Promise<string>}
  */
 async function retryMissingCitationNumbers(originalBody, renumberedBody, findings) {
-  // 근거가 될 자료 ids
-  const ids = findings.map((f) => f.id).filter(Boolean);
-  if (ids.length === 0) return renumberedBody;
-
-  // 원문에서 마크를 뺀 것 — 모델과 비교할 때 마크는 의미 없음
+  if (!findings.length) return renumberedBody;
   const originalStripped = stripCitationMarks(originalBody);
+  const N = findings.length;
+  const prompt = `아래 문장에 근거가 되는 자료 번호를 붙여 주세요.
+자료는 아래 목록입니다. 각 자료에 순서대로 번호를 붙입니다.
+문장 내용은 절대 바꾸지 말고, 근거가 되는 곳마다 해당 자료 번호 마크를 붙이세요.
+결과에는 마크가 붙은 문장 하나만 출력하고 다른 설명은 넣지 마세요.
 
-  const prompt = [
-    '아래 문장에 근거가 되는 자료 번호를 붙여 주세요.',
-    '자료는 아래 id 목록입니다. 각 자료에 순서대로 [1], [2], ... 번호를 붙입니다.',
-    '문장 안에서 근거가 되는 곳마다 해당 자료의 번호 마크를 붙이되,',
-    '문장 내용은 절대 바꾸지 마세요.',
-    '결과에는 마크가 붙은 문장 하나만 출력하고, 다른 설명은 넣지 마세요.',
-    '',
-    '자료 id: ' + ids.join(', '),
-    '',
-    '원문:',
-    originalBody,
-  ].join('\n');
+자료:
+${findings.map((f, i) => `[${i + 1}] ${f.name || f.id}`).join('\n')}
 
+원문:
+${originalBody}`;
   try {
-    const messages = [
-      { role: 'system', content: '당신은 근거 번호를 문장에 붙이는 어시스턴트입니다. JSON 없이 문장만 출력합니다.' },
-      { role: 'user', content: prompt },
-    ];
-    const res = await callSolar(messages, { tools: false, tool_choice: 'auto', maxTokens: 1500, timeoutMs: 60_000 });
+    const res = await callSolar(
+      [{ role: 'system', content: '당신은 근거 번호를 문장에 붙이는 어시스턴트입니다. JSON 없이 문장만 출력합니다.' }, { role: 'user', content: prompt }],
+      { tools: false, tool_choice: 'auto', maxTokens: 1500, timeoutMs: 60_000 },
+    );
     if (!res.content) return renumberedBody;
-
-    const returned = res.content.trim();
-    const returnedStripped = stripCitationMarks(returned);
-    // 마크를 뺀 문장이 원문과 같아야 채택
-    if (returnedStripped !== originalStripped) return renumberedBody;
-
-    // 살아 있는 마크 개수가 원문보다 많아야 채택 (재요청 목적 달성)
-    const returnedMarks = countCitationMarks(returned);
-    if (returnedMarks === 0) return renumberedBody;
-
-    return returned;
+    const returnedText = res.content.trim();
+    if (typeof returnedText !== 'string') return renumberedBody;
+    if (returnedText.length === 0) return renumberedBody;
+    const normalizeForCompare = (s) =>
+      s.replace(/[\s]+/g, ' ').replace(/\s+([.!?。])/g, '$1').trim();
+    if (normalizeForCompare(stripCitationMarks(returnedText)) !== normalizeForCompare(stripCitationMarks(originalBody))) {
+      return renumberedBody;
+    }
+    const markRegex = /\[(\d+)\]/g;
+    const markNums = [];
+    let m;
+    while ((m = markRegex.exec(returnedText)) !== null) {
+      const n = +m[1];
+      if (!Number.isInteger(n) || n < 1 || n > N) return renumberedBody;
+      markNums.push(n);
+    }
+    if (markNums.length === 0) return renumberedBody;
+    const maxMark = Math.max(...markNums);
+    const markSet = new Set(markNums);
+    for (let i = 1; i <= maxMark; i++) { if (!markSet.has(i)) return renumberedBody; }
+    return returnedText;
   } catch (e) {
     logCall('stage.retryMissingCitationNumbers', 0, 0, { err: String(e) });
     return renumberedBody;
