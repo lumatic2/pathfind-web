@@ -74,3 +74,69 @@ export function stripCitationMarks(body) {
   if (!body || typeof body !== 'string') return '';
   return body.replace(/\[\d+\]/g, '');
 }
+
+/**
+ * 재요청으로도 인용 번호가 안 붙은 본문에 대해,
+ * 실제 자료 이름이 들어 있는 문장에만 그 자료의 인용 번호를 붙인다.
+ * 이미 [n] 마크가 있는 문장, 이름이 없는 문장은 건드리지 않는다.
+ * 원문의 공백·줄 구조는 바꾸지 않고 문장 끝에만 번호를 더한다.
+ *
+ * @param {string} body         - 재요청까지 거친 본문
+ * @param {Array}  finalFindings - 최종 선정 자료 배열 ({ id, name })
+ * @returns {string}
+ */
+export function attachNumbersByMaterialName(body, finalFindings) {
+  if (!body || typeof body !== 'string') return '';
+  if (!finalFindings || !finalFindings.length) return body;
+
+  // 문장 단위 패턴: (앞 공백)(내용)(문장 종결 문자)(뒤 공백)
+  // - 내용은 문장 종결 문자(. ! ? \n)를 포함하지 않는다 (greedy).
+  // - 종결 문자가 없는 텍스트는 문장 경계로 보지 않고 원문 그대로 둔다.
+  const sentenceRe = /(\s*)([^.!?\n]*)([.!?\n])(\s*)/g;
+
+  let lastIndex = 0;
+  const parts = [];
+  let m;
+  while ((m = sentenceRe.exec(body)) !== null) {
+    // regex가前に 건너뛰은 원문 조각이 있으면 그대로 붙인다
+    if (m.index > lastIndex) {
+      parts.push(body.slice(lastIndex, m.index));
+    }
+    lastIndex = sentenceRe.lastIndex;
+
+    const leading = m[1];
+    const content = m[2];
+    const punct = m[3];
+    const trailing = m[4];
+
+    // 이미 마크가 있으면 건드리지 않고 그대로 기록
+    if (/\[\d+\]/.test(content)) {
+      parts.push(leading + content + punct + trailing);
+      continue;
+    }
+
+    // 자료 이름이 들어 있는 문장인지 확인 (첫 번째 매칭 자료만)
+    let attached = false;
+    for (let i = 0; i < finalFindings.length; i++) {
+      const name = finalFindings[i]?.name;
+      if (!name) continue;
+      if (content.includes(name)) {
+        // 문장 종결 문자 앞에 번호를 더한다 (예: "...봤다 [1].")
+        parts.push(leading + content + ` [${i + 1}]` + punct + trailing);
+        attached = true;
+        break;
+      }
+    }
+    if (!attached) {
+      parts.push(leading + content + punct + trailing);
+    }
+  }
+
+  // regex가 끝까지의 모든 문장을 잡았는지 확인
+  if (lastIndex >= body.length) {
+    return parts.join('');
+  }
+
+  // 잡히지 않은 꼬리(원문 뒷부분)가 있으면 그대로 덧붙인다
+  return parts.join('') + body.slice(lastIndex);
+}

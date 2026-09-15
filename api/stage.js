@@ -11,7 +11,7 @@ import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 import { reviewFindings } from './_lib/review-findings.js';
 import { selectFindings } from './_lib/select-findings.js';
-import { renumberBody, countCitationMarks, stripCitationMarks } from './_lib/citation-marks.js';
+import { renumberBody, countCitationMarks, stripCitationMarks, attachNumbersByMaterialName } from './_lib/citation-marks.js';
 
 // ---------- 상수 ----------
 
@@ -1191,9 +1191,13 @@ export async function POST(request) {
 
     // ----- 자료가 있는데 살아 있는 인용 번호가 0개면 한 번만 다시 묻는다 -----
     const markCount = countCitationMarks(verdictReason);
-    const finalVerdictReason = (markCount === 0 && findingsAfterReview.length > 0)
+    const afterRetry = (markCount === 0 && findingsAfterReview.length > 0)
       ? await retryMissingCitationNumbers(rawVerdictReason, verdictReason, findingsAfterReview)
       : verdictReason;
+    const finalVerdictReason = attachNumbersByMaterialName(
+      afterRetry,
+      findingsAfterReview,
+    );
 
     let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
