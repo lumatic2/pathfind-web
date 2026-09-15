@@ -891,6 +891,7 @@ function buildResponse(stage, modelOutput, findings, queries, plannedChannels, c
     icon: stage.icon || '',
     tasks: stage.tasks,
     verdict,
+    verdictLine,
     verdictReason,
     findings: frontendFindings,
     choices: stage.choices || [],
@@ -1265,6 +1266,7 @@ export async function POST(request) {
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findingsAfterReview.length);
+    const verdictLine = parsed?.verdictLine || '';
     const rawVerdictReason = composeReason(
       parsed?.verdictReason,
       parsed?.reasonPoints,
@@ -1323,7 +1325,7 @@ export async function POST(request) {
       tasks: stage.tasks,
       verdict,
       verdictLine,
-      finalVerdictReason,
+      verdictReason: finalVerdictReason,
       findings: frontendFindings,
       choices: stage.choices || [],
       options,
