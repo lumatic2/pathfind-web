@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react'
 
 import { FileText } from 'lucide-react'
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
 import type { ChatEntry, GrillChoice } from '../state/types'
-import type { ChatMessage, ChatStatus } from '../components/chat-conversation-panel'
+import type { ChatMessage, ChatCitation, ChatStatus } from '../components/chat-conversation-panel'
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
 import { renderMarkdown } from '../components/chat-conversation-panel'
-import { sourceTree, mindmapTree, mindmapLegend } from '../state/derive'
+import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestors } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { sourceCard } from '../lib/api'
 import type { GroundedSource } from '../components/grounded-source-panel'
@@ -19,6 +19,8 @@ import {
   NotebookTopbar,
   MindmapPanel,
 } from '../components/notebook-workspace-shell'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 
 type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 
@@ -93,6 +95,22 @@ export default function App() {
     </span>
   )
 
+  const leftPanelRef = useRef<LeftPanelHandle>(null)
+  const [openCitationN, setOpenCitationN] = useState<number | null>(null)
+
+  const renderCitation = useCallback((citation: ChatCitation, index: number) => {
+    const doc = resolveCitation(sourceTree(session), citation)
+    return (
+      <CitationBadge
+        citation={citation}
+        doc={doc}
+        open={openCitationN === citation.n}
+        onOpenChange={(n) => setOpenCitationN(n)}
+        onOpen={(id) => leftPanelRef.current?.openSourceDoc(id)}
+      />
+    )
+  }, [session])
+
   return (
     <div
       className="app-shell"
@@ -102,8 +120,8 @@ export default function App() {
     >
       <NotebookWorkspaceShell
         ratios={[22, 43, 35]}
-        left={<LeftPanel collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
-        center={<CenterPanel />}
+        left={<LeftPanel ref={leftPanelRef} collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
+        center={<CenterPanel renderCitation={renderCitation} />}
         right={<RightPanel />}
         leftCollapsed={leftCollapsed}
         onLeftCollapsedChange={setLeftCollapsed}
@@ -122,7 +140,11 @@ export default function App() {
   )
 }
 
-function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCollapsedChange: (v: boolean) => void }) {
+interface LeftPanelHandle {
+  openSourceDoc: (id: string) => void
+}
+
+const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedChange: (v: boolean) => void }>(({ collapsed, onCollapsedChange }, ref) => {
   const { session, patch } = useSession()
   const tree = sourceTree(session)
   const stageFolderIds = tree
@@ -194,6 +216,22 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
     })()
   }, [session.sourceCards, session.stages, session.summary, patch])
 
+  const handleDetailChange = useCallback((id: string | null) => {
+    setDetailId(id)
+    if (id != null) handleSourceOpen(id)
+  }, [handleSourceOpen])
+
+  const openSourceDoc = useCallback((id: string) => {
+    const ancestors = sourceAncestors(tree, id)
+    const currentExpanded = new Set(session.sourceExpandedIds ?? [])
+    for (const a of ancestors) currentExpanded.add(a)
+    patch({ sourceExpandedIds: [...currentExpanded] })
+    if (collapsed) onCollapsedChange(false)
+    handleDetailChange(id)
+  }, [tree, session.sourceExpandedIds, collapsed, onCollapsedChange, patch, handleDetailChange])
+
+  useImperativeHandle(ref, () => ({ openSourceDoc }), [openSourceDoc])
+
   return (
     <div className="panel-left">
       <GroundedSourcePanel
@@ -224,10 +262,7 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
         expandedIds={expanded}
         onExpandedChange={(ids) => patch({ sourceExpandedIds: ids })}
         detailId={detailId}
-        onDetailChange={(id) => {
-          setDetailId(id)
-          if (id != null) handleSourceOpen(id)
-        }}
+        onDetailChange={handleDetailChange}
         showAdd={false}
         showSearch={false}
         showToolbar={false}
@@ -235,10 +270,9 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
       />
     </div>
   )
-}
+})
 
-
-function CenterPanel() {
+function CenterPanel({ renderCitation }: { renderCitation?: (citation: ChatCitation, index: number) => React.ReactNode }) {
   const { sendAnswer, approve, reviseSummary, retry, resumeResearch, fillMissingOutlines, sendChat } = useFlow()
   const { session, patch } = useSession()
   const resumeRef = useRef(false)
@@ -505,6 +539,7 @@ function CenterPanel() {
         suggestionsPrompt={suggestionsPrompt}
         waitingLabel={waitingLabel}
         renderAssistantMark={renderAssistantMark}
+        renderCitation={renderCitation}
       />
       {session.phase === "interview" && session.busy ? (
         <div className="interview-progress" aria-live="polite">
@@ -579,5 +614,144 @@ function MindmapLegend() {
         </span>
       ))}
     </div>
+  )
+}
+
+function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation: ChatCitation; doc: SourceDoc | null; open: boolean; onOpenChange: (n: number | null) => void; onOpen: (id: string) => void }) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const timer = useRef<number | null>(null)
+  const openedBy = useRef<'hover' | 'focus' | 'key' | null>(null)
+
+  const clear = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    timer.current = null
+  }
+
+  useEffect(() => clear, [])
+
+  const openAs = (by: 'hover' | 'focus' | 'key') => {
+    clear()
+    openedBy.current = by
+    onOpenChange(citation.n)
+  }
+
+  const scheduleClose = () => {
+    clear()
+    timer.current = window.setTimeout(() => {
+      openedBy.current = null
+      onOpenChange(null)
+    }, 160)
+  }
+
+  const onPointerEnter = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse' || open) return
+    clear()
+    timer.current = window.setTimeout(() => openAs('hover'), 120)
+  }
+
+  const onPointerLeave = () => {
+    if (openedBy.current === 'key') return
+    if (!open) clear()
+    else scheduleClose()
+  }
+
+  const onFocus = () => {
+    if (!open) openAs('focus')
+  }
+
+  const onBlur = (e: React.FocusEvent) => {
+    if (contentRef.current?.contains(e.relatedTarget as Node | null)) return
+    if (openedBy.current === 'focus') scheduleClose()
+  }
+
+  const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (open && openedBy.current !== 'key') {
+      e.preventDefault()
+      openedBy.current = 'key'
+      contentRef.current?.querySelector<HTMLElement>('a,button')?.focus()
+      return
+    }
+    if (!open) openedBy.current = 'key'
+    if (doc) onOpen(doc.id)
+    onOpenChange(citation.n)
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        clear()
+        if (!v) {
+          openedBy.current = null
+          onOpenChange(null)
+        } else {
+          openedBy.current = 'key'
+          onOpenChange(citation.n)
+        }
+      }}
+    >
+      <PopoverTrigger asChild>
+        <button
+          ref={triggerRef}
+          type="button"
+          data-citation-badge={citation.n}
+          aria-label={`${citation.n}: ${citation.title}`}
+          className={cn(
+            'ml-1 inline-flex shrink-0 items-center justify-center rounded-full bg-muted align-middle font-medium text-muted-foreground outline-none ring-ring ring-offset-1 ring-offset-background focus-visible:ring-2',
+          )}
+          style={{ width: 22, height: 22, fontSize: 11, lineHeight: '16px' }}
+          onPointerEnter={onPointerEnter}
+          onPointerLeave={onPointerLeave}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          onClick={onClick}
+        >
+          {citation.n}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        ref={contentRef}
+        align="start"
+        sideOffset={8}
+        aria-labelledby="citation-popover-head"
+        onPointerEnter={clear}
+        onPointerLeave={() => {
+          if (openedBy.current === 'hover') scheduleClose()
+        }}
+        className="flex w-auto flex-col overflow-hidden rounded-lg border-0 bg-popover p-0 text-foreground shadow-md"
+        style={{ width: 420, height: 420 }}
+      >
+        <div id="citation-popover-head" data-citation-popover-head className="shrink-0 truncate px-4 py-3 text-sm font-medium" style={{ height: 49 }}>
+          {citation.title}
+        </div>
+        <div data-citation-popover-body tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-4 text-base leading-6 outline-none [&>p]:mb-2">
+          {doc ? (
+            <>
+              <p className="text-sm text-muted-foreground">{doc.subtitle ?? '자료'}</p>
+              <p className="mt-1 text-sm leading-relaxed">
+                <span className="line-clamp-4 block overflow-hidden text-foreground">
+                  {doc.evidence ?? doc.markdown}
+                </span>
+              </p>
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">{citation.title}</span>
+          )}
+        </div>
+        {doc && (
+          <div className="shrink-0 p-4">
+            <button
+              type="button"
+              data-citation-show-source
+              onClick={() => onOpen(doc.id)}
+              className="text-sm text-foreground underline underline-offset-4 outline-none ring-ring ring-offset-2 ring-offset-popover hover:text-muted-foreground focus-visible:ring-2"
+            >
+              소스 보기
+            </button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   )
 }
