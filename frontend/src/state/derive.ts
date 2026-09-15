@@ -407,22 +407,26 @@ function buildStage(slot: StageSlot): SourceDoc {
     todos: new Set(),
   }
   for (const it of outlineItems) {
-    placed[it.kind].add(it.ref)
+    placed[it.kind + "s"].add(it.ref)
   }
 
   const placedFindingIds = placed.findings
   const placedTaskIds = placed.tasks
   const placedTodoIds = placed.todos
 
-  const remainingFindings = orphanFindings.filter((_, i) => !placedFindingIds.has(`finding-${i}`))
-  const remainingTasks = orphanTasks.filter((_, i) => !placedTaskIds.has(`task-${i}`))
-  const remainingTodos = orphanTodos.filter((_, i) => !placedTodoIds.has(`todo-${i}`))
-
   const orphans: SourceDoc[] = [
-    ...remainingFindings.map((f, i) => findingDoc(stageNo, i, f)),
-    ...remainingTodos.filter((t) => t.owner === "가져다 씀").map((t, i) => todoDoc(stageNo, i, t)),
-    ...remainingTasks.map((t, i) => taskDoc(stageNo, i, t)),
-    ...remainingTodos.filter((t) => t.owner === "직접 함").map((t, i) => todoDoc(stageNo, i, t)),
+    ...orphanFindings.flatMap((f, i) =>
+      placedFindingIds.has(`finding-${i}`) ? [] : [findingDoc(stageNo, i, f)]
+    ),
+    ...orphanTodos.flatMap((t, i) =>
+      placedTodoIds.has(`todo-${i}`) ? [] : t.owner === "가져다 씀" ? [todoDoc(stageNo, i, t)] : []
+    ),
+    ...orphanTasks.flatMap((t, i) =>
+      placedTaskIds.has(`task-${i}`) ? [] : [taskDoc(stageNo, i, t)]
+    ),
+    ...orphanTodos.flatMap((t, i) =>
+      placedTodoIds.has(`todo-${i}`) ? [] : t.owner === "직접 함" ? [todoDoc(stageNo, i, t)] : []
+    ),
   ]
 
   children.push(...orphans)
