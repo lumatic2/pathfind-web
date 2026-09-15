@@ -384,8 +384,8 @@ export function useFlow() {
   function buildCompletionText(completed: ReturnType<typeof useSession>['session']): string {
     const failedCount = completed.stages.filter((s) => s.status === 'failed').length
     return failedCount === 0
-      ? `조사를 마쳤습니다. 오른쪽 마인드맵에서 궁금한 것을 누르면 설명해 드립니다.`
-      : `조사를 마쳤습니다. 전체 슬롯 수에서 실패 수를 뺀 개수만큼 단계가 채워졌고 실패 수만큼은 자료를 못 찾았습니다(둘 다 굵게). 오른쪽 마인드맵에서 노드를 누르면 설명해 드립니다.`
+      ? `🧰 조사를 마쳤습니다! 오른쪽 마인드맵에서 궁금한 것을 누르면 설명해 드려요.`
+      : `🧰 조사를 마쳤습니다! 전체 슬롯 수에서 실패 수를 뺀 개수만큼 단계가 채워졌고 실패 수만큼은 자료를 못 찾았습니다(둘 다 굵게). 오른쪽 마인드맵에서 노드를 누르면 설명해 드려요.`
   }
 
   const startResearch = useCallback(() => {
@@ -452,20 +452,7 @@ export function useFlow() {
           researchPath: 'local',
         })
 
-        // 4) 진행 말풍선: 진행 안내
         const afterSkeleton = sessionRef.current
-        patch({
-          messages: [
-            ...afterSkeleton.messages,
-            {
-              id: msgId(),
-              role: 'assistant',
-              text: '지금은 이 창을 열어 두시면 끝까지 진행됩니다.',
-              kind: 'progress',
-              suggestions: [],
-            },
-          ],
-        })
 
         // 5) 단계 결과 자리 표시: 단계 수만큼 stage-result-${i} 진행 말풍선을 미리 깐다
         const placeholderMessages: typeof afterSkeleton.messages = stages.map((s, i) => ({

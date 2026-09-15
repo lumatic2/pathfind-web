@@ -12,7 +12,6 @@ export function isResultLine(line: string): boolean {
 const EVENT_PHRASES = [
   '조사를 마쳤습니다',
   '단계마다 직접 웹을 찾습니다',
-  '이 창을 열어 두시면 끝까지 진행됩니다',
   '요청이 몰려',
   '자료를 못 찾았습니다',
   '이어서 조사합니다',
