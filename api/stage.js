@@ -122,7 +122,12 @@ function clampWords(text, maxWords) {
 
 // ---------- 근거 등급 (코드 결정) ----------
 
-function gradeFor(host, channel) {
+function gradeFor(host, channel, form) {
+  if (channel === 'web_review') {
+    if (form === 'blog') return 'E4';
+    if (form === 'cafe') return 'E5';
+    return 'E3';
+  }
   const h = ((host || '')).toLowerCase();
   if (channel === 'law' || channel === 'stats' || channel === 'public_data') return 'E1';
   if (channel === 'oss') return 'E2';
@@ -172,6 +177,8 @@ function kindForChannel(channel) {
   switch (channel) {
     case 'web':
       return '참고 사례'; // 웹은 모델이 나중에 호스트 기반 4분류? — 스펙: 웹 호스트별 4분류는 코드.
+    case 'web_review':
+      return '참고 사례';
     case 'oss':
       return '오픈소스';
     case 'public_data':
@@ -413,32 +420,46 @@ async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTok
 
 async function runChannelSearch(channelName, query) {
   const ch = CHANNELS.find((c) => c.name === channelName);
-  if (!ch || !ch.search) return [];
+  if (!ch || !ch.search) return { results: [], calls: 0 };
   try {
     if (channelName === 'web') {
-      // 기존 searchWeb 함수 재사용 (SEARCH_API_KEY 기반)
-      return await searchWeb(query);
+      const plannedForWeb = plannedFinal.filter((n) => n !== 'web');
+      if (plannedForWeb.length <= 2) {
+        const [webResults, blogResults, cafeResults] = await Promise.all([
+          searchNaver(query, 'webkr', MAX_RESULTS_PER_CHANNEL),
+          searchNaver(query, 'blog', MAX_RESULTS_PER_CHANNEL),
+          searchNaver(query, 'cafearticle', MAX_RESULTS_PER_CHANNEL),
+        ]);
+        const results = [
+          ...webResults.map((r) => ({ ...r, channel: 'web' })),
+          ...blogResults.map((r) => ({ ...r, channel: 'web_review' })),
+          ...cafeResults.map((r) => ({ ...r, channel: 'web_review' })),
+        ];
+        return { results, calls: 3 };
+      }
+      const webResults = await searchNaver(query, 'webkr', MAX_RESULTS_PER_CHANNEL);
+      return { results: webResults.map((r) => ({ ...r, channel: 'web' })), calls: 1 };
     }
     if (channelName === 'oss') {
       const results = await searchGithub(query, MAX_RESULTS_PER_CHANNEL);
-      return results.map(r => ({ ...r, channel: 'oss' }));
+      return { results: results.map((r) => ({ ...r, channel: 'oss' })), calls: 1 };
     }
     if (channelName === 'law') {
       const results = await searchLaw(query, MAX_RESULTS_PER_CHANNEL);
-      return results.map(r => ({ ...r, channel: 'law' }));
+      return { results: results.map((r) => ({ ...r, channel: 'law' })), calls: 1 };
     }
     if (channelName === 'stats') {
       const results = await searchKosis(query, MAX_RESULTS_PER_CHANNEL);
-      return results.map(r => ({ ...r, channel: 'stats' }));
+      return { results: results.map((r) => ({ ...r, channel: 'stats' })), calls: 1 };
     }
     if (channelName === 'public_data') {
       const results = await searchPublicData(query);
-      return results.map(r => ({ ...r, channel: 'public_data' }));
+      return { results: results.map((r) => ({ ...r, channel: 'public_data' })), calls: 1 };
     }
-    return [];
+    return { results: [], calls: 0 };
   } catch (e) {
     console.warn(`채널 ${channelName} 검색 중 오류:`, e.message);
-    return [];
+    return { results: [], calls: 0 };
   }
 }
 
@@ -616,7 +637,8 @@ function assembleFindings(modelOutput, catalog) {
     const item = catalog.get(id);
     const channel = item.channel || 'web';
     const host = item.host || extractHost(item.url);
-    const grade = gradeFor(host, channel);
+    const form = item.form || '';
+    const grade = gradeFor(host, channel, form);
     const kind = channel === 'web' ? kindForWebByHost(host) : kindForChannel(channel);
     findings.push({
       id: f.id || item.id,
@@ -760,8 +782,7 @@ export async function POST(request) {
 
   // 키 없는 환경 → proxy 취급
   const hasSolarKey = !!(process.env.SOLAR_API_KEY);
-  const hasSearchKey = !!(process.env.SEARCH_API_KEY);
-  const isEmptyEnv = !hasSolarKey && !hasSearchKey;
+  const isEmptyEnv = !hasSolarKey;
 
   let source = 'local';
   if (isProxy || isEmptyEnv) source = 'proxy';
@@ -807,17 +828,16 @@ export async function POST(request) {
     let calls = 0;
     const prePromises = plannedFinal.map(async (ch) => {
       const q = queryMap.get(ch) || stage.title;
-      const results = await runChannelSearch(ch, q);
-      calls++;
+      const { results } = await runChannelSearch(ch, q);
       return { channel: ch, results, query: q };
     });
-
     const preResultsList = await Promise.all(prePromises);
     for (const { channel, results, query } of preResultsList) {
-      for (const r of results.slice(0, MAX_RESULTS_PER_CHANNEL)) {
-        preResults.push({ ...r, query });
-      }
+      preResults.push(...results.slice(0, MAX_RESULTS_PER_CHANNEL).map((r) => ({ ...r, query })));
     }
+    calls += preResultsList.reduce((acc, item) => acc + item.calls, 0);
+
+    const webReviewUsed = preResults.some((r) => r.channel === 'web_review');
 
     // 4) 분석 호출 (tool_choice auto)
     const messages = [
@@ -929,12 +949,18 @@ export async function POST(request) {
 
     // scope
     const scopeCalls = calls + toolCallCount;
+    const scopePlanned = webReviewUsed
+      ? [...new Set([...plannedFinal, 'web_review'])]
+      : plannedFinal;
+    const scopeCalled = webReviewUsed
+      ? [...new Set([...calledChannels, 'web_review'])]
+      : calledChannels;
     const scope = {
       claimType: parsed?.claimType || '기술',
-      channels: [...new Set([...plannedFinal, ...calledChannels])],
+      channels: [...new Set([...scopePlanned, ...scopeCalled])],
       calls: scopeCalls,
       queries: queries.map((q) => `${q.channel}:${q.query}`),
-      planned: plannedFinal,
+      planned: scopePlanned,
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findings.length);
