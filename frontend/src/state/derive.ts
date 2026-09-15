@@ -101,7 +101,7 @@ export function findingKindLabel(kind: string | undefined): string {
 }
 
 const TITLE_BRING = "이미 있는 것, 가져다 쓰거나 손봐서 씁니다"
-const TITLE_DIRECT = "직접 만들 것, 선례가 없어 직접 만듭니다"
+const TITLE_DIRECT = "직접 만들 것, 참고할 자료가 없어 직접 만듭니다"
 const TITLE_BUSY = "아직 조사하고 있습니다"
 const TITLE_FAILED = "이 단계는 자료를 못 찾았습니다"
 
@@ -893,6 +893,14 @@ const VERDICT_TO_HUMAN: Record<Verdict, string> = {
   "선례를 못 찾음": "참고할 자료를 찾지 못했습니다",
 }
 
+// 서버가 고정으로 채워 넣는 판정 이유 문장. models 이 비운 reason을 서버가 대신 넣은 것.
+// displayStageResult에서 이것과 같으면 셋째 문단을 붙이지 않는다 — 같은 말이 단계마다 반복돼 보이지 않게.
+const SERVER_FILLED_VERDICT_REASONS = [
+  "자료를 확인했습니다.",
+  "조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.",
+  "Solar 호출 단계에서 오류가 발생해 조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.",
+] as const
+
 const CHANNEL_HUMAN: Record<string, string> = {
   web: "웹",
   oss: "GitHub",
@@ -954,7 +962,10 @@ export function displayStageResult(text: string, stage?: Stage): string {
     }
     const out = [first, second]
     if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
-      out.push(stage.verdictReason.trim())
+      const reason = stage.verdictReason.trim()
+      if (!SERVER_FILLED_VERDICT_REASONS.includes(reason as (typeof SERVER_FILLED_VERDICT_REASONS)[number])) {
+        out.push(reason)
+      }
     }
     return out.join("\n\n")
   }
