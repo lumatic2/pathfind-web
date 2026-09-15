@@ -816,19 +816,16 @@ export function MindmapPanel({ root, layout = "roadmap", mapTitle, onMapTitleCha
             <DialogContent
               showCloseButton={false}
               data-mindmap-panel-viewer
-              className="flex max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl border-0 bg-card p-0 text-foreground shadow-xl data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 sm:max-w-none"
-              style={{
-                inset: VIEWER_INSET_PX,
-                width: `calc(100vw - ${VIEWER_INSET_PX * 2}px)`,
-                height: `calc(100dvh - ${VIEWER_INSET_PX * 2}px)`,
-                maxHeight: "none",
-              }}
+              className="flex max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden p-0 text-foreground data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 sm:max-w-none"
+              style={{ inset: VIEWER_INSET_PX }}
             >
-              {mapTitle == null && <DialogTitle className="sr-only">{L.title}</DialogTitle>}
-              <DialogDescription className="sr-only">{sourcesLabel ?? L.title}</DialogDescription>
-              {titleBlock(true)}
-              <div data-mindmap-panel-viewer-body className="mt-2 min-h-0 flex-1 px-4 pb-4">
-                {fullscreen ? map : null}
+              <div className="min-h-0 flex-1 max-h-none overflow-hidden rounded-2xl border-0 bg-card p-0 shadow-xl">
+                {mapTitle == null && <DialogTitle className="sr-only">{L.title}</DialogTitle>}
+                <DialogDescription className="sr-only">{sourcesLabel ?? L.title}</DialogDescription>
+                {titleBlock(true)}
+                <div data-mindmap-panel-viewer-body className="mt-2 min-h-0 flex-1 px-4 pb-4">
+                  {fullscreen ? map : null}
+                </div>
               </div>
             </DialogContent>
           </Dialog>
