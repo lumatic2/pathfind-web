@@ -538,15 +538,18 @@ ${reviewedSection(reviewed)}
       maxTokens: 400,
       timeoutMs: MODEL_REVIEW_TIMEOUT_MS,
     });
-    if (!res.content) return [];
+    if (!res.content) return { ok: false, ids: [] };
     const parsed = JSON.parse(res.content.trim());
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((id) => typeof id === 'string' && id.length > 0)
-      .map((id) => id.trim());
+    if (!Array.isArray(parsed)) return { ok: false, ids: [] };
+    return {
+      ok: true,
+      ids: parsed
+        .filter((id) => typeof id === 'string' && id.length > 0)
+        .map((id) => id.trim()),
+    };
   } catch (e) {
     logCall('stage.modelReview', 0, 0, { err: String(e) });
-    return [];
+    return { ok: false, ids: [] };
   }
 }
 
@@ -1015,15 +1018,15 @@ export async function POST(request) {
       const reviewed = preResults.filter((r) => r.channel === 'stats' || r.channel === 'public_data');
       if (reviewed.length > 0) {
         try {
-          const reviewIds = await modelReviewPass(stage, reviewed);
-          if (!Array.isArray(reviewIds)) {
-            // 형식이 틀리면 규칙 결과로 돌아간다 — ID는 추가하지 않음
+          const review = await modelReviewPass(stage, reviewed);
+          if (!review.ok) {
+            // 호출 실패·형식 틀림 → 규칙 결과로 돌아간다
             modelReviewStatus = 'failed';
-          } else if (reviewIds.length === 0) {
+          } else if (review.ids.length === 0) {
             // 빈 배열 = 통계·공공데이터에서 고르고 남은 자료가 없다는 뜻
             modelReviewStatus = 'empty';
           } else {
-            for (const id of reviewIds) {
+            for (const id of review.ids) {
               if (typeof id === 'string' && id) modelReviewedIds.add(id);
             }
             modelReviewStatus = 'applied';
@@ -1185,7 +1188,7 @@ export async function POST(request) {
       // 'unavailable'(호출 안 함) 또는 'failed'(호출 실패·형식 틀림) → 규칙 결과로 돌아간다
       reviewedFindings = findings;
     }
-    const findingsAfterReview = reviewedFindings.length ? reviewedFindings : findings;
+    const findingsAfterReview = reviewedFindings;
     const calledChannels = new Set();
     for (const f of findingsAfterReview) calledChannels.add(f.channel);
 
@@ -1200,11 +1203,11 @@ export async function POST(request) {
         : plannedFinal,
     };
 
-    const verdict = normalizeVerdict(parsed?.verdict, findings.length);
+    const verdict = normalizeVerdict(parsed?.verdict, findingsAfterReview.length);
     const verdictReason = composeReason(
       parsed?.verdictReason,
       parsed?.reasonPoints,
-    ) || (findings.length ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
+    ) || (findingsAfterReview.length ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
 
     let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
@@ -1213,7 +1216,7 @@ export async function POST(request) {
       note: t.note || '',
     }));
 
-    if (todos.length === 0 && findings.length === 0) {
+    if (todos.length === 0 && findingsAfterReview.length === 0) {
       for (const t of stage.tasks || []) {
         todos.push({ task: t.task, owner: '직접 함', note: t.why || '' });
       }
@@ -1222,7 +1225,7 @@ export async function POST(request) {
     options = options.slice(0, 5);
     todos = todos.slice(0, 5);
 
-    const frontendFindings = findings.map((f) => ({
+    const frontendFindings = findingsAfterReview.map((f) => ({
       id: f.id,
       name: f.name,
       kind: f.kind,
