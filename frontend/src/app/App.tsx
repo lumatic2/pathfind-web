@@ -8,6 +8,7 @@ import type { ChatEntry, GrillChoice } from '../state/types'
 import type { ChatMessage, ChatCitation, ChatStatus } from '../components/chat-conversation-panel'
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
+import { renumberCitations } from './chatCitations'
 import { renderMarkdown } from '../components/chat-conversation-panel'
 import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestors, displayStageResult } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
@@ -633,7 +634,7 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
       ? `이대로 조사를 시작할까요? 남은 ${remaining}회 중 1회를 씁니다`
       : undefined
 
-  const chatMessages: AppChatMessage[] = (() => {
+  const rawChatMessages: AppChatMessage[] = (() => {
     const out: AppChatMessage[] = []
     const buffer: ChatEntry[] = []
 
@@ -751,6 +752,8 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
     flushBuffer(true)
     return out
   })()
+
+  const chatMessages = renumberCitations(rawChatMessages)
 
   const handleSend = (text: string) => {
     if (text === directInputLabel) return
