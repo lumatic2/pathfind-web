@@ -19,6 +19,7 @@ import {
   NotebookTopbar,
   MindmapPanel,
 } from '../components/notebook-workspace-shell'
+import type { MindmapNode } from '../components/mindmap-spine-tree'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
@@ -574,9 +575,25 @@ function CenterPanel({ renderCitation }: { renderCitation?: (citation: ChatCitat
 
 function RightPanel() {
   const { session, patch } = useSession()
+  const { explainNode } = useFlow()
   const root = useMemo(() => mindmapTree(session), [session])
 
   const expandedIds = session.expandedIds?.length > 0 ? session.expandedIds : ['root']
+
+  const handleNodeSelect = useCallback(
+    (node: MindmapNode) => {
+      if (node.id === 'root' || session.busy) {
+        patch({ selectedId: null })
+        return
+      }
+      const label = (node.data as { full?: string })?.full ?? node.label
+      const m = node.id.match(/^s(\d+)/)
+      if (m == null) return
+      const stageIndex = parseInt(m[1], 10) - 1
+      explainNode({ id: node.id, label }, stageIndex)
+    },
+    [session.busy, patch, explainNode],
+  )
 
   return (
     <div className="panel-right">
@@ -606,7 +623,7 @@ function RightPanel() {
         onExpandedChange={(ids) => patch({ expandedIds: ids })}
         selectedId={session.selectedId}
         onSelectedChange={(id) => patch({ selectedId: id })}
-        onNodeSelect={undefined}
+        onNodeSelect={handleNodeSelect}
         legend={<MindmapLegend />}
       />
     </div>
