@@ -31,6 +31,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
+  DialogClose,
 } from '@/components/ui/dialog'
 import { EditableText } from '@/components/editable-text'
 
@@ -642,11 +644,17 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
       return session.stages[idx]?.stage
     }
 
-    const entryToMessage = (m: ChatEntry): AppChatMessage => ({
+    const isStageResultLine = (text: string): boolean => {
+      const verdictRe = /\*\*(가져다 써도 됨|직접 해야 함|섞어야 함|선례를 못 찾음)\*\*/
+      return verdictRe.test(text)
+    }
+
+    const entryToMessage = (m: ChatEntry, sectionStart?: boolean): AppChatMessage => ({
       id: m.id,
       role: m.role,
       text: m.text,
       kind: m.kind,
+      sectionStart,
       citations:
         m.citationTitles != null
           ? m.citationTitles.map((t, i) => ({
@@ -685,8 +693,10 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
       }
       flushBuffer(false)
       if (m.role === 'assistant' && m.kind === 'progress') {
-        const displayText = displayStageResult(m.text, stageSlotByResultLine(m.text))
-        out.push({ ...entryToMessage(m), text: displayText })
+        const stage = stageSlotByResultLine(m.text)
+        const isResult = isStageResultLine(m.text)
+        const displayText = displayStageResult(m.text, stage)
+        out.push({ ...entryToMessage(m, stage != null && isResult ? true : undefined), text: displayText })
       } else {
         out.push(entryToMessage(m))
       }
