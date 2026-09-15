@@ -3,6 +3,57 @@ import type { Verdict, StageRunStatus, Stage } from "./types"
 import { VERDICTS } from "./types"
 import type { Session, SourceDoc, StageSlot, Finding, Task, Todo, OutlineTopic } from "./types"
 
+const CHANNEL_HOST: Record<string, string> = {
+  stats: "kosis.kr",
+  law: "law.go.kr",
+  public_data: "data.go.kr",
+  oss: "github.com",
+}
+
+function extractHost(url: string): string | null {
+  try {
+    const parsed = new URL(url)
+    return parsed.host
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 게이트웨이가 돌려준 조사 결과(findings)에서 주소 없는 항목과
+ * 호스트가 채널과 맞지 않는 항목을 걸러 낸다.
+ *
+ * - url이 http로 시작하지 않으면 통째로 버린다.
+ * - URL 파싱으로 호스트를 꺼내지 못하면 버린다.
+ * - 남은 항목은 호스트를 꺼내 채널과 대조한다.
+ *   stats → kosis.kr, law → law.go.kr, public_data → data.go.kr, oss → github.com
+ *   web은 대조하지 않는다.
+ * - 호스트가 기대 값이거나 그 값으로 끝나지 않으면 channel과 grade를 빼고 자료 자체는 남긴다.
+ * - 원본 배열은 고치지 않고 새 배열을 반환한다.
+ */
+export function sanitizeHermesFindings(input: Finding[]): Finding[] {
+  const out: Finding[] = []
+  for (const f of input) {
+    if (typeof f.url !== "string" || !f.url.startsWith("http")) {
+      continue
+    }
+    const host = extractHost(f.url)
+    if (host == null) {
+      continue
+    }
+    const expectedHost = CHANNEL_HOST[f.channel ?? ""]
+    if (expectedHost != null && f.channel != null) {
+      if (host !== expectedHost && !host.endsWith(expectedHost)) {
+        const { channel, grade, ...rest } = f
+        out.push(rest)
+        continue
+      }
+    }
+    out.push(f)
+  }
+  return out
+}
+
 /**
  * 서버·저장 계약의 판정 문자열 네 값 가운데 하나로 접는다.
  * 앞부분이 일치하면 그 값으로, 어느 것과도 안 맞으면 "선례를 못 찾음"으로 접는다.
@@ -39,6 +90,7 @@ export const channelLabel: Record<string, string> = {
   public_data: "공공데이터포털",
   stats: "국가통계 KOSIS",
   law: "국가법령정보",
+  web_review: "블로그 카페 후기",
 }
 
 /** findings의 kind를 자료 행 부제(7종)로 정리 */
@@ -59,6 +111,7 @@ export const channelShort: Record<string, string> = {
   public_data: "공공데이터",
   stats: "통계",
   law: "법령",
+  web_review: "후기",
 }
 
 export function channelTally(findings: Finding[]): { channel: string; count: number }[] {
@@ -846,6 +899,7 @@ const CHANNEL_HUMAN: Record<string, string> = {
   public_data: "공공데이터",
   stats: "통계",
   law: "법령",
+  web_review: "후기",
 }
 
 /**
