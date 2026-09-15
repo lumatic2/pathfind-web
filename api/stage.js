@@ -10,6 +10,7 @@ import { lawAvailable, searchLaw, NAME as LAW_NAME, isRelevantHit } from './_cha
 import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './_channels/public-data.js';
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 import { reviewFindings } from './_lib/review-findings.js';
+import { selectFindings } from './_lib/select-findings.js';
 
 // ---------- 상수 ----------
 
@@ -1088,10 +1089,22 @@ export async function POST(request) {
     } else {
       reviewResult = { kept: [], dropped: 0, timedOut: false };
     }
-    const findingsAfterReview = [
+    const reviewedFindings = [
       ...reviewResult.kept,
       ...findings.filter((f) => !TARGET_CHANNELS.has(f.channel)),
     ];
+
+    // ----- 자료 여섯 칸 고르기: 웹 상한·비웹 우선·밀린 웹 보존 -----
+    const { findings: findingsAfterReview, deferredWeb } = selectFindings(
+      reviewedFindings,
+      [...catalog.values()],
+    );
+    if (deferredWeb.length > 0) {
+      logCall('stage.selectFindings.deferredWeb', 0, 0, {
+        count: deferredWeb.length,
+        ids: deferredWeb.map((f) => f.id),
+      });
+    }
 
     const calledChannels = new Set();
     for (const f of findingsAfterReview) calledChannels.add(f.channel);
