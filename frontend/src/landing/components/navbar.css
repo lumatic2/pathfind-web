@@ -27,6 +27,7 @@
   color: var(--primary);
   text-decoration: none;
   display: inline-flex;
+  view-transition-name: pathfinder-logo;
 }
 .nav__logo:focus-visible {
   outline: var(--focus-ring-width) solid var(--ring);
