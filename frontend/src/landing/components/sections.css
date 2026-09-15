@@ -159,6 +159,27 @@
 }
 .trust__title b { color: var(--primary); font-weight: 900; }
 
+.trust__subtitle {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  color: var(--muted-foreground);
+  line-height: var(--lh-quote);
+}
+
+.trust__subtitle-group {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding-inline: var(--space-2);
+  border-inline: var(--hairline) solid var(--border);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
 /* ────────────────────────────────────────────────────────
    Quote — 원본 `gl-feedback`
    ──────────────────────────────────────────────────────── */
@@ -358,6 +379,18 @@
   position: relative;
   aspect-ratio: 6 / 5;
 }
+
+/* 판정 도식 원은 정사각 상자 안에서만 그린다 — 판이 세로로 길면 원이 타원으로 찌그러진다 */
+.band__wheel-square {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: min(var(--wheel-w), 320px);
+  margin-inline: auto;
+}
+
+/* 스포크 자리는 정사각 기준이라 값 그대로 둔다 */
+.band__wheel-rotor { position: absolute; inset: 0; transform-origin: center; }
 /* 한 열로 접히면 패널이 좁아져 라벨끼리 겹친다 — 가로로 못 벌리면 세로로 벌린다 */
 @media (max-width: 640px) {
   .band__scatter,
@@ -432,6 +465,25 @@
 }
 
 .band__action { margin-top: var(--space-14); }
+
+/* 아래로 내려가는 힌트 — 보라 버튼 대신 조용한 링크 */
+.band__action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--foreground);
+  text-decoration: none;
+  font-weight: 600;
+  transition: translate 150ms ease;
+}
+.band__action-link:hover { translate: 0 var(--space-1); }
+.band__action-arrow {
+  font-size: var(--fs-item);
+  line-height: 1;
+  color: var(--muted-foreground);
+  transition: translate 150ms ease;
+}
+.band__action-link:hover .band__action-arrow { translate: 0 calc(var(--space-1) * -1); }
 
 /* ────────────────────────────────────────────────────────
    Team — 원본 `gl-service`

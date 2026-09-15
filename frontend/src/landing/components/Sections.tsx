@@ -99,7 +99,12 @@ export function Trust() {
       </div>
 
       <h2 className="trust__title">
-        {T.title.before}<b>{T.title.number}</b>{T.title.after}<br />{T.title.line2}
+        {T.title.before}<b>{T.title.number}</b>{T.title.after}<br />
+        <span className="trust__subtitle">
+          {T.title.line2.map((g, i) => (
+            <span key={i} className="trust__subtitle-group">{g}</span>
+          ))}
+        </span>
       </h2>
     </div>
   );
@@ -134,7 +139,6 @@ export function Quote() {
               <blockquote className="quote__text">{qt.text}</blockquote>
               <figcaption className="quote__who">
                 <span className="quote__name">{qt.name}</span>
-                <span className="quote__role">{qt.role}</span>
               </figcaption>
             </figure>
           ))}
@@ -224,25 +228,27 @@ export function Compare() {
             <div className="band__col">
               <p className="band__col-title"><span className="band__mood -high" aria-hidden="true" />{C.right.heading}</p>
               <div className="band__wheel">
-                <svg className="band__threads" viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-                  <circle cx="200" cy="150" r="118" />
-                </svg>
-                <span className="band__hub">{C.right.hub}</span>
-                {/* 회전은 스포크를 담은 로터에 걸고, 스포크는 역회전한다 — 원본 `-v2` 와 같은 2단 구조 */}
-                <div className="band__wheel-rotor">
-                  {C.right.spokes.map((t) => (
-                    <span key={t.label} className="band__spoke" style={{ ...img(t.icon), ...place(t) }}>
-                      <span className="band__tile-label">{t.label}</span>
-                    </span>
-                  ))}
+                <div className="band__wheel-square">
+                  <svg className="band__threads" viewBox="0 0 400 400" aria-hidden="true" focusable="false">
+                    <circle cx="200" cy="200" r="118" />
+                  </svg>
+                  <span className="band__hub">{C.right.hub}</span>
+                  {/* 회전은 스포크를 담은 로터에 걸고, 스포크는 역회전한다 — 원본 `-v2` 와 같은 2단 구조 */}
+                  <div className="band__wheel-rotor">
+                    {C.right.spokes.map((t) => (
+                      <span key={t.label} className="band__spoke" style={{ ...img(t.icon), ...place(t) }}>
+                        <span className="band__tile-label">{t.label}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="band__action">
-            <a className="btn btn--primary" href={C.cta.href}>
-              {C.cta.label} <span aria-hidden="true">→</span>
+            <a className="band__action-link" href={C.cta.href}>
+              {C.cta.label} <span className="band__action-arrow" aria-hidden="true">↓</span>
             </a>
           </div>
         </div>
