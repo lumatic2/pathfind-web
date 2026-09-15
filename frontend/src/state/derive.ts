@@ -1018,15 +1018,31 @@ function channelTallyHuman(tally: { channel: string; count: number }[]): string 
    const out = [first, second]
    if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
      const { verdictSentence, remainingReason } = pickVerdictSentence(stage.verdictReason)
-     const parts: string[] = []
-     if (verdictSentence) {
-       parts.push(`**${verdictSentence}**`)
-     }
-     if (remainingReason != null && remainingReason.trim().length > 0) {
-       parts.push(remainingReason)
-     }
-     if (parts.length > 0) {
-       out.push(parts.join('\n\n'))
+     if (stage.verdictLine && stage.verdictLine.trim().length > 0) {
+       out.push(stage.verdictLine.trim())
+       if (verdictSentence && verdictSentence.trim() === stage.verdictLine.trim()) {
+         if (remainingReason && remainingReason.trim().length > 0) {
+           out.push(remainingReason)
+         }
+       } else if (verdictSentence && verdictSentence.trim().length > 0) {
+         out.push(verdictSentence)
+         if (remainingReason && remainingReason.trim().length > 0) {
+           out.push(remainingReason)
+         }
+       } else if (remainingReason && remainingReason.trim().length > 0) {
+         out.push(remainingReason)
+       }
+     } else {
+       const parts: string[] = []
+       if (verdictSentence) {
+         parts.push(`**${verdictSentence}**`)
+       }
+       if (remainingReason != null && remainingReason.trim().length > 0) {
+         parts.push(remainingReason)
+       }
+       if (parts.length > 0) {
+         out.push(parts.join('\n\n'))
+       }
      }
    }
    return out.join('\n\n')

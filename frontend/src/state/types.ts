@@ -49,6 +49,7 @@ export type Stage = {
   choices: string[]
   verdict?: Verdict
   verdictReason?: string
+  verdictLine?: string
   findings?: Finding[]
   options?: string[]
   todos?: Todo[]
