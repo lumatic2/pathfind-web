@@ -265,7 +265,7 @@ export function useFlow() {
               remaining > 0
                 ? {
                     label: "맞아요, 이대로 조사해 주세요",
-                    note: "로드맵 1회 소진",
+                    note: "패스 1회 소진",
                   }
                 : null
             const chipEdit = {
@@ -281,7 +281,7 @@ export function useFlow() {
 
             const guidanceLine = remaining > 0
               ? `이렇게 이해했습니다. 맞나요?\n\n${res.summary}\n\n이러면 조사를 시작할까요?\n\n**남은 ${remaining}회 중 1회를 씁니다.**`
-              : `이렇게 이해했습니다. 맞나요?\n\n${res.summary}\n\n**로드맵 2회를 모두 쓰셨습니다.**\n만든 로드맵은 계속 보실 수 있고, 마인드맵과 ROADMAP.md도 그대로 내려받을 수 있어요.`
+              : `이렇게 이해했습니다. 맞나요?\n\n${res.summary}\n\n**패스 2회를 모두 쓰셨습니다.**\n만든 패스는 계속 보실 수 있고, 마인드맵과 PATH.md도 그대로 내려받을 수 있어요.`
 
             const latest = sessionRef.current
             patch({
@@ -364,7 +364,7 @@ export function useFlow() {
   function buildCompletionText(completed: ReturnType<typeof useSession>['session']): string {
     const failedCount = completed.stages.filter((s) => s.status === 'failed').length
     return failedCount === 0
-      ? `조사를 마쳤습니다. 오른쪽 마인드맵에서 노드를 누르면(굵게) 제가 그 노드를 설명해 드립니다.`
+      ? `조사를 마쳤습니다. 오른쪽 마인드맵에서 궁금한 것을 누르면 설명해 드립니다.`
       : `조사를 마쳤습니다. 전체 슬롯 수에서 실패 수를 뺀 개수만큼 단계가 채워졌고 실패 수만큼은 자료를 못 찾았습니다(둘 다 굵게). 오른쪽 마인드맵에서 노드를 누르면 설명해 드립니다.`
   }
 
@@ -428,7 +428,7 @@ export function useFlow() {
           researchPath: 'local',
         })
 
-        // 4) 진행 말풍선: 기본 경로 안내
+        // 4) 진행 말풍선: 진행 안내
         const afterSkeleton = sessionRef.current
         patch({
           messages: [
@@ -436,7 +436,7 @@ export function useFlow() {
             {
               id: msgId(),
               role: 'assistant',
-              text: '지금은 기본 경로로 조사합니다. 이 창을 열어 두시면 끝까지 진행됩니다.',
+              text: '지금은 이 창을 열어 두시면 끝까지 진행됩니다.',
               kind: 'progress',
               suggestions: [],
             },
@@ -641,7 +641,7 @@ export function useFlow() {
           const followupChips: string[] =
             res.followups.length > 0
               ? res.followups
-              : ['이 로드맵에서 먼저 할 일은', '직접 만들 것만 순서대로 정리해 줘', 'ROADMAP.md 내려받기']
+              : ['이 패스에서 먼저 할 일은', '직접 만들 것만 순서대로 정리해 줘', 'PATH.md 내려받기']
 
           patch({
             messages: [
