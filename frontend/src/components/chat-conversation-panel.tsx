@@ -206,7 +206,7 @@ function DefaultCitationBadge({ citation }: { citation: ChatCitation }) {
  * `| 항목 | 값 |` 가 글자 그대로 섰다**(5차 finding). 6차는 step-7·9 로 모델 자유도를 늘리므로 그 결함이
  * 더 자주 발현된다 — 그래서 여기서 닫는다. 받는 것은 **이 셋뿐**이고 각주·인용문·중첩 표는 여전히 안 받는다.
  */
-type InlineCtx = { citations?: ChatCitation[]; render?: (c: ChatCitation, i: number) => ReactNode }
+type InlineCtx = { citations?: ChatCitation[]; render?: (c: ChatCitation, i: number) => ReactNode; staged?: boolean }
 
 /**
  * ⚠ **차례가 뜻을 정한다.** 이미지(`![…](…)`)를 링크보다 먼저, 링크(`[…](…)`)를 인용(`[n]`)보다 먼저 본다 —
@@ -493,20 +493,23 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
   // 블록 단위 등장(3차 step-5, 사용자 피드백 A6) — i 번째 블록이 i×80ms 뒤에 좌→우로 뜬다(상한 800ms).
   // CSS 애니메이션이라 DOM 노드가 살아 있는 한 재렌더에 다시 돌지 않는다(키가 안정적이므로 이미 읽은 답변은 안 깜빡인다).
   // 움직임을 줄인 환경은 `index.css` 가 `animation: none` 으로 즉시 표시한다.
-  const staged = blocks.map((b, i) =>
-    isValidElement<{ className?: string; style?: CSSProperties }>(b)
-      ? cloneElement(b as ReactElement<{ className?: string; style?: CSSProperties }>, {
-          className: cn(b.props.className, "chat-block-in"),
-          style: { ...b.props.style, ["--block-delay" as string]: `${Math.min(i * BLOCK_STAGGER_MS, BLOCK_STAGGER_MAX_MS)}ms` },
-          ...({ "data-chat-block": i } as Record<string, unknown>),
-        })
-      : b,
-  )
+  const applyStagger = ctx.staged !== false
+  const stagedBlocks = applyStagger
+    ? blocks.map((b, i) =>
+        isValidElement<{ className?: string; style?: CSSProperties }>(b)
+          ? cloneElement(b as ReactElement<{ className?: string; style?: CSSProperties }>, {
+              className: cn(b.props.className, "chat-block-in"),
+              style: { ...b.props.style, ["--block-delay" as string]: `${Math.min(i * BLOCK_STAGGER_MS, BLOCK_STAGGER_MAX_MS)}ms` },
+              ...({ "data-chat-block": i } as Record<string, unknown>),
+            })
+          : b,
+      )
+    : blocks
 
-  if (staged.length === 1) return staged[0]
+  if (stagedBlocks.length === 1) return stagedBlocks[0]
   return (
     <div data-chat-markdown className="flex flex-col gap-4">
-      {staged}
+      {stagedBlocks}
     </div>
   )
 }
