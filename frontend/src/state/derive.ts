@@ -970,6 +970,40 @@ export function displayStageResult(text: string, stage?: Stage): string {
     return out.join("\n\n")
   }
 
+  // 결과 줄(구형): "번호. 제목 → **계약값** (채널집계)[마커]" — 한 줄에 화살표+계약값
+  const arrowResultRe =
+    /^(\d+)\. (.+) → \*\*(가져다 써도 됨|직접 해야 함|섞어야 함|선례를 못 찾음)\*\*\s*(\(.*?\))?(\[.*?\])?$/
+  const arrowResultMatch = text.match(arrowResultRe)
+  if (arrowResultMatch) {
+    const [, numStr, title, verdict, tallyRaw, markerRaw] = arrowResultMatch
+    const first = `${numStr}. ${title}`
+    const humanVerdict = VERDICT_TO_HUMAN[verdict as Verdict]
+    let second = `**${humanVerdict}**`
+    if (tallyRaw) {
+      const inner = tallyRaw.slice(1, -1).trim()
+      if (inner.length > 0) {
+        const items = inner.split("·").map((s) => s.trim()).filter(Boolean)
+        const parts = items.map((item) => {
+          const m = item.match(/^(.+?) (\d+)$/)
+          if (m) {
+            const chName = CHANNEL_HUMAN[m[1]] ?? m[1]
+            return `${chName}에서 자료 ${m[2]}건`
+          }
+          return item
+        })
+        if (parts.length > 0) second += ` ${parts.join(" · ")}`
+      }
+    }
+    const out = [first, second]
+    if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
+      const reason = stage.verdictReason.trim()
+      if (!SERVER_FILLED_VERDICT_REASONS.includes(reason as (typeof SERVER_FILLED_VERDICT_REASONS)[number])) {
+        out.push(reason)
+      }
+    }
+    return out.join("\n\n")
+  }
+
   // 진행 줄: "번호. 제목 · 상태" — 이음표를 두고 한 줄로 편다
   const progressRe = /^(\d+)\. (.+) · (.+)$/
   const progressMatch = text.match(progressRe)

@@ -9,7 +9,7 @@ import type { ChatMessage, ChatCitation, ChatStatus } from '../components/chat-c
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
 import { renderMarkdown } from '../components/chat-conversation-panel'
-import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestors } from '../state/derive'
+import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestors, displayStageResult } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { downloadText, sourceCard } from '../lib/api'
 import { saveRoadmap, newRoadmapId, getRoadmap, toCurrentSession } from '../state/roadmaps'
@@ -635,6 +635,13 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
     const out: AppChatMessage[] = []
     const buffer: ChatEntry[] = []
 
+    const stageSlotByResultLine = (line: string): Stage | undefined => {
+      const m = line.match(/^(\d+)\. /)
+      if (!m) return undefined
+      const idx = Number(m[1]) - 1
+      return session.stages[idx]?.stage
+    }
+
     const entryToMessage = (m: ChatEntry): AppChatMessage => ({
       id: m.id,
       role: m.role,
@@ -677,7 +684,12 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
         continue
       }
       flushBuffer(false)
-      out.push(entryToMessage(m))
+      if (m.role === 'assistant' && m.kind === 'progress') {
+        const displayText = displayStageResult(m.text, stageSlotByResultLine(m.text))
+        out.push({ ...entryToMessage(m), text: displayText })
+      } else {
+        out.push(entryToMessage(m))
+      }
     }
     flushBuffer(true)
     return out
