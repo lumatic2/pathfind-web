@@ -136,6 +136,13 @@ docs/api-contract.md  서버 API 계약
 
 ---
 
+## 예선 당선 스킬 원문
+
+서비스 코어는 예선에서 당선된 스킬 `pathfind`의 원문 그대로를 출발점으로 쓴다. 원문은 `pathfind-src/` 폴더에 있다.
+
+- `pathfind-src/` 안의 파일 네 개(`SKILL.md`, `scripts/render.py`, `assets/steps-flow-template.html`, `assets/lucide-icons.json`)는 예선에 낸 zip과 파일 구성과 내용이 같다. 해시 대조 결과(PRD 6) 참조.
+- 이 폴더 자체는 고치지 않는다. 서비스로 늘린 부분은 전부 `api/`와 `frontend/` 쪽 후처리다.
+
 ## 결과물 규격
 
 - 화면을 "로드맵"이라 부르지 않는다. 결과물은 **패스(path)** 다.
