@@ -58,6 +58,13 @@ type ChatConversationPanelProps = {
    * 누르면 무엇이 줄어드는지를 누르기 **전에** 말한다(실소비자 문구 정본 §3-2).
    */
   suggestionNotes?: Record<string, string>
+  /**
+   * 칩 아래 **고른 이유 한 줄**(M123 — 실소비자 승격, 참조 구현 5차 step-6). 라벨 → 이유. 이유가 있는 칩만 두 줄
+   * 둥근 사각이 되고, 없는 칩은 종전대로 한 줄 알약으로 선다 — 승인 칩·후속 칩·첫 화면은 이 prop 을 비워 종전 모양 그대로다.
+   */
+  suggestionReasons?: Record<string, string>
+  /** 「추천」 표시가 붙는 칩의 라벨(M123). 정확히 하나. 그 칩을 맨 위에 놓는 정렬은 호출 측이 한다 */
+  recommendedSuggestion?: string
   /** M117 — 입력창 우측 근거 범위(「소스 N개」) */
   scopeLabel?: string
   /** M117 — 입력창 초안 제어(밖에서 채우기 — 예: 마인드맵 노드 → 질의 문구). 안 주면 내부 state */
@@ -69,6 +76,8 @@ type ChatConversationPanelProps = {
   showHeaderActions?: boolean
   /** M117 grounded — 빈 상태 인사 블록(👋 + 32px 제목). `emptyHint` 가 본문, `suggestionsPrompt` 가 칩 위 굵은 유도 문장 */
   emptyTitle?: string
+  /** 빈 상태 인사 그림(M123). 안 주면 종전 lucide 손 아이콘 — 브랜드 그림체를 쓰려는 소비자가 넘긴다 */
+  emptyIcon?: ReactNode
   suggestionsPrompt?: string
   /**
    * 입력창 안내 문구(M122 보강 — 실소비자 승격). 종전에는 「소스에 대해 물어보세요」가 박혀 있었다.
@@ -366,27 +375,68 @@ function Reasoning({ reasoning }: { reasoning: NonNullable<ChatMessage["reasonin
   )
 }
 
-function Suggestions({ items, onPick, notes, directInputLabel }: { items: string[]; onPick?: (s: string) => void; notes?: Record<string, string>; directInputLabel?: string }) {
+/**
+ * 칩 묶음. `reasons` 가 있는 칩만 아래에 **고른 이유 한 줄**이 붙고, `recommended` 칩에는 「추천」 표시가 붙는다(M123).
+ * ⚠ 두 prop 이 비면 종전 모양 그대로 선다 — 빈 상태·마지막 답변 아래·인터뷰 칩이 같은 부품이라 한쪽만 바뀌지 않는다.
+ */
+function Suggestions({
+  items,
+  onPick,
+  notes,
+  reasons,
+  recommended,
+  directInputLabel,
+}: {
+  items: string[]
+  onPick?: (s: string) => void
+  notes?: Record<string, string>
+  reasons?: Record<string, string>
+  recommended?: string
+  directInputLabel?: string
+}) {
   return (
     <div data-chat-suggestions className="flex flex-col items-start gap-2">
-      {items.map((s) => (
-        <button
-          key={s}
-          type="button"
-          data-chat-suggestion={s}
-          data-direct-input={directInputLabel && s === directInputLabel ? "" : undefined}
-          onClick={() => onPick?.(s)}
-          className={cn("inline-flex max-w-full items-center rounded-full border border-border px-5 text-left text-sm leading-6 outline-none ring-ring ring-offset-2 ring-offset-background focus-visible:ring-2", STATE_LAYER)}
-          style={{ minHeight: CHIP_PX }}
-        >
-          {s}
-          {notes?.[s] ? (
-            <span data-chat-suggestion-note className="ml-2 shrink-0 text-xs text-muted-foreground">
-              {notes[s]}
+      {items.map((s) => {
+        const why = reasons?.[s]
+        const isRecommended = recommended === s && s !== directInputLabel
+        return (
+          <button
+            key={s}
+            type="button"
+            data-chat-suggestion={s}
+            data-chat-suggestion-recommended={isRecommended ? "" : undefined}
+            data-direct-input={directInputLabel && s === directInputLabel ? "" : undefined}
+            onClick={() => onPick?.(s)}
+            className={cn(
+              "inline-flex max-w-full flex-col items-start justify-center border border-border px-5 text-left text-sm leading-6 outline-none ring-ring ring-offset-2 ring-offset-background focus-visible:ring-2",
+              // 한 줄짜리는 종전 그대로 알약, 이유가 붙어 두 줄이 되면 둥근 사각 — 알약은 두 줄에서 양 끝이 뭉개진다
+              why ? "gap-0.5 rounded-2xl py-2" : "rounded-full",
+              isRecommended && "border-foreground",
+              STATE_LAYER,
+            )}
+            style={{ minHeight: CHIP_PX }}
+          >
+            <span className="flex max-w-full items-center gap-2">
+              {isRecommended ? (
+                <span data-chat-suggestion-badge className="shrink-0 rounded-full bg-foreground px-2 text-xs font-medium leading-5 text-background">
+                  추천
+                </span>
+              ) : null}
+              <span className="min-w-0">{s}</span>
+              {notes?.[s] ? (
+                <span data-chat-suggestion-note className="shrink-0 text-xs text-muted-foreground">
+                  {notes[s]}
+                </span>
+              ) : null}
             </span>
-          ) : null}
-        </button>
-      ))}
+            {why ? (
+              <span data-chat-suggestion-why className="max-w-full break-keep text-xs leading-5 text-muted-foreground">
+                {why}
+              </span>
+            ) : null}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -402,9 +452,8 @@ function Suggestions({ items, onPick, notes, directInputLabel }: { items: string
  * M117 보강(옵트인 — 기본 렌더 무변경): `reasoning`·`citations` + `renderCitation` 슬롯 · `suggestions` 세로 칩 ·
  * `scopeLabel` 근거 범위 · `draft` 제어 · `variant="grounded"`. 관측 근거 `evidence/m117/…observation.md` §3.
  */
-export function ChatConversationPanel({ messages, status, onSend, onRetry, emptyHint, variant = "default", renderCitation, suggestions, onSuggestion, scopeLabel, draft: draftProp, onDraftChange, title, showHeaderActions = true, emptyTitle, suggestionsPrompt, onSaveNote, onCopy, onFeedback, saveNoteLabel = "메모에 저장", composerPlaceholder = "한 문장으로 편하게 적어 주세요. 잘 모르면 “잘 모르겠어요”도 괜찮습니다.", renderAssistantMark, assistantMarkPlacement = "leading", waitingLabel, directInputLabel, suggestionNotes, className }: ChatConversationPanelProps) {
+export function ChatConversationPanel({ messages, status, onSend, onRetry, emptyHint, variant = "default", renderCitation, suggestions, onSuggestion, scopeLabel, draft: draftProp, onDraftChange, title, showHeaderActions = true, emptyTitle, suggestionsPrompt, onSaveNote, onCopy, onFeedback, saveNoteLabel = "메모에 저장", composerPlaceholder = "소스에 대해 물어보세요", renderAssistantMark, assistantMarkPlacement = "leading", waitingLabel, directInputLabel, suggestionNotes, suggestionReasons, recommendedSuggestion, emptyIcon, className }: ChatConversationPanelProps) {
   const [draftState, setDraftState] = useState("")
-  const [composerError, setComposerError] = useState<string | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   // 「직접 입력」은 답이 아니라 문이다 — 보내지 않고 입력창으로 포커스만 옮긴다(M122).
   const pick = (s: string) => {
@@ -432,11 +481,7 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
   const canSend = draft.trim().length > 0 && status !== "waiting"
 
   const send = () => {
-    if (!canSend) {
-      setComposerError("한 글자 이상 적어 주세요.")
-      window.setTimeout(() => setComposerError(null), 2200)
-      return
-    }
+    if (!canSend) return
     onSend(draft.trim())
     setDraft("")
   }
@@ -471,15 +516,17 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
         {zeroState ? (
           // 원본 §3 빈 상태 — 좌정렬 컨테이너(패딩 48 40 · max 672) · 👋 48 · 제목 32/40 400 · 본문 14/24 · 유도 14/24 500 · 칩 세로
           <div data-chat-zero className="flex flex-col items-start gap-4" style={{ padding: `${ZERO_PAD_Y_PX - 16}px ${ZERO_PAD_X_PX - 16}px`, maxWidth: ZERO_MAX_PX }}>
-            <HandIcon aria-hidden className="size-12 text-muted-foreground motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:duration-500" />
-            <h1 className="font-semibold" style={{ fontSize: ZERO_TITLE_PX, lineHeight: `${ZERO_TITLE_LINE_PX}px` }}>
+            <div aria-hidden className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-75 motion-safe:duration-500">
+              {emptyIcon ?? <HandIcon className="size-12 text-muted-foreground" />}
+            </div>
+            <h1 className="font-normal" style={{ fontSize: ZERO_TITLE_PX, lineHeight: `${ZERO_TITLE_LINE_PX}px` }}>
               {emptyTitle}
             </h1>
             {emptyHint ? <p className="break-keep text-sm leading-6">{emptyHint}</p> : null}
             {suggestions?.length ? (
               <>
                 {suggestionsPrompt ? <p className="text-sm font-medium leading-6">{suggestionsPrompt}</p> : null}
-                <Suggestions items={suggestions} onPick={pick} notes={suggestionNotes} directInputLabel={directInputLabel} />
+                <Suggestions items={suggestions} onPick={pick} notes={suggestionNotes} reasons={suggestionReasons} recommended={recommendedSuggestion} directInputLabel={directInputLabel} />
               </>
             ) : null}
           </div>
@@ -620,7 +667,7 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
         {showTrailingSuggestions ? (
           <>
             {suggestionsPrompt ? <p className="text-sm font-medium leading-6">{suggestionsPrompt}</p> : null}
-            <Suggestions items={suggestions!} onPick={pick} notes={suggestionNotes} directInputLabel={directInputLabel} />
+            <Suggestions items={suggestions!} onPick={pick} notes={suggestionNotes} reasons={suggestionReasons} recommended={recommendedSuggestion} directInputLabel={directInputLabel} />
           </>
         ) : null}
       </div>
@@ -634,9 +681,6 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
             send()
           }}
         >
-          {composerError ? (
-            <p className="mb-2 shrink-0 text-sm text-destructive">{composerError}</p>
-          ) : null}
           {/* 세로 정렬: 한 줄일 때 textarea(24 + 상하 8 = 40)·「소스 N개」·전송 원 40 이 같은 높이의 중앙에 선다. 여러 줄이면 바닥 정렬 */}
           <div className="flex items-end gap-3 rounded-2xl border border-muted-foreground/60 bg-card px-4 py-3 motion-safe:transition-[border-color,box-shadow] focus-within:border-foreground focus-within:ring-1 focus-within:ring-foreground">
             <textarea
