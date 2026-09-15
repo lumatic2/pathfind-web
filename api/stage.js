@@ -230,6 +230,13 @@ const VERDICT_MUST = '직접 해야 함';
 const VERDICT_MIX = '섞어야 함';
 const VERDICT_NONE = '선례를 못 찾음';
 
+// 모델이 프롬프트에서 보는 이름(쓸 만한 자료 없음)을 저장·응답 값(선례를 못 찾음)으로 되돌린다.
+// 옛 이름(선례를 못 찾음)이 그대로 와도 아래 표가 그대로 통과시킨다.
+const VERDICT_MODEL_TO_STORED = {
+  '쓸 만한 자료 없음': VERDICT_NONE,
+  '선례를 못 찾음': VERDICT_NONE,
+};
+
 const VERDICT_PREFIX = {
   [VERDICT_CAN]: VERDICT_CAN,
   [VERDICT_MUST]: VERDICT_MUST,
@@ -237,7 +244,13 @@ const VERDICT_PREFIX = {
   [VERDICT_NONE]: VERDICT_NONE,
 };
 
+function mapModelVerdict(raw) {
+  if (!raw) return raw;
+  return VERDICT_MODEL_TO_STORED[raw] ?? raw;
+}
+
 function normalizeVerdict(raw, findingsCount) {
+  raw = mapModelVerdict(raw);
   if (!raw) {
     if (findingsCount === 0) return VERDICT_MUST;
     return VERDICT_NONE;
@@ -282,15 +295,15 @@ const SYSTEM_PROMPT = `당신은 특정 구현 단계의 리서치 결과를 정
 - 전체 findings 상한은 6건입니다.
 
 ## 5단계 — 판정
-네 가지 고정 값 중 하나로 verdict를 냅니다: 가져가 써도 됨 / 직접 해야 함 / 섞어야 함 / 선례를 못 찾음.
-- 자료가 0건이면 "직접 해야 함"만 인정합니다. 그 외엔 "선례를 못 찾음".
-- 자료가 있는데 "선례를 못 찾음"이면 "직접 해야 함"으로, 넷 어느 것도 아니면 "가져다 써도 됨"으로 정상화합니다(코드 정규화 대상이지만 모델도 예측 가능).
+네 가지 고정 값 중 하나로 verdict를 냅니다: 가져가 써도 됨 / 직접 해야 함 / 섞어야 함 / 쓸 만한 자료 없음.
+- 자료가 0건이면 "직접 해야 함"만 인정합니다. 그 외엔 "쓸 만한 자료 없음".
+- 자료가 있는데 "쓸 만한 자료 없음"이면 "직접 해야 함"으로, 넷 어느 것도 아니면 "가져다 써도 됨"으로 정상화합니다(코드 정규화 대상이지만 모델도 예측 가능).
 
 최종 출력은 아래 스키마를 정확히 따르는 JSON 객체 하나입니다. 마크다운·설명 텍스트 없이 JSON만 출력합니다.
 
 {
   "claimType": "기술"|"정량/법적"|"맥락",
-  "verdict": "가져다 써도 됨"|"직접 해야 함"|"섞어야 함"|"선례를 못 찾음",
+  "verdict": "가져다 써도 됨"|"직접 해야 함"|"섞어야 함"|"쓸 만한 자료 없음",
   "verdictReason": "판정 근거 한 줄. 사람에게 설명하는 자리이므로 합니다·입니다로 끝맺습니다.",
   "findings": [
     {
