@@ -592,7 +592,7 @@ export function mindmapTree(session: Session): MindmapNode {
   const rootLabel =
     trimmedNonEmpty(session.mapTitle) ??
     trimmedNonEmpty(session.bigPicture?.title) ??
-    "제목 없는 로드맵"
+    "제목 없는 패스"
 
   const root: MindmapNode = {
     id: "root",
