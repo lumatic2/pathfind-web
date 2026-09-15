@@ -284,7 +284,7 @@ const SYSTEM_PROMPT = `당신은 특정 구현 단계의 리서치 결과를 정
 {
   "claimType": "기술"|"정량/법적"|"맥락",
   "verdict": "가져다 써도 됨"|"직접 해야 함"|"섞어야 함"|"선례를 못 찾음",
-  "verdictReason": "판정 근거 한 줄",
+  "verdictReason": "판정 근거 한 줄. 사람에게 설명하는 자리이므로 합니다·입니다로 끝맺습니다.",
   "findings": [
     {
       "id": "채널-번호 형태의 항목 식별자 (예: naver-web-0)",
@@ -645,7 +645,7 @@ function extractHost(url) {
 function buildResponse(stage, modelOutput, findings, queries, plannedChannels, calledChannels, calls, source) {
   const findingsCount = findings.length;
   const verdict = normalizeVerdict(modelOutput?.verdict, findingsCount);
-  const verdictReason = modelOutput?.verdictReason || (findingsCount ? '검색 자료 확인' : '검색 상한 내 유효한 선례를 못 찾음');
+  const verdictReason = modelOutput?.verdictReason || (findingsCount ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
 
   let options = modelOutput?.options || stage.choices || [];
   let todos = (modelOutput?.todos || []).map((t) => ({
@@ -938,7 +938,7 @@ export async function POST(request) {
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findings.length);
-    const verdictReason = parsed?.verdictReason || (findings.length ? '검색 자료 확인' : '검색 상한 내 유효한 선례를 못 찾음');
+    const verdictReason = parsed?.verdictReason || (findings.length ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
 
     let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
@@ -1021,7 +1021,7 @@ async function runLegacyFallback(request, source) {
           icon: stage.icon || '',
           tasks: stage.tasks,
           verdict: '선례를 못 찾음',
-          verdictReason: 'Solar 호출 단계에서 오류가 발생해 검색 상한 내 유효한 선례를 못 찾음',
+          verdictReason: 'Solar 호출 단계에서 오류가 발생해 조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.',
           findings: [],
           choices: stage.choices || [],
           options: stage.choices || [],
