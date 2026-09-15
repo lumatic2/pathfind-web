@@ -3,18 +3,19 @@ import { AlertCircleIcon, ArrowRightIcon, BrainIcon, ChevronDownIcon, CopyIcon, 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-/**
- * ⚠ 이 부품은 프로젝트 CSS 에 **@keyframes 두 개**가 있어야 완성된다 (M122 — 실소비자 발견).
- * 레지스트리 페이로드는 이 `.tsx` 만 싣기 때문에, 이름만 부르고 정의가 없으면 **오류 없이 애니메이션만 죽는다**.
- * 이식하는 프로젝트의 전역 CSS 에 그대로 붙인다(문구 정본: `recipes/application-ui/chat-conversation-panel.md` Code):
- *
- *   @keyframes chat-message-in { from { opacity: 0; transform: translateY(8px) scale(0.96) } to { opacity: 1; transform: none } }
- *   @keyframes chat-block-in   { from { opacity: 0; transform: translateX(-8px) }           to { opacity: 1; transform: none } }
- */
-
-/** `id` — 이 인용이 가리키는 소스 문서 식별자(옵셔널, M122). 배지 렌더 슬롯이 문서를 찾는 열쇠다. */
+/** `id` — 이 인용이 가리키는 소스 문서 식별자(옵셔널, 설계 정본 국소 추가 4차 step-1 — 상류 등재 대상). 배지 렌더 슬롯이 문서를 찾는 열쇠다. */
 export type ChatCitation = { n: number; title: string; id?: string }
-export type ReasoningStep = { title: string; body?: string; kind?: "think" | "search" }
+export type ReasoningStep = {
+  title: string
+  body?: string
+  kind?: "think" | "search"
+  /**
+   * 그 단계에서 **실제로 건진 자료** — 채널 이름표 + 제목 (6차 step-8b, 2026-09-15 사용자 육안).
+   * 집계 한 줄(`body`)이 「몇 건인지」를 말하고 이것이 「어느 것인지」를 말한다.
+   * 이름표가 앞 줄와 같으면 렌더가 비운다 — 같은 말이 세로로 반복되면 목록이 안 읽힌다.
+   */
+  found?: Array<{ label: string; name: string }>
+}
 
 export type ChatMessage = {
   id: string
@@ -26,6 +27,14 @@ export type ChatMessage = {
    * `steps` 가 없으면 `content` 한 문단.
    */
   reasoning?: { label: string; content?: string; steps?: ReasoningStep[] }
+  /**
+   * 이 답변 **앞에 옅은 구분선**을 긋는다 (2026-09-15 사용자 육안 ⑤ — 제미나이 노트북의 단계 구분선).
+   *
+   * ⚠ 본문 안(`---`)으로 그으면 **`reasoning` 아코디언보다 아래**에 선다. 아코디언은 답변 **위**에 서므로
+   *   그러면 선이 「아코디언 | 제목」 사이에 끼어 아코디언이 **앞 단계에 붙어** 보인다(실측으로 잡았다).
+   *   그래서 선은 본문이 아니라 **말풍선 바깥 맨 위**가 자리다.
+   */
+  sectionStart?: boolean
   /** M117 — 본문의 `[n]` 마커를 배지로 바꿔 끼운다. 렌더는 `renderCitation` 슬롯, 미제공 시 패널 자신의 22px 원 배지 */
   citations?: ChatCitation[]
 }
@@ -49,21 +58,18 @@ type ChatConversationPanelProps = {
   suggestions?: string[]
   onSuggestion?: (suggestion: string) => void
   /**
-   * 「직접 입력」 칩(M122). 이 라벨의 칩은 답으로 보내지 않고
-   * **입력창에 포커스**만 준다 — 칩이 뜨는 모든 화면에 자유 입력의 문이 있어야 한다(실소비자 사용자 피드백 A7).
+   * 「직접 입력」 칩(3차 step-7 — 설계 정본 국소 추가, 상류 등재 대상). 이 라벨의 칩은 답으로 보내지 않고
+   * **입력창에 포커스**만 준다 — 칩이 뜨는 모든 화면에 자유 입력의 문이 있어야 한다(사용자 피드백 A7).
    */
   directInputLabel?: string
   /**
-   * 칩 주석(M122). 라벨 옆에 작은 회색 글자 — 예: 승인 칩 옆 「로드맵 1회 소진」.
-   * 누르면 무엇이 줄어드는지를 누르기 **전에** 말한다(실소비자 문구 정본 §3-2).
+   * 칩 주석(3차 step-7 — 설계 정본 국소 추가, 상류 등재 대상). 라벨 옆에 작은 회색 글자 — 예: 승인 칩 옆 「로드맵 1회 소진」.
+   * 누르면 무엇이 줄어드는지를 누르기 **전에** 말한다(문구 정본 §3-2).
    */
   suggestionNotes?: Record<string, string>
-  /**
-   * 칩 아래 **고른 이유 한 줄**(M123 — 실소비자 승격, 참조 구현 5차 step-6). 라벨 → 이유. 이유가 있는 칩만 두 줄
-   * 둥근 사각이 되고, 없는 칩은 종전대로 한 줄 알약으로 선다 — 승인 칩·후속 칩·첫 화면은 이 prop 을 비워 종전 모양 그대로다.
-   */
+  /** 칩 아래 **고른 이유 한 줄**(5차 step-6 · D3). 라벨 → 이유. 없는 칩은 종전대로 한 줄 알약으로 선다 */
   suggestionReasons?: Record<string, string>
-  /** 「추천」 표시가 붙는 칩의 라벨(M123). 정확히 하나. 그 칩을 맨 위에 놓는 정렬은 호출 측이 한다 */
+  /** 추천 표시가 붙는 칩의 라벨. 정확히 하나이고, 그 칩을 맨 위에 놓는 것은 호출 측이 한다 */
   recommendedSuggestion?: string
   /** M117 — 입력창 우측 근거 범위(「소스 N개」) */
   scopeLabel?: string
@@ -72,35 +78,29 @@ type ChatConversationPanelProps = {
   onDraftChange?: (draft: string) => void
   /** M117 grounded — 패널 머리(49h + 하단선): 제목 + 아이콘 버튼 2(구성·옵션). 주지 않으면 머리 없음 */
   title?: string
-  /** grounded 헤더의 「노트북 구성」·「채팅 옵션」 아이콘. 기능을 배선하지 않은 소비자는 끈다(M122) */
+  /** grounded 헤더의 「노트북 구성」·「채팅 옵션」 아이콘. 기능을 배선하지 않은 소비자는 끈다(설계 정본 국소 추가 M5 4차 보강 3 — 상류 등재 대상) */
   showHeaderActions?: boolean
   /** M117 grounded — 빈 상태 인사 블록(👋 + 32px 제목). `emptyHint` 가 본문, `suggestionsPrompt` 가 칩 위 굵은 유도 문장 */
   emptyTitle?: string
-  /** 빈 상태 인사 그림(M123). 안 주면 종전 lucide 손 아이콘 — 브랜드 그림체를 쓰려는 소비자가 넘긴다 */
+  /** 빈 상태 인사 그림. 안 주면 lucide 손 아이콘이 선다 — 브랜드 그림체를 쓰려면 앱이 넘긴다. */
   emptyIcon?: ReactNode
   suggestionsPrompt?: string
   /**
-   * 입력창 안내 문구(M122 보강 — 실소비자 승격). 종전에는 「소스에 대해 물어보세요」가 박혀 있었다.
-   * 이 패널은 문서 Q&A 말고 다른 대화에도 쓰이므로 문구를 소비자가 정한다. 안 주면 종전 문구 그대로.
+   * 입력창 안내 문구(M5 확장 2차 step-4 — 설계 정본 국소 추가, 상류 등재 대상).
+   * 종전에는 「소스에 대해 물어보세요」가 박혀 있었다. 이 패널은 문서 Q&A 말고 다른 대화에도 쓰이므로
+   * 문구를 소비자가 정한다. 안 주면 종전 문구 그대로.
    */
   composerPlaceholder?: string
   /**
-   * 어시스턴트 마크(M122 — 실소비자 승격). `grounded` 답변은 버블 없는 산문이라 「누가 말하는가」가 화면에 없다.
-   * **연속한 어시스턴트 줄에는 그 구간에 한 번만 그린다** — 줄마다 반복하면 조사 중계처럼 줄이 길게 쌓일 때
-   * 아바타가 화면을 잡아먹는다(실측: 어시스턴트 9줄 → 마크 6개).
-   * `status === "waiting"` 이면 점 3개 스피너 대신 **이 마크 + `waitingLabel`** 이 그 자리에 선다.
+   * 어시스턴트 마크(M5 확장 2차 step-4 → 3차 step-4 — 설계 정본 국소 추가, 상류 등재 대상).
+   * **연속한 어시스턴트 줄에는 마지막 줄 아래에만 그린다**(사용자 재확인 2026-09-13 — 「답변 아래로」). 줄마다 반복하면
+   * 조사 중계처럼 줄이 길게 쌓일 때 화면을 아바타가 잡아먹는다(설계 실측 전제).
+   * `status === "waiting"` 이면 점 3개 스피너 대신 **이 마크 + `waitingLabel`** 이 그 자리에 선다 — 그동안 맨 끝
+   * 구간의 아래 마크는 그리지 않는다(마크 2개·문구 2줄 겹침 방지).
    */
   renderAssistantMark?: () => ReactNode
   /**
-   * 마크를 구간의 **어디**에 두는가 (M122 — 계약 옵션).
-   * `leading`(기본) = 구간 첫 줄 **위**. 말하는 주체를 먼저 세우는 보통의 대화 화면.
-   * `trailing` = 구간 마지막 줄 **아래** — 생각 중 스피너와 같은 자리라 「진행 중계」 화면에서 마크가 한 자리에
-   * 머문다(실소비자가 계약을 뒤집어야 했던 자리). `trailing` 이고 대기 중이면 맨 끝 구간의 아래 마크는
-   * 그리지 않는다 — 대기 줄이 그 마크를 대신 들고 있어 마크 2개가 겹친다.
-   */
-  assistantMarkPlacement?: "leading" | "trailing"
-  /**
-   * 생각 중 한 줄(M122) — 스피너 자리에 마크와 함께 뜨는 「지금 하는 일」. 조사 중계의 마지막 활동 줄이
+   * 생각 중 한 줄(3차 step-4) — 스피너 자리에 마크와 함께 뜨는 「지금 하는 일」. 조사 중계의 마지막 활동 줄이
    * 여기로 들어온다. 안 주면 기본 문구. `renderAssistantMark` 가 없으면 종전 점 3개 스피너 그대로다.
    */
   waitingLabel?: string
@@ -110,14 +110,20 @@ type ChatConversationPanelProps = {
   onFeedback?: (message: ChatMessage, v: "up" | "down") => void
   saveNoteLabel?: string
   className?: string
+  /**
+   * 어시스턴트 마크를 구간의 어디에 둘지 정한다(M122 — 실소비자 승격, 계약 옵션).
+   * `leading`(기본) = 구간 첫 줄 위. `trailing` = 구간 마지막 줄 아래.
+   * 우리 App.tsx 는 `trailing` 을 넘긴다 — 정본 패널은 원래 trailing 전용이라 이 prop 을 받으면 정본 행동에 `leading` 선택지 하나가 더해진다.
+   */
+  assistantMarkPlacement?: "leading" | "trailing"
 }
 
 const ROOT_CLASS = "flex h-[24rem] w-full max-w-md flex-col overflow-hidden rounded-lg border bg-background"
 // M117 — 원본 관측(evidence §3): 사용자 버블 max-width 700 · 인용 배지 22 원 11px · Thoughts 36h · 제안 칩 40h ·
 // 머리 49h · 빈 상태 패딩 48 40 max 672 · 제목 32/40 · 입력창 r16 패딩 16 + 전송 원 40 · 액션 pill 32
 const BUBBLE_MAX_PX = 700
-const BADGE_PX = 22
-const BADGE_FONT_PX = 11
+const BADGE_PX = 18
+const BADGE_FONT_PX = 10
 const REASONING_PX = 36
 const REASONING_STEP_PX = 32
 const CHIP_PX = 40
@@ -130,10 +136,38 @@ const ZERO_TITLE_LINE_PX = 40
 const SEND_PX = 40
 const ACTION_PX = 32
 const ICON_BUTTON_PX = 36
-/** 답변 블록 등장 간격·상한 (M122 — 사용자 확정 ~80ms). 상한이 없으면 긴 답변의 꼬리가 몇 초 뒤에 뜬다. */
+/** 답변 블록 등장 간격·상한 (3차 step-5 — 사용자 확정 ~80ms). 상한이 없으면 긴 답변의 꼬리가 몇 초 뒤에 뜬다. */
 const BLOCK_STAGGER_MS = 80
 const BLOCK_STAGGER_MAX_MS = 800
 const STATE_LAYER = "motion-safe:transition-colors hover:bg-foreground/8"
+/** 대화 줄의 등장 전환. 말풍선·답변 본문이 쓰던 것과 같은 것을 부속 줄(마크·조사 과정·진행 줄·칩)에도 준다 —
+ *  이 넷이 빠져 있어 답변은 떠오르는데 그 아래 줄들만 튀어나왔다(2026-09-15 실측: 넷 다 `animation: none`). */
+/**
+ * 기다리는 동안의 경과 시간 (M5 확장 6차 step-5, 사용자 피드백 C
+ * 「여기 우측에, 에이전트가 생각하는 시간이 표시되면 좋겠어. 0초부터 해서 분 30초~~ 뭐 이렇게」).
+ *
+ * `active` 가 켜지는 **그 순간부터** 0 으로 다시 센다 — 턴이 바뀌면 앞 회차 값이 남지 않는다.
+ * 꺼지면 인터벌을 걷고 0 으로 되돌린다(값이 화면에 남는 자리는 없다 — 대기 줄 자체가 사라진다).
+ * ⚠ `motion-safe` 밖이다. 이건 장식이 아니라 **얼마나 걸리는지**를 말하는 정보라 감소모션에서도 돈다.
+ */
+function useElapsedSeconds(active: boolean): number {
+  const [sec, setSec] = useState(0)
+  useEffect(() => {
+    if (!active) { setSec(0); return }
+    const started = Date.now()
+    setSec(0)
+    const id = setInterval(() => setSec(Math.floor((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [active])
+  return sec
+}
+
+/** `12초` · `1분 0초` · `1분 30초`. 60초를 넘으면 분을 앞세우고 **초가 0 이어도 적는다**(숫자가 도는 게 보여야 한다). */
+export function formatElapsed(sec: number): string {
+  return sec < 60 ? `${sec}초` : `${Math.floor(sec / 60)}분 ${sec % 60}초`
+}
+
+const ENTER_IN = "motion-safe:animate-[chat-message-in_0.24s_cubic-bezier(0.2,0.8,0.25,1)]"
 
 function GroundedIconButton({ label, size = ICON_BUTTON_PX, className, ...rest }: { label: string; size?: number } & React.ComponentProps<"button">) {
   return (
@@ -157,7 +191,7 @@ function DefaultCitationBadge({ citation }: { citation: ChatCitation }) {
 
 /** 본문 `[n]` 마커 → 배지 (해당 citation 이 없으면 문자열 그대로 둔다 — 조용히 사라지지 않는다) */
 /**
- * 답변 본문 렌더 (M122 — 실소비자 승격).
+ * 답변 본문 렌더 (M5 확장 2차 step-5 → 2차 보강 2026-09-13 사용자 지시).
  *
  * 모델은 **마크다운으로 답한다** — 제목·목록·굵게·문단으로 구조를 만들어 보낸다.
  * 그걸 평문으로 흘리면 별표와 붙임표가 그대로 보이고, 무엇보다 **답변 안의 구획이 사라진다**.
@@ -165,78 +199,140 @@ function DefaultCitationBadge({ citation }: { citation: ChatCitation }) {
  *
  * 전체 마크다운을 구현하지 않는다 — 답변에 실제로 나오는 블록만 받는다:
  *   `#`~`####` 제목 · `-`/`*`/`1.` 목록 · `---` 구분선 · 빈 줄로 나뉘는 문단.
- * 인라인은 `**굵게**` · `` `코드` `` · `[n]` 인용. 표·이미지·링크는 받지 않는다(답변 패널이
- * 문서 렌더러가 되는 순간 유지비가 본문보다 커진다).
+ * 인라인은 `**굵게**` · `` `코드` `` · `[n]` 인용 · `[글](주소)` 링크 · `![대체글](주소)` 이미지.
+ *
+ * ⚠ **표·링크·이미지는 6차 step-13 에서 받기 시작했다.** 5차까지는 「답변 패널이 문서 렌더러가 되는 순간
+ * 유지비가 본문보다 커진다」는 이유로 안 받았는데, 그 결과 **모델이 산출 지시를 어기고 표를 내면 화면에
+ * `| 항목 | 값 |` 가 글자 그대로 섰다**(5차 finding). 6차는 step-7·9 로 모델 자유도를 늘리므로 그 결함이
+ * 더 자주 발현된다 — 그래서 여기서 닫는다. 받는 것은 **이 셋뿐**이고 각주·인용문·중첩 표는 여전히 안 받는다.
  */
 type InlineCtx = { citations?: ChatCitation[]; render?: (c: ChatCitation, i: number) => ReactNode }
 
-const INLINE_RE = /\[(\d+)\]|\*\*([^*]+)\*\*|`([^`]+)`/g
+/**
+ * ⚠ **차례가 뜻을 정한다.** 이미지(`![…](…)`)를 링크보다 먼저, 링크(`[…](…)`)를 인용(`[n]`)보다 먼저 본다 —
+ * 링크를 뒤에 두면 `[3](https://…)` 의 앞머리가 인용으로 먼저 잡혀 주소가 글자로 샌다.
+ */
+const INLINE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|\[(\d+)\]|\*\*([^*]+)\*\*|`([^`]+)`/g
 
-function renderInline(text: string, ctx: InlineCtx, keyPrefix: string): ReactNode[] {
-  return renderInlineInner(text, ctx, keyPrefix, 0)[0]
+/**
+ * 화면에 실을 수 있는 주소인가. **`javascript:` 같은 스킴을 막는다** — 모델이 낸 문자열이 그대로 `href` 가 되는 자리다.
+ * 허용은 `http`·`https` 와 페이지 안 앵커뿐이다.
+ */
+function safeUrl(raw: string): string | null {
+  const u = String(raw ?? "").trim()
+  if (!u) return null
+  if (u.startsWith("#")) return u
+  return /^https?:\/\//i.test(u) ? u : null
 }
 
-function renderInlineInner(
-  text: string,
-  ctx: InlineCtx,
-  keyPrefix: string,
-  startN: number,
-): [ReactNode[], number] {
-  if (!text) return [[], 0]
+/**
+ * 인라인 조각을 그린다. `startN` 은 **배지 순번의 이어달리기**다 — 굵은 글씨 안을 재귀로 훑을 때
+ * 번호가 1부터 다시 시작하면 같은 문단에 같은 번호가 두 번 선다.
+ */
+function renderInline(text: string, ctx: InlineCtx, keyPrefix: string): ReactNode[] {
+  return renderInlineParts(text, ctx, keyPrefix, 0).nodes
+}
+
+function renderInlineParts(text: string, ctx: InlineCtx, keyPrefix: string, startN = 0): { nodes: ReactNode[]; used: number } {
   const out: ReactNode[] = []
-  // 모듈 전역 INLINE_RE는 g 플래그라 lastIndex를 건드린다. 재귀 호출이 그 값을 덮어쓰면
-  // 바깥 반복문이 안 끝나므로, 함수 안에서 source로 새 정규식을 매번 만든다(전역은 그대로).
-  const re = new RegExp(INLINE_RE.source, "g")
   let last = 0
   let n = startN
   let m: RegExpExecArray | null
-  let k = 0
+  /**
+   * ⚠ **호출마다 제 정규식을 쓴다.** `INLINE_RE` 는 모듈 전역 `/g` 라 `lastIndex` 를 들고 있는데,
+   *   굵은 글씨 안을 재귀로 훑으면 안쪽 호출이 그 값을 덮어써 **바깥 루프가 끝나지 않는다**
+   *   (실측: probe 가 스택을 태우고 죽었다). 재귀를 넣는 순간 공유 상태가 사고가 된다.
+   */
+  const re = new RegExp(INLINE_RE.source, "g")
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index))
-    const key = `${keyPrefix}-${k++}`
-    if (m[1] !== undefined) {
-      const n1 = Number(m[1])
-      const c = ctx.citations?.find((x) => x.n === n1)
+    const key = `${keyPrefix}-${m.index}`
+    if (m[2] !== undefined) {
+      // 이미지 — 주소가 안전할 때만 그린다. 아니면 대체글만 남긴다(주소를 글자로 흘리지 않는다).
+      const src = safeUrl(m[2])
+      const alt = m[1] ?? ""
+      out.push(
+        src ? (
+          <img key={key} src={src} alt={alt} loading="lazy" className="my-1 max-h-72 max-w-full rounded-lg border border-border object-contain" />
+        ) : (
+          <span key={key}>{alt}</span>
+        ),
+      )
+    } else if (m[4] !== undefined) {
+      // 링크 — 막힌 스킴이면 **글만 남긴다**. 죽은 링크를 만드느니 글로 두는 쪽이 낫다.
+      const href = safeUrl(m[4])
+      const label = m[3] ?? ""
+      out.push(
+        href ? (
+          <a key={key} href={href} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 hover:text-foreground">
+            {label}
+          </a>
+        ) : (
+          <span key={key}>{label}</span>
+        ),
+      )
+    } else if (m[5] !== undefined) {
+      const c = ctx.citations?.find((x) => x.n === Number(m![5]))
       // 인용 목록에 없는 번호는 글자 그대로 둔다 — 없는 자료를 가리키는 배지를 만들지 않는다.
       if (c) {
-        out.push(
-          <span key={key}>
-            {ctx.render ? ctx.render(c, n) : <DefaultCitationBadge citation={c} />}
-          </span>,
-        )
+        out.push(<span key={key}>{ctx.render ? ctx.render(c, n) : <DefaultCitationBadge citation={c} />}</span>)
         n += 1
       } else out.push(m[0])
-    } else if (m[2] !== undefined) {
-      // 굵은 글씨 안쪽도 다시 훑는다 — 모델이 심은 [n] 이 배지 로 나오게.
-      const [inner, used] = renderInlineInner(m[2], ctx, `${keyPrefix}-b`, n)
-      out.push(<strong key={key} className="font-semibold">{inner}</strong>)
-      n += used
+    } else if (m[6] !== undefined) {
+      /**
+       * ⚠ **굵은 글씨 안도 다시 훑는다** (2026-09-15 실측 — 배지가 통째로 사라졌다).
+       *
+       * 6차가 판정 문장을 `**…**` 로 싸기 시작했는데, 그 문장에는 모델이 심은 `[n]` 이 들어 있다.
+       * 안쪽을 그대로 뱉으면 그 마커가 **글자 그대로** 화면에 남는다 — 실측에서 배지 0개,
+       * `[1][2][3]` 이 굵은 글씨 안에 날것으로 섰다. 5차까지는 굵은 자리에 계약 값만 들어가서 안 드러났다.
+       *
+       * `n`(배지 순번)은 재귀 호출과 **공유되어야** 번호가 이어진다 — 그래서 되돌려 받아 더한다.
+       */
+      const inner = renderInlineParts(m[6], ctx, `${key}-b`, n)
+      n += inner.used
+      out.push(
+        <strong key={key} className="font-semibold">
+          {inner.nodes}
+        </strong>,
+      )
     } else {
       out.push(
         <code key={key} className="rounded bg-muted px-1 py-0.5 text-[0.9em]">
-          {m[3]}
+          {m[7]}
         </code>,
       )
     }
     last = m.index + m[0].length
   }
   if (last < text.length) out.push(text.slice(last))
-  return [out, n - startN]
+  return { nodes: out, used: n - startN }
 }
 
 const HEADING_RE = /^(#{1,4})\s+(.*)$/
-const BULLET_RE = /^\s*[-*]\s+(.*)$/
-const ORDERED_RE = /^\s*(\d+)[.)]\s+(.*)$/
+/**
+ * 파이프 표 (6차 step-13). 첫 줄이 `| a | b |`, 둘째 줄이 `|---|---|` 이면 표로 본다.
+ * 둘째 줄(구분선)을 **함께 요구하는** 이유: 그것 없이 파이프만 보면 산문 속 `|` 가 표로 오인된다.
+ */
+const TABLE_ROW_RE = /^\s*\|(.+)\|\s*$/
+const TABLE_SEP_RE = /^\s*\|[\s:|-]+\|\s*$/
+/** `| a | b |` → `["a","b"]`. 양끝 파이프를 이미 뗀 몸통을 받는다. */
+function tableCells(body: string): string[] {
+  return body.split("|").map((c) => c.trim())
+}
+const BULLET_RE = /^(\s*)[-*]\s+(.*)$/
+const ORDERED_RE = /^(\s*)(\d+)[.)]\s+(.*)$/
 const RULE_RE = /^\s*(-{3,}|\*{3,}|_{3,})\s*$/
 
 /** 본문 → 블록 노드들. 빈 줄이 문단을 가르고, 목록은 연속한 줄을 하나로 묶는다. */
-/** export — 좌 패널 자료 카드도 같은 렌더러로 그린다(M122). `ctx` 는 `{}` 여도 된다. */
+/** export — 좌 패널 자료 카드도 같은 렌더러로 그린다(설계 정본 국소 4차 step-12, 상류 등재 대상). `ctx` 는 `{}` 여도 된다. */
 export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
   const lines = text.split("\n")
   const blocks: ReactNode[] = []
   let para: string[] = []
   // 번호 목록은 **원래 번호를 들고 다닌다** — `<ol>` 에 맡기면 1 부터 다시 센다.
-  let list: { ordered: boolean; items: { num: number; text: string }[] } | null = null
+  // `depth` 는 2단까지만 본다 (2026-09-16 사용자 지시 — 「2단 같이 표현할 수 있을거고(사용될 일 생길 경우에만)」).
+  // 3단 이상은 화면에서 읽히지 않아 2단으로 접는다.
+  let list: { ordered: boolean; items: { num: number; text: string; depth: number }[] } | null = null
   let k = 0
 
   const flushPara = () => {
@@ -265,20 +361,37 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
       list = null
       return
     }
-    const cls = "flex flex-col gap-1 break-keep pl-5 " + (ordered ? "list-decimal" : "list-disc")
+    const cls = "flex flex-col gap-2 break-keep pl-5 " + (ordered ? "list-decimal" : "list-disc")
+    /**
+     * 2단 목록 (2026-09-16 사용자 지시). 종전에는 들여쓰기를 안 봐서 **하위 항목이 상위와 같은 줄에 평평하게** 섰다.
+     * 깊은 항목은 **바로 앞 항목 안쪽**으로 넣는다 — 앞이 없으면(첫 줄부터 들여쓴 경우) 그냥 1단으로 둔다.
+     * 하위 목록의 기호는 속이 빈 동그라미(`list-[circle]`)라 눈으로 단이 갈린다.
+     */
+    const tree: { it: { num: number; text: string; depth: number }; kids: { num: number; text: string; depth: number }[] }[] = []
+    for (const it of items) {
+      if (it.depth > 0 && tree.length) tree[tree.length - 1].kids.push(it)
+      else tree.push({ it, kids: [] })
+    }
+    const renderItems = (key: string) =>
+      tree.map((node, i) => (
+        <li key={i}>
+          {renderInline(node.it.text, ctx, `${key}-${i}`)}
+          {node.kids.length ? (
+            <ul className="mt-2 flex list-[circle] flex-col gap-2 break-keep pl-5">
+              {node.kids.map((kid, j) => (
+                <li key={j}>{renderInline(kid.text, ctx, `${key}-${i}-${j}`)}</li>
+              ))}
+            </ul>
+          ) : null}
+        </li>
+      ))
     blocks.push(
       ordered ? (
-        <ol key={`l${k++}`} className={cls} start={items[0].num}>
-          {items.map((it, i) => (
-            <li key={i}>{renderInline(it.text, ctx, `l${k}-${i}`)}</li>
-          ))}
+        <ol key={`l${k++}`} className={cls} start={tree[0].it.num}>
+          {renderItems(`l${k}`)}
         </ol>
       ) : (
-        <ul key={`l${k++}`} className={cls}>
-          {items.map((it, i) => (
-            <li key={i}>{renderInline(it.text, ctx, `l${k}-${i}`)}</li>
-          ))}
-        </ul>
+        <ul key={`l${k++}`} className={cls}>{renderItems(`l${k}`)}</ul>
       ),
     )
     list = null
@@ -288,15 +401,59 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
     flushList()
   }
 
-  for (const raw of lines) {
-    const line = raw.trimEnd()
+  // ⚠ 인덱스 루프다 — 표는 **다음 줄(구분선)** 을 봐야 시작을 알 수 있고, 먹은 줄만큼 건너뛰어야 한다.
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li].trimEnd()
     if (!line.trim()) {
       flushAll()
       continue
     }
     if (RULE_RE.test(line)) {
       flushAll()
-      blocks.push(<hr key={`h${k++}`} className="my-1 border-0 border-t border-border" />)
+      blocks.push(<hr key={`h${k++}`} className="my-5 border-0 border-t border-border" />)
+      continue
+    }
+    // 표 — 이 줄이 표 행이고 **다음 줄이 구분선**이면 거기서부터 표가 시작된다.
+    const asRow = TABLE_ROW_RE.exec(line)
+    if (asRow && TABLE_SEP_RE.test((lines[li + 1] ?? "").trimEnd())) {
+      flushAll()
+      const header = tableCells(asRow[1])
+      const rows: string[][] = []
+      let j = li + 2
+      while (j < lines.length) {
+        const nextRow = TABLE_ROW_RE.exec(lines[j].trimEnd())
+        if (!nextRow) break
+        rows.push(tableCells(nextRow[1]))
+        j += 1
+      }
+      li = j - 1 // 바깥 루프가 ++ 하므로 마지막으로 먹은 줄을 가리켜 둔다
+      blocks.push(
+        <div key={`tb${k++}`} className="my-1 overflow-x-auto">
+          <table className="w-full border-collapse text-[0.95em]">
+            <thead>
+              <tr>
+                {header.map((c, i) => (
+                  <th key={i} className="border border-border bg-muted px-2 py-1 text-left font-medium break-keep">
+                    {renderInline(c, ctx, `tb${k}-h${i}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri}>
+                  {/* 머리 칸 수에 맞춘다 — 모자라면 빈 칸, 넘치면 버린다. 어긋난 표가 레이아웃을 깨지 않게. */}
+                  {header.map((_, ci) => (
+                    <td key={ci} className="border border-border px-2 py-1 align-top break-keep">
+                      {renderInline(r[ci] ?? "", ctx, `tb${k}-${ri}-${ci}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      )
       continue
     }
     const head = HEADING_RE.exec(line)
@@ -308,7 +465,7 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
       blocks.push(
         <h3
           key={`t${k++}`}
-          className={cn("break-keep font-semibold", head[1].length <= 2 ? "text-base" : "text-[0.95em]", !first && "mt-2 border-t border-border pt-3")}
+          className={cn("break-keep font-semibold", head[1].length <= 2 ? "text-base" : "text-[0.95em]", !first && "mt-5 border-t border-border pt-5")}
         >
           {renderInline(head[2], ctx, `t${k}`)}
         </h3>,
@@ -322,7 +479,10 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
       const ordered = Boolean(ol)
       if (list && list.ordered !== ordered) flushList()
       if (!list) list = { ordered, items: [] }
-      list.items.push(ol ? { num: Number(ol[1]), text: ol[2] } : { num: 0, text: ul![1] })
+      // 들여쓴 칸 2개당 한 단 — 목록 기호 앞의 공백이 그대로 깊이다(탭은 2칸으로 친다).
+      const indent = (ol ? ol[1] : ul![1]).replace(/\t/g, "  ").length
+      const depth = Math.min(1, Math.floor(indent / 2))
+      list.items.push(ol ? { num: Number(ol[2]), text: ol[3], depth } : { num: 0, text: ul![2], depth })
       continue
     }
     flushList()
@@ -330,14 +490,14 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
   }
   flushAll()
 
-  // 블록 단위 등장(M122) — i 번째 블록이 i×80ms 뒤에 좌→우로 뜬다(상한 800ms). 진행 중계처럼 줄이 계속 붙는
-  // 대화에서 새 줄이 튀어 보이지 않게 한다. CSS 애니메이션이라 DOM 노드가 살아 있는 한 재렌더에 다시 돌지 않는다
-  // (키가 안정적이므로 이미 읽은 답변은 안 깜빡인다). `motion-safe:` 가 감소모션을 맡는다.
+  // 블록 단위 등장(3차 step-5, 사용자 피드백 A6) — i 번째 블록이 i×80ms 뒤에 좌→우로 뜬다(상한 800ms).
+  // CSS 애니메이션이라 DOM 노드가 살아 있는 한 재렌더에 다시 돌지 않는다(키가 안정적이므로 이미 읽은 답변은 안 깜빡인다).
+  // 움직임을 줄인 환경은 `index.css` 가 `animation: none` 으로 즉시 표시한다.
   const staged = blocks.map((b, i) =>
     isValidElement<{ className?: string; style?: CSSProperties }>(b)
       ? cloneElement(b as ReactElement<{ className?: string; style?: CSSProperties }>, {
-          className: cn(b.props.className, "motion-safe:animate-[chat-block-in_0.32s_cubic-bezier(0.2,0.8,0.25,1)_both]"),
-          style: { ...b.props.style, animationDelay: `${Math.min(i * BLOCK_STAGGER_MS, BLOCK_STAGGER_MAX_MS)}ms` },
+          className: cn(b.props.className, "chat-block-in"),
+          style: { ...b.props.style, ["--block-delay" as string]: `${Math.min(i * BLOCK_STAGGER_MS, BLOCK_STAGGER_MAX_MS)}ms` },
           ...({ "data-chat-block": i } as Record<string, unknown>),
         })
       : b,
@@ -345,7 +505,7 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
 
   if (staged.length === 1) return staged[0]
   return (
-    <div data-chat-markdown className="flex flex-col gap-2">
+    <div data-chat-markdown className="flex flex-col gap-4">
       {staged}
     </div>
   )
@@ -354,12 +514,18 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
 function Reasoning({ reasoning }: { reasoning: NonNullable<ChatMessage["reasoning"]> }) {
   const [open, setOpen] = useState(false)
   return (
-    <div data-chat-reasoning className="flex flex-col items-start">
+    <div data-chat-reasoning className={cn("flex flex-col items-start origin-bottom-left", ENTER_IN)}>
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={cn("inline-flex items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground outline-none ring-ring ring-offset-2 ring-offset-background focus-visible:ring-2", STATE_LAYER)}
+        /**
+         * 본문과 **같은 글자 크기·같은 왼쪽 선**에 세운다 (2026-09-15 사용자 지적, 실측으로 확인).
+         *   잰 값: 본문 글자 16px/24 · left 293 / 아코디언 라벨 14px/20 · left 321(+28) / 펼친 단계 줄 left 333(+40)
+         * `-ml-2` 는 버튼의 좌우 여백(`px-2`)을 상쇄해 **아이콘이 본문 첫 글자 자리에서 시작**하게 한다 —
+         * 여백을 지우는 대신 상쇄하는 이유는 눌리는 면적(STATE_LAYER)을 그대로 두기 위해서다.
+         */
+        className={cn("-ml-2 inline-flex items-center gap-1 rounded-lg px-2 text-base leading-6 text-muted-foreground outline-none ring-ring ring-offset-2 ring-offset-background focus-visible:ring-2", STATE_LAYER)}
         style={{ height: REASONING_PX }}
       >
         <SparkleIcon aria-hidden className="size-4" />
@@ -368,7 +534,7 @@ function Reasoning({ reasoning }: { reasoning: NonNullable<ChatMessage["reasonin
       </button>
       {open && reasoning.steps?.length ? (
         // 원본 §3 Thoughts 펼침 — 단계: 아이콘 20 + 제목 16/24(먹), 본문 16/24(회색)이 아이콘 중심 아래 세로 선(1px)에 걸려 들여쓰기
-        <ol data-chat-reasoning-steps className="mt-1 flex flex-col gap-1 pl-2">
+        <ol data-chat-reasoning-steps className="mt-1 flex flex-col gap-1">
           {reasoning.steps.map((st, i) => (
             <li key={i} data-chat-reasoning-step={st.kind ?? "think"} className="flex flex-col">
               <div className="flex items-center gap-3 text-base leading-6 text-foreground" style={{ minHeight: REASONING_STEP_PX }}>
@@ -376,15 +542,29 @@ function Reasoning({ reasoning }: { reasoning: NonNullable<ChatMessage["reasonin
                 <span className="break-keep">{renderInline(st.title, {}, `rs-${i}`)}</span>
               </div>
               {st.body ? (
-                <p className="mb-1 ml-2.5 break-keep border-l border-border pl-5 text-base leading-6 text-muted-foreground" style={{ paddingTop: 2, paddingBottom: 2 }}>
+                <p className="ml-2.5 break-keep border-l border-border pl-5 text-base leading-6 text-muted-foreground" style={{ paddingTop: 2, paddingBottom: 2 }}>
                   {st.body}
                 </p>
+              ) : null}
+              {/**
+                * 건진 자료의 **제목 목록** — 집계 줄 바로 아래, 같은 세로 선에 걸린다.
+                * 이름표 칸을 고정 폭으로 두는 이유는 제목들의 왼쪽 끝을 맞추기 위해서다(들쭉날쭉하면 훑어지지 않는다).
+                */}
+              {st.found?.length ? (
+                <ul className="mb-1 ml-2.5 flex flex-col border-l border-border pl-5 text-base leading-6">
+                  {st.found.map((f, j) => (
+                    <li key={j} className="flex gap-2 break-keep">
+                      <span className="w-16 shrink-0 text-muted-foreground/60">{j > 0 && st.found![j - 1].label === f.label ? "" : f.label}</span>
+                      <span className="min-w-0 flex-1 text-muted-foreground">{f.name}</span>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
             </li>
           ))}
         </ol>
       ) : open ? (
-        <p data-chat-reasoning-content className="mt-1 break-keep px-2 text-sm leading-6 text-muted-foreground">
+        <p data-chat-reasoning-content className="mt-1 break-keep text-base leading-6 text-muted-foreground">
           {reasoning.content}
         </p>
       ) : null}
@@ -393,8 +573,9 @@ function Reasoning({ reasoning }: { reasoning: NonNullable<ChatMessage["reasonin
 }
 
 /**
- * 칩 묶음. `reasons` 가 있는 칩만 아래에 **고른 이유 한 줄**이 붙고, `recommended` 칩에는 「추천」 표시가 붙는다(M123).
- * ⚠ 두 prop 이 비면 종전 모양 그대로 선다 — 빈 상태·마지막 답변 아래·인터뷰 칩이 같은 부품이라 한쪽만 바뀌지 않는다.
+ * 칩 묶음. `reasons` 가 있는 칩만 아래에 **고른 이유 한 줄**이 붙고, `recommended` 칩에는 표시가 붙는다(5차 step-6 · D3).
+ * ⚠ 이유가 없는 화면(승인 칩·완주 후 후속 칩·첫 화면)에서는 두 prop 이 비어 **종전 모양 그대로** 선다 —
+ *   이 셋이 같은 부품을 쓰므로 한쪽을 고치면 세 화면이 같이 바뀐다.
  */
 function Suggestions({
   items,
@@ -412,7 +593,7 @@ function Suggestions({
   directInputLabel?: string
 }) {
   return (
-    <div data-chat-suggestions className="flex flex-col items-start gap-2">
+    <div data-chat-suggestions className={cn("flex flex-col items-start gap-2 origin-bottom-left", ENTER_IN)}>
       {items.map((s) => {
         const why = reasons?.[s]
         const isRecommended = recommended === s && s !== directInputLabel
@@ -426,7 +607,7 @@ function Suggestions({
             onClick={() => onPick?.(s)}
             className={cn(
               "inline-flex max-w-full flex-col items-start justify-center border border-border px-5 text-left text-sm leading-6 outline-none ring-ring ring-offset-2 ring-offset-background focus-visible:ring-2",
-              // 한 줄짜리는 종전 그대로 알약, 이유가 붙어 두 줄이 되면 둥근 사각 — 알약은 두 줄에서 양 끝이 뭉개진다
+              // 한 줄짜리는 종전 그대로 알약, 이유가 붙어 두 줄이 되면 둥근 사각이 된다(알약은 두 줄에서 양 끝이 뭉개진다)
               why ? "gap-0.5 rounded-2xl py-2" : "rounded-full",
               isRecommended && "border-foreground",
               STATE_LAYER,
@@ -459,6 +640,19 @@ function Suggestions({
 }
 
 /**
+ * 이 메시지 앞의 어시스턴트 구간이 여기서 끝나는지 판정한다.
+ * trailing: messages[index + 1]?.role !== "assistant"
+ * leading: index === 0 || messages[index - 1]?.role !== "assistant"
+ */
+function endsAssistantRun(messages: ChatMessage[], index: number, trailing: boolean): boolean {
+  if (messages[index].role !== "assistant") return false
+  if (trailing) {
+    return index === messages.length - 1 || messages[index + 1]?.role !== "assistant"
+  }
+  return index === 0 || messages[index - 1]?.role !== "assistant"
+}
+
+/**
  * Chat conversation panel: a bounded message thread (`role="log"` polite live
  * region) above a single input bar. The thread owns its own scroll and pins to
  * the newest message; waiting and error are explicit thread entries — a
@@ -466,13 +660,46 @@ function Suggestions({
  * only action is Retry. `break-keep` keeps CJK sentences from splitting
  * mid-word inside narrow bubbles.
  *
- * M117 보강(옵트인 — 기본 렌더 무변경): `reasoning`·`citations` + `renderCitation` 슬롯 · `suggestions` 세로 칩 ·
- * `scopeLabel` 근거 범위 · `draft` 제어 · `variant="grounded"`. 관측 근거 `evidence/m117/…observation.md` §3.
+ * 정본 기반(목표화면): 3차 step-4 trailing 마크 + 6차 step-5 경과 시간 + 6차 step-8b found 목록 + 6차 step-13 표·링크·이미지.
+ * 우리 App.tsx 가 넘기는 `assistantMarkPlacement` 는 정본에 없는 계약 옵션이라 여기서 살려 둔다 — 값이 `leading` 이면
+ * 마크를 구간 첫 줄 위에 두고, `trailing`(정본·우리 호출부 기본값) 이면 정본대로 마지막 줄 아래에 둔다.
  */
-export function ChatConversationPanel({ messages, status, onSend, onRetry, emptyHint, variant = "default", renderCitation, suggestions, onSuggestion, scopeLabel, draft: draftProp, onDraftChange, title, showHeaderActions = true, emptyTitle, suggestionsPrompt, onSaveNote, onCopy, onFeedback, saveNoteLabel = "메모에 저장", composerPlaceholder = "소스에 대해 물어보세요", renderAssistantMark, assistantMarkPlacement = "leading", waitingLabel, directInputLabel, suggestionNotes, suggestionReasons, recommendedSuggestion, emptyIcon, className }: ChatConversationPanelProps) {
+export function ChatConversationPanel({
+  messages,
+  status,
+  onSend,
+  onRetry,
+  emptyHint,
+  variant = "default",
+  renderCitation,
+  suggestions,
+  onSuggestion,
+  scopeLabel,
+  draft: draftProp,
+  onDraftChange,
+  title,
+  showHeaderActions = true,
+  emptyTitle,
+  emptyIcon,
+  suggestionsPrompt,
+  onSaveNote,
+  onCopy,
+  onFeedback,
+  saveNoteLabel = "메모에 저장",
+  composerPlaceholder = "소스에 대해 물어보세요",
+  renderAssistantMark,
+  waitingLabel,
+  directInputLabel,
+  suggestionNotes,
+  suggestionReasons,
+  recommendedSuggestion,
+  className,
+  assistantMarkPlacement = "trailing",
+}: ChatConversationPanelProps) {
+  const waitingSeconds = useElapsedSeconds(status === "waiting")
   const [draftState, setDraftState] = useState("")
   const composerRef = useRef<HTMLTextAreaElement>(null)
-  // 「직접 입력」은 답이 아니라 문이다 — 보내지 않고 입력창으로 포커스만 옮긴다(M122).
+  // 「직접 입력」은 답이 아니라 문이다 — 보내지 않고 입력창으로 포커스만 옮긴다(3차 step-7).
   const pick = (s: string) => {
     if (directInputLabel && s === directInputLabel) {
       composerRef.current?.focus()
@@ -487,6 +714,7 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
   }
   const threadRef = useRef<HTMLDivElement>(null)
   const grounded = variant === "grounded"
+  const trailing = assistantMarkPlacement === "trailing"
 
   useEffect(() => {
     const thread = threadRef.current
@@ -524,7 +752,7 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
           )}
         </header>
       ) : null}
-      {/* ⚠ `relative` 는 장식이 아니라 **스크롤 가둠의 조건**이다 (M122 보강 — 실소비자 승격).
+      {/* ⚠ `relative` 는 장식이 아니라 **스크롤 가둠의 조건**이다 (M5 확장 2차 step-6).
           말풍선마다 든 `sr-only` 스팬은 `position:absolute` 인데, 위치 기준 조상이 없으면
           컨테이닝 블록이 최초 컨테이닝 블록(뷰포트)이 된다 — 그러면 이 상자의 `overflow-y-auto`
           가 **그 스팬들을 못 자르고** 문서 전체가 말풍선 수만큼 길어진다(실측 1280×800·80줄에서
@@ -561,29 +789,22 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
             message.role === "assistant"
               ? renderMarkdown(message.text, { citations: message.citations, render: renderCitation })
               : message.text
-          // 마크는 연속한 어시스턴트 구간에 한 번만 (M122). `leading` = 구간 첫 줄 위, `trailing` = 마지막 줄 아래.
-          // `trailing` 인데 지금 답을 만드는 중이면 맨 끝 구간의 마크는 대기 줄이 대신 들고 있으므로 여기서는 그리지 않는다.
-          const trailing = assistantMarkPlacement === "trailing"
-          const atRunEdge =
-            message.role === "assistant" && (trailing ? messages[index + 1]?.role !== "assistant" : messages[index - 1]?.role !== "assistant")
-          const suppressed = trailing && status === "waiting" && index === messages.length - 1
-          const mark = renderAssistantMark && atRunEdge && !suppressed ? renderAssistantMark() : null
+          // 마크는 연속한 어시스턴트 구간의 어디에 둘지는 `assistantMarkPlacement` 가 정한다(우리 것 살려 둠).
+          // 정본(3차 step-4): trailing 이면 마지막 줄 아래만. 대기 중 맨 끝 구간 마크는 스피너가 대신 들고 있으므로 생략.
+          const trailingWhileWaiting = trailing && status === "waiting" && index === messages.length - 1
+          const mark = renderAssistantMark && endsAssistantRun(messages, index, trailing) && !trailingWhileWaiting ? renderAssistantMark() : null
           if (grounded && message.role === "assistant") {
             return (
-              <div key={message.id} data-chat-grounded-answer className="flex flex-col items-start gap-1">
-                {mark && !trailing ? (
-                  <div data-chat-assistant-mark className="flex items-center gap-2 pb-0.5">
-                    {mark}
-                  </div>
-                ) : null}
+              <div key={message.id} data-chat-grounded-answer className="flex w-full flex-col items-start gap-1">
+                {message.sectionStart ? <hr data-chat-section-rule className="mb-2 w-full border-0 border-t border-border" /> : null}
                 {message.reasoning && <Reasoning reasoning={message.reasoning} />}
                 {/* 블록(제목·목록·구분선)을 담아야 하므로 `p` 가 아니라 `div` 다 — `p` 안에 `ul`/`hr` 은 못 넣는다. */}
                 <div className="max-w-full break-keep text-base leading-6 text-foreground motion-safe:animate-[chat-message-in_0.24s_cubic-bezier(0.2,0.8,0.25,1)] origin-bottom-left">
                   <span className="sr-only">Assistant: </span>
                   {body}
                 </div>
-                {mark && trailing ? (
-                  <div data-chat-assistant-mark className="flex items-center gap-2 pt-0.5">
+                {mark ? (
+                  <div data-chat-assistant-mark className={cn("flex items-center gap-2 pt-0.5 origin-bottom-left", ENTER_IN)}>
                     {mark}
                   </div>
                 ) : null}
@@ -610,12 +831,8 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
           }
           return (
             <Fragment key={message.id}>
-              {mark && !trailing ? (
-                <div data-chat-assistant-mark className="flex items-center gap-2 pb-0.5">
-                  {mark}
-                </div>
-              ) : null}
-              <div className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
+            {message.sectionStart ? <hr data-chat-section-rule className="my-2 w-full border-0 border-t border-border" /> : null}
+            <div className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
               {message.reasoning && message.role === "assistant" ? <Reasoning reasoning={message.reasoning} /> : null}
               <div
                 className={cn(
@@ -634,8 +851,8 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
                 {body}
               </div>
             </div>
-              {mark && trailing ? (
-                <div data-chat-assistant-mark className="flex items-center gap-2 pt-0.5">
+              {mark ? (
+                <div data-chat-assistant-mark className={cn("flex items-center gap-2 pt-0.5 origin-bottom-left", ENTER_IN)}>
                   {mark}
                 </div>
               ) : null}
@@ -644,19 +861,23 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, empty
         })}
         {status === "waiting" ? (
           renderAssistantMark ? (
-            // 생각 중(M122) — 점 3개 대신 **마크 + 지금 하는 일 한 줄**. 마크가 숨 쉬듯 깜빡여 「살아 있다」를 말한다.
-            <div data-chat-waiting className="flex items-center gap-2" aria-live="polite">
+            // 생각 중(3차 step-4) — 점 3개 대신 **마크 + 지금 하는 일 한 줄**. 마크가 숨 쉬듯 깜빡여 「살아 있다」를 말한다.
+            <div data-chat-waiting className={cn("flex items-center gap-2 origin-bottom-left", ENTER_IN)} aria-live="polite">
               <span data-chat-assistant-mark className="flex shrink-0 items-center motion-safe:animate-pulse">
                 {renderAssistantMark()}
               </span>
               <span data-chat-waiting-label className="break-keep text-sm leading-6 text-muted-foreground">
                 {waitingLabel ?? "생각하는 중…"}
               </span>
+              {/* 경과 시간 — 문구 오른쪽. `tabular-nums` 라 숫자가 바뀌어도 폭이 안 흔들린다(옆 문구가 밀리면 읽기 싫어진다). */}
+              <span data-chat-waiting-elapsed className="shrink-0 text-sm leading-6 text-muted-foreground/70 tabular-nums">
+                {formatElapsed(waitingSeconds)}
+              </span>
               <span className="sr-only">Assistant is typing</span>
             </div>
           ) : (
           <div className="flex justify-start" aria-hidden="false">
-            <div className="flex items-center gap-1 rounded-lg rounded-bl-sm bg-muted px-3 py-2.5">
+            <div className={cn("flex items-center gap-1 rounded-lg rounded-bl-sm bg-muted px-3 py-2.5 origin-bottom-left", ENTER_IN)}>
               <span className="sr-only">Assistant is typing</span>
               {[0, 1, 2].map((dot) => (
                 <span
@@ -816,7 +1037,7 @@ export function ChatConversationPanelDemo() {
       demoMessageId += 1
       setMessages((current) => [
         ...current,
-        { id: `m-${demoMessageId}`, role: "assistant", text: `Echoing back: "${userText}" — 한국어 문장도 단어 중간에서 잘리지 않고 줄바꿈됩니다.` },
+        { id: `m-${demoMessageId}`, role: "assistant", text: `Echoing back: \"${userText}\" — 한국어 문장도 단어 중간에서 잘리지 않고 줄바꿈됩니다.` },
       ])
       setStatus("idle")
     }, 900)
@@ -856,6 +1077,12 @@ export const chatGroundedDemoMessages: ChatMessage[] = [
   },
 ]
 export const chatGroundedDemoSuggestions = ["semantic 토큰만 참조하면 다크 모드에서 무엇이 달라지나요?", "무대와 카드의 명도 순서를 라이트·다크에서 비교해 주세요", "타일 tint 가 다크에서 hue 를 유지해야 하는 이유는?"]
+export const chatGroundedDemoZero = {
+  title: "노트북을 시작해 보세요...",
+  hint: "새로운 것을 이해하고, 만들고, 발전시킬 수 있는 나만의 빈 캔버스입니다. 시작을 도와드릴 수도 있고 아니면 직접 소스를 추가해도 됩니다.",
+  prompt: "이 노트북이 어떤 도움을 주기를 바라시나요?",
+  suggestions: ["새로운 주제에 관해 알아보기", "새로운 항목 만들기", "프로젝트 진행하기"],
+}
 
 export function ChatConversationPanelGroundedDemo() {
   const [messages, setMessages] = useState<ChatMessage[]>(chatGroundedDemoMessages)
@@ -888,12 +1115,4 @@ export function ChatConversationPanelGroundedDemo() {
       onFeedback={() => {}}
     />
   )
-}
-
-/** 빈 노트북 인사 문안 — 원본 §3 빈 상태(제목·본문·유도 문장) */
-export const chatGroundedDemoZero = {
-  title: "노트북을 시작해 보세요...",
-  hint: "새로운 것을 이해하고, 만들고, 발전시킬 수 있는 나만의 빈 캔버스입니다. 시작을 도와드릴 수도 있고 아니면 직접 소스를 추가해도 됩니다.",
-  prompt: "이 노트북이 어떤 도움을 주기를 바라시나요?",
-  suggestions: ["새로운 주제에 관해 알아보기", "새로운 항목 만들기", "프로젝트 진행하기"],
 }
