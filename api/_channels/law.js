@@ -260,6 +260,49 @@ function pickTwoLongWords(query) {
   return picked.join(' ');
 }
 
+// ---------- 결과 relevance 판정 ----------
+
+/** 뼈대 낱말 — 법령명에 흔히 들어가지만 단계와의 관련성을 보증하지 않는 말 */
+const SKELETON_WORDS = new Set([
+  '기본', '특별', '관한', '관리', '진흥', '지원', '촉진', '육성',
+  '법률', '시행', '규정', '등에', '조정', '현황', '구성', '형태',
+  '전체', '일반', '분류', '기타', '규칙',
+]);
+
+/**
+ * 검색 결과 하나가 단계 글과 관련 있는지 판정한다.
+ *
+ * @param {object}  result         - 검색 결과 하나 ({ title, ... })
+ * @param {string[]} filteredTerms  - 걸렀던 검색어들
+ * @param {string[]} wordList       - 단계 글에서 뽑은 낱말 목록
+ * @param {object}  options         - options.query: 모델이 지은 검색어
+ * @returns {boolean}
+ */
+export function isRelevantHit(result, filteredTerms, wordList, options) {
+  const title = result && result.title ? String(result.title) : '';
+  const filtered = filteredTerms || [];
+  const words = wordList || [];
+  const query = options && options.query ? String(options.query) : '';
+
+  // 1. 낱말 목록이 없거나 비면 통과
+  if (!words || words.length === 0) return true;
+
+  // 2. 모델이 지은 검색어가 3글자 이상이고 결과 이름에 통째로 들어 있으면 통과
+  //    (코드가 만든 폴백 낱말에는 이 길을 열지 않는다)
+  if (query.length >= 3 && title.includes(query)) return true;
+
+  // 3. 낱말 목록 중 두 글자 이상이고, 걸렀던 검색어에 없고, 뼈대 낱말이 아닌 것이
+  //    결과 이름에 들어 있으면 통과
+  for (const w of words) {
+    if (w.length < 2) continue;
+    if (filtered.includes(w)) continue;
+    if (SKELETON_WORDS.has(w)) continue;
+    if (title.includes(w)) return true;
+  }
+
+  return false;
+}
+
 // ---------- 채널 명 ----------
 
 export { NAME };
