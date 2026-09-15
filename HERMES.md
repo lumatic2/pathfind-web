@@ -20,7 +20,9 @@ MABC 2026 결선 산출물 레포. 예선 당선 스킬 `pathfind` 를 누구나
 ## 파일 지도
 
 - **진입**: `index.html`(랜딩), `app.html`(앱). 둘 다 `vite.config.ts`의 빌드 입력.
-- **서버**: `api/*.js` 함수 하나가 엔드포인트 하나. 기존 `grill`·`pathfind`·`stage`·`handoff` 넷은 요청·응답 모양을 바꾸지 않는다. 신설은 `explain`·`chat`·`outline`·`source-card`. 서버 공용 코드는 `api/_lib/`, 조사 채널은 `api/channels/`. 계약은 `docs/api-contract.md`.
+- **서버**: `api/*.js` 함수 하나가 엔드포인트 하나. 기존 `grill`·`pathfind`·`stage`·`handoff` 넷은 요청·응답 모양을 바꾸지 않는다. 신설은 `explain`·`chat`·`outline`·`source-card`. 계약은 `docs/api-contract.md`.
+- **서버 공용**: `api/_lib/`. 여러 엔드포인트가 공유하는 헬퍼·상수·푸터.
+- **조사 채널**: `api/channels/`. 웹·뉴스 등 외부 조사 채널 구현.
 - **앱**: `frontend/src/app/`(진입·셸), `frontend/src/state/`(타입·저장·흐름·파생), `frontend/src/lib/api.ts`(서버 호출), `frontend/src/landing/`(랜딩 진입). 상태 모양은 `docs/app-state.md`.
 - **디자인 자산**: `frontend/src/components/`는 `https://ui.askewly.com` 레지스트리 설치본이다. 손으로 고치지 않는다. 필요한 슬롯이 없으면 그 사실을 말하고 멈춘다. 재설치는 `npx shadcn@latest add https://ui.askewly.com/r/<이름>.json --overwrite`. 토큰은 `frontend/tokens.css`.
 - **랜딩은 예외**: `frontend/src/landing/`은 레지스트리 블록이 아니라 디자인 시스템 레포 `examples/glide-landing`의 복사본이다. 자기 `tokens.css`·`base.css`를 쓰고 앱 토큰을 쓰지 않는다. 문안·링크는 `content.ts`만 고치고 컴포넌트·CSS는 손대지 않는다. 그림은 `public/`.
@@ -50,7 +52,7 @@ MABC 2026 결선 산출물 레포. 예선 당선 스킬 `pathfind` 를 누구나
 - **라이트 모드만.** 다크 모드 토글을 만들지 않는 것으로 부족하고, OS가 다크여도 켜지지 않게 막는다. 모바일·사용자 소스 추가·공유 링크·로그인도 만들지 않는다.
 - **기능 없는 버튼을 두지 않는다.** 콜백이 없는 아이콘·메뉴는 끈다.
 - **빌드 통과는 완료가 아니다.** CSS가 번들에 없어도 빌드는 성공한다.
-- **화면 문구**: 존댓말, 느낌표·이모지 없음. 싸이클·세션·런 대신 "로드맵". 횟수가 줄어드는 순간은 누르기 전에 알린다. 기다리는 동안 몇 번째인지 보여 준다. 실패는 한 줄로 말하고 남은 것을 먼저 말한다. 하지 말라는 문장 대신 해 달라는 문장으로 쓴다.
+- **화면 문구**: 존댓말, 느낌표·이모지 없음. 싸이클·세션·런 대신 "패스". 횟수가 줄어드는 순간은 누르기 전에 알린다. 기다리는 동안 몇 번째인지 보여 준다. 실패는 한 줄로 말하고 남은 것을 먼저 말한다. 하지 말라는 문장 대신 해 달라는 문장으로 쓴다.
 - **판정 4종은 계약 값이다.** `가져다 써도 됨`·`직접 해야 함`·`섞어야 함`·`선례를 못 찾음`을 저장과 서버 응답에 그대로 두고, 화면에 보여 줄 때만 이미 있음·없음·일부만 있음·못 찾음으로 바꾼다.
 
 ## 끝났다고 말하는 법
