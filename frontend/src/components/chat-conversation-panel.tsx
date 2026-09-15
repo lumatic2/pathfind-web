@@ -480,7 +480,7 @@ export function renderMarkdown(text: string, ctx: InlineCtx): ReactNode {
       if (list && list.ordered !== ordered) flushList()
       if (!list) list = { ordered, items: [] }
       // 들여쓴 칸 2개당 한 단 — 목록 기호 앞의 공백이 그대로 깊이다(탭은 2칸으로 친다).
-      const indent = (ol ? ol[1] : ul![1]).replace(/\t/g, "  ").length
+      const indent = (ol ? ol[1] : ul![1]).replace(/	/g, "  ").length
       const depth = Math.min(1, Math.floor(indent / 2))
       list.items.push(ol ? { num: Number(ol[2]), text: ol[3], depth } : { num: 0, text: ul![2], depth })
       continue
