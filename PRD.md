@@ -47,7 +47,7 @@
 |---|---|---|---|
 | 판정 A/B(첫 줄 판정) — 입력 대상 여부 | `api/grill.js` | 변형(인터뷰 흡수) | 예선 원문의 첫 줄 판정 로직을 서비스에서는 grill 인터뷰로 바꿔 흡수한다. 원문의 판정 문장 형식은 프론트가 그대로 표시하지 않는다. |
 | 단계 분해(단계 수 4~7, 제목 24자 이내, 실제 작업 순서) | `api/pathfind.js`(머리 주석에 원문 수록) → 프론트 렌더링 | 이식 | 큰 단계·할 일·선택지·아이콘을 bigPicture.stages로 반환하고, 카드는 프론트가 그린다. |
-| 조사 절차 — 단계마다 웹 검색 1회 | `api/stage.js` + `api/channels/`(naver·github·law·public-data·kosis) | 변형(채널·등급) | 원문은 단일 웹 검색이었으나 서비스는 규칙 기반 채널 5종과 근거 등급을 단계 텍스트 키워드로 선택한다. 채널과 등급은 stage 응답의 scope·grade로 내려간다. |
+| 조사 절차 — 단계마다 웹 검색 1회 | `api/stage.js` + `api/_channels/`(naver·github·law·public-data·kosis) | 변형(채널·등급) | 원문은 단일 웹 검색이었으나 서비스는 규칙 기반 채널 5종과 근거 등급을 단계 텍스트 키워드로 선택한다. 채널과 등급은 stage 응답의 scope·grade로 내려간다. |
 | 조사 결과 JSON 스키마(steps[], verdict, findings 등) | `api/stage.js` 출력(verdict·findings·options·todos) / `api/pathfind.js`(stages) | 이식 | 원문의 steps·verdict·findings 골격을 유지한다. verdict는 판정 4종 계약 값, findings는 kind·evidence·url을 그대로 쓴다. |
 | handoff.md — 구현 에이전트로 넘길 문서 | `api/handoff.js` → `handoffMarkdown` | 이식·확장 | 원문의 handoff.md 작성 의도를 마크다운 다운로드·복사로 이어간다. 서버 조립 폴백을 두고, x-handoff-source로 solar·retry·assembled 중 하나를 표기한다. |
 | render.py — stdin JSON → 연구노트.md + 흐름도.html | 쓰지 않음. 큰 그림은 `api/pathfind.js`, 카드는 프론트, handoff는 `api/handoff.js` | 대체 | 웹 MVP에서는 render.py를 실행하지 않는다. 원문의 파일 생성 단계를 서비스 함수 3개로 나눠 처리한다. |
