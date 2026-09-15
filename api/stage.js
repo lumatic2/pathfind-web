@@ -10,7 +10,7 @@ import { lawAvailable, searchLaw, NAME as LAW_NAME, isRelevantHit } from './_cha
 import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './_channels/public-data.js';
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 import { reviewFindings } from './_lib/review-findings.js';
-import { selectFindings } from './_lib/select-findings.js';
+import { selectFindings, normalizeCandidate } from './_lib/select-findings.js';
 import { renumberBody, countCitationMarks, stripCitationMarks, attachNumbersByMaterialName } from './_lib/citation-marks.js';
 import { topicWords } from './_lib/topic-query.js';
 
@@ -1209,22 +1209,50 @@ export async function POST(request) {
     const parsed = parseSolarJson(toolResult.content || '');
     const findings = assembleFindings(parsed, catalog);
 
-    // ----- 고른 근거 자료를 뜻으로 다시 확인 (law / stats / public_data) -----
     const TARGET_CHANNELS = new Set(['law', 'stats', 'public_data']);
+
+    // 대상 채널 finding만 골라낸다 (처음 모델이 고른 법령·통계·공공데이터)
     const targetFindings = findings.filter((f) => TARGET_CHANNELS.has(f.channel));
+
+    // 카탈로그에서 아직 고르지 않은 대상 채널 후보를 상한 내로 고른다
+    const selectedIds = new Set(findings.map((f) => f.id));
+    const supplementRaw = pickSupplementCandidates([...catalog.values()], selectedIds, TARGET_CHANNELS);
+    // reviewFindings가 읽는 필드(id/name/evidence/url/channel)에 맞춰 보충 후보를 정리한다
+    const supplementForReview = supplementRaw.map((c) => ({
+      id: c.id,
+      name: c.title || '항목',
+      evidence: (c.snippet || '').slice(0, 300),
+      url: c.url || '',
+      channel: c.channel,
+    }));
+
+    // 처음 고른 대상 + 보충 후보를 합쳐 한 번만 뜻으로 확인한다
+    const toReview = [...targetFindings, ...supplementForReview];
     let reviewResult;
-    if (targetFindings.length > 0) {
+    if (toReview.length > 0) {
       try {
-        reviewResult = await reviewFindings(stage, targetFindings, callSolar, MODEL_REVIEW_TIMEOUT_MS);
+        reviewResult = await reviewFindings(stage, toReview, callSolar, MODEL_REVIEW_TIMEOUT_MS);
       } catch (e) {
         logCall('stage.reviewFindings', 0, 0, { err: String(e) });
-        reviewResult = { kept: [], dropped: targetFindings.length, timedOut: false };
+        reviewResult = { kept: [], dropped: toReview.length, timedOut: false };
       }
     } else {
       reviewResult = { kept: [], dropped: 0, timedOut: false };
     }
+
+    // 통과된 것만 추려 최종 선택 앞단계로 넘긴다
+    const reviewedIds = new Set(reviewResult.kept.map((f) => f.id));
+    const supplementOriginallySelectedIds = new Set(supplementForReview.map((c) => c.id));
+    // 통과된 보충 후보는 kind/grade를 채워 프론트 표시 형태로 맞춘다 (이미 note는 붙어 있음)
+    const preparedSupplement = reviewResult.kept
+      .filter((f) => supplementOriginallySelectedIds.has(f.id))
+      .map((f) => {
+        const norm = normalizeCandidate({ ...f, title: f.name, snippet: f.evidence, form: f.form || '' });
+        return { ...norm, note: f.note || '' };
+      });
     const reviewedFindings = [
-      ...reviewResult.kept,
+      ...preparedSupplement,
+      ...reviewResult.kept.filter((f) => !supplementOriginallySelectedIds.has(f.id)),
       ...findings.filter((f) => !TARGET_CHANNELS.has(f.channel)),
     ];
 

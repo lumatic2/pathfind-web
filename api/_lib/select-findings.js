@@ -153,5 +153,43 @@ export function selectFindings(selected, candidates, deferredWeb = []) {
     heldDeferred = heldDeferred.filter((d) => !resultIds.has(d.id));
   }
 
+  // 그래도 빈 칸이 남으면 보류한 웹(deferredWeb)으로 복구한다. 이미 들어간 id와 겹치지 않게.
+  if (result.length < MAX_FINDINGS && heldDeferred.length > 0) {
+    const resultIds = new Set(result.map((f) => f.id));
+    for (const d of heldDeferred) {
+      if (result.length >= MAX_FINDINGS) break;
+      if (resultIds.has(d.id)) continue;
+      result.push(d);
+      resultIds.add(d.id);
+    }
+    // 복구에 쓴 것은 deferred에서 뺀다
+    heldDeferred = heldDeferred.filter((d) => !resultIds.has(d.id));
+  }
+
   return { findings: result, deferredWeb: heldDeferred };
+}
+
+// ---------- 보충 후보 고르기 ----------
+
+const SUPPLEMENT_MAX = 3;
+
+/**
+ * 카탈로그 값 목록에서, 이미 선택된 ids에 없고 대상 채널(law / stats / public_data)인
+ * 후보를 상한(SUPPLEMENT_MAX) 내로 골라 반환한다.
+ *
+ * @param {object[]} catalogValues     - 카탈로그 값 전체 (raw 형태)
+ * @param {Set<string>} selectedIds    - 이미 고른 자료 id 집합
+ * * @param {Set<string>} targetChannels - 대상 채널 (기본: NON_WEB_CHANNELS)
+ * @returns {object[]}
+ */
+export function pickSupplementCandidates(catalogValues, selectedIds, targetChannels = NON_WEB_CHANNELS) {
+  const picked = [];
+  for (const c of catalogValues) {
+    if (!c || !c.id) continue;
+    if (selectedIds.has(c.id)) continue;
+    if (!targetChannels.has(c.channel)) continue;
+    if (picked.length >= SUPPLEMENT_MAX) break;
+    picked.push(c);
+  }
+  return picked;
 }
