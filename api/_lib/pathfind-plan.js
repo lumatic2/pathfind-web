@@ -16,6 +16,14 @@ const SEARCH_MS = 15_000;
 const DESIGN_MS = 40_000;
 const RETRY_MS = 25_000;
 
+function requestIdFn() {
+  try {
+    return `req-${crypto.randomUUID()}`;
+  } catch {
+    return `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
 const QUERY_SYSTEM = `당신은 선행 조사에 쓸 검색어 두 개를 만드는 역할입니다.
 
 산출물:
@@ -201,10 +209,50 @@ export async function planFromResearch(
     throw new Error('단계 설계 응답이 검증에 통과하지 못했습니다: ' + check.error);
   }
 
+  // 5) 조회 기록과 제안 이유를 같은 응답에 담는다 (계약 §planning)
+  const searchFinishedAt = clock.now();
+  const designFinishedAt = clock.now();
+  const responseReadyAt = clock.now();
+
+  const traceRows = (trace?.calls || []).map((c) => {
+    const label = c.label ?? '';
+    const colonIdx = label.indexOf(':');
+    return {
+      query: colonIdx >= 0 ? label.slice(colonIdx + 1) : label,
+      channel: colonIdx >= 0 ? label.slice(0, colonIdx) : (c.kind ?? ''),
+      status: c.status === 'ok' ? (c.count > 0 ? 'success' : 'empty') : 'error',
+      count: c.count ?? 0,
+      elapsedMs: c.elapsedMs ?? 0,
+    };
+  });
+
+  const warnings = [
+    ...(check.data.planning.warnings?.filter(Boolean) ?? []),
+  ];
+  if (sources.length === 0) {
+    warnings.push('모든 검색이 연결 실패하여 인터뷰 기반 초안입니다.');
+  } else if (!check.data.planning.researchNotes?.length) {
+    warnings.push('직접 참고한 자료가 없어 인터뷰 기반 초안입니다.');
+  }
+
+  const planning = {
+    ...check.data.planning,
+    requestId: requestIdFn(),
+    researchedAt: new Date().toISOString(),
+    trace: traceRows,
+    events: [
+      { name: 'request_received', elapsedMs: 0 },
+      { name: 'search_finished', elapsedMs: Math.max(0, searchFinishedAt - startedAt) },
+      { name: 'design_finished', elapsedMs: Math.max(0, designFinishedAt - startedAt) },
+      { name: 'response_ready', elapsedMs: Math.max(0, responseReadyAt - startedAt) },
+    ],
+    warnings,
+  };
+
   // handoffMarkdown은 이 연결 단계에서 채우지 않는다(다른 단계 관할).
   return {
     bigPicture: check.data.bigPicture,
-    planning: check.data.planning,
+    planning,
     handoffMarkdown: '',
   };
 }
