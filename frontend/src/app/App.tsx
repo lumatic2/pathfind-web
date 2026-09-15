@@ -1271,10 +1271,10 @@ function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" data-archive-dialog>
         <DialogHeader>
           <DialogTitle>내 패스 목록</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             완주한 패스는 이 브라우저에 자동으로 보관됩니다. 골라서 열면 그 자리로 돌아갑니다.
             남은 횟수는 줄지 않아요. 제목을 누르면 고칠 수 있습니다.
           </DialogDescription>
