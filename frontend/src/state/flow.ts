@@ -4,6 +4,7 @@ import { useSession } from './store'
 import {
   chat,
   downloadText,
+  explain,
   grill,
   handoff,
   pathfind,
@@ -668,6 +669,61 @@ export function useFlow() {
     [patch],
   )
 
+  const explainNode = useCallback(
+    (node: { id: string; label: string }, stageIndex: number) => {
+      const current = sessionRef.current
+      if (current.busy) return
+
+      // 단계 번호로 슬롯을 찾는다. 뿌리처럼 단계가 없으면 stage는 null.
+      const slot = current.stages[stageIndex]
+      const stage = slot?.stage ?? null
+
+      // 사용자 말풍선: 라벨을 따옴표로 감싸고 "이 뭔가요"를 붙인다.
+      patch({
+        messages: [
+          ...current.messages,
+          {
+            id: msgId(),
+            role: 'user',
+            text: `"${node.label}"이 뭔가요`,
+            kind: 'chat',
+            suggestions: [],
+          },
+        ],
+        busy: true,
+        selectedId: node.id,
+        error: null,
+      })
+
+      explain({ node, stage, summary: current.summary })
+        .then((res) => {
+          patch({
+            messages: [
+              ...sessionRef.current.messages,
+              {
+                id: msgId(),
+                role: 'assistant',
+                text: res.explanation,
+                kind: 'node-explain',
+                citationTitles: res.citationTitles,
+                suggestions: res.followups,
+              },
+            ],
+            busy: false,
+            selectedId: null,
+          })
+        })
+        .catch(() => {
+          patch({
+            error: '노드 설명을 가져오지 못했습니다.',
+            busy: false,
+            selectedId: null,
+          })
+        })
+    },
+    [patch],
+  )
+
   const downloadRoadmap = useCallback(() => {
     const current = sessionRef.current
     if (current.bigPicture == null) return
@@ -737,6 +793,7 @@ export function useFlow() {
     resumeResearch,
     fillMissingOutlines,
     sendChat,
+    explainNode,
     downloadRoadmap,
     buildRoadmap,
   }

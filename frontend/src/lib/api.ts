@@ -211,7 +211,7 @@ export async function handoff(
 // 5. explain
 export interface ExplainRequest {
   node: { id: string; label: string; depth?: number };
-  stage: Stage;
+  stage: Stage | null;
   summary: string;
 }
 
