@@ -999,16 +999,40 @@ export async function POST(request) {
     const topicSummary = topicWords(summary) || [];
     const TOPIC_TARGET_CHANNELS = new Set(['law', 'stats', 'public_data']);
 
+    // ---------- 채널 통계 ----------
+    const channelStats = {};
+    for (const ch of plannedFinal) {
+      channelStats[ch] = { calls: 0, returned: 0, gated: 0, picked: 0 };
+    }
+    channelStats['web_review'] = { calls: 0, returned: 0, gated: 0, picked: 0 };
+    function ensureStats(chname) {
+      if (!channelStats[chname]) {
+        channelStats[chname] = { calls: 0, returned: 0, gated: 0, picked: 0 };
+      }
+      return channelStats[chname];
+    }
+
     for (const ch of plannedFinal) {
       if (calls >= MAX_CALLS_PER_STAGE) break; // 단계당 호출 상한 도달
       const q = queryMap.get(ch) || stage.title;
       let results = [];
       let chCalls = 0;
+      const stageWords = extractStageWords(stage);
       const { results: chResults, calls: chSearchCalls } = await runChannelSearch(ch, q, stage);
-      results = chResults;
       chCalls = chSearchCalls;
+      const stats = ensureStats(ch);
+      stats.calls += chSearchCalls;
+      stats.returned += chResults.length;
+      if (ch === 'stats' || ch === 'public_data') {
+        const { kept, dropped } = gateResultsIfNeeded(ch, q, stage, chResults, stageWords);
+        results = kept;
+        stats.gated += dropped;
+      } else {
+        results = chResults;
+      }
       const slotsLeft = MAX_CALLS_PER_STAGE - calls;
       const takeCalls = Math.min(chCalls, slotsLeft);
+      stats.calls = stats.calls - chSearchCalls + takeCalls;
       preResults.push(
         ...results.slice(0, Math.min(MAX_RESULTS_PER_CHANNEL, slotsLeft)).map((r) => ({ ...r, query: q })),
       );
@@ -1027,9 +1051,21 @@ export async function POST(request) {
         const hasTopic = kwTokens.some((kw) => topicSummary.includes(kw));
         if (!hasTopic) {
           const topicQuery = topicSummary.slice(0, 2).join(' ');
-          const { results: topicResults, calls: topicCalls } = await runChannelSearch(ch, topicQuery, stage);
+          let topicResults = [];
+          let topicCalls = 0;
+          const { results: tResults, calls: tCalls } = await runChannelSearch(ch, topicQuery, stage);
+          topicResults = tResults;
+          topicCalls = tCalls;
+          const tStats = ensureStats(ch);
+          tStats.returned += topicResults.length;
+          if (ch === 'stats' || ch === 'public_data') {
+            const { kept, dropped } = gateResultsIfNeeded(ch, topicQuery, stage, topicResults, stageWords);
+            topicResults = kept;
+            tStats.gated += dropped;
+          }
           const topicSlotsLeft = MAX_CALLS_PER_STAGE - calls;
           const topicTake = Math.min(topicCalls, topicSlotsLeft);
+          tStats.calls = tStats.calls - topicCalls + topicTake;
           preResults.push(
             ...topicResults.slice(0, Math.min(MAX_RESULTS_PER_CHANNEL, topicSlotsLeft)).map(
               (r) => ({ ...r, query: topicQuery }),
@@ -1084,22 +1120,29 @@ export async function POST(request) {
       const tc = tcs[0];
       if (!tc || tc.function?.name !== 'web_search' && tc.function?.name !== 'github_search' && tc.function?.name !== 'law_search') break;
 
+      let chname = 'web';
+      if (tc.function.name === 'github_search') {
+        chname = 'oss';
+      } else if (tc.function.name === 'law_search') {
+        chname = 'law';
+      }
+
       try {
+        calls++;
+        ensureStats(chname).calls++;
         const args = JSON.parse(tc.function.arguments || '{}');
         const q = args.query || '';
         if (!q) break;
 
         let results = [];
-        let chname = 'web';
         if (tc.function.name === 'github_search') {
           results = await searchGithub(q, MAX_RESULTS_PER_CHANNEL);
-          chname = 'oss';
         } else if (tc.function.name === 'law_search') {
           results = await searchLaw(q, MAX_RESULTS_PER_CHANNEL);
-          chname = 'law';
         } else {
           results = await searchWeb(q);
         }
+        ensureStats(chname).returned += results.length;
 
         // web 결과에서 stats/public_data로 분류된 항목도 관문을 지나게 한다
         if (chname === 'web' && stage && results.some((r) => r.channel === 'stats' || r.channel === 'public_data')) {
@@ -1121,7 +1164,6 @@ export async function POST(request) {
 
         // 낱말 상한 적용
         const clamped = clampWords(q, tc.function.name === 'law_search' || tc.function.name === 'stats' ? 2 : tc.function.name === 'public_data' ? 3 : 4);
-        calls++;
         const enriched = results.map((r, idx) => ({
           ...r,
           id: `${chname}-${idx}`,
@@ -1196,9 +1238,17 @@ export async function POST(request) {
     }
 
     const calledChannels = new Set();
-    for (const f of findingsAfterReview) calledChannels.add(f.channel);
+    for (const f of findingsAfterReview) {
+      calledChannels.add(f.channel);
+      const st = ensureStats(f.channel);
+      st.picked++;
+    }
 
-    // scope
+    // ----- 뜻 판정 집계: vetRejected / vetTimeout -----
+    const vetRejected = reviewResult?.dropped ?? 0;
+    const vetTimeout = reviewResult?.timedOut ? 1 : 0;
+
+    // scope 구성
     const scope = {
       claimType: parsed?.claimType || '기술',
       channels: [...new Set([...plannedFinal, ...calledChannels, ...(webReviewUsed ? ['web_review'] : [])])],
@@ -1207,6 +1257,9 @@ export async function POST(request) {
       planned: webReviewUsed
         ? [...new Set([...plannedFinal, 'web_review'])]
         : plannedFinal,
+      channelStats,
+      vetRejected,
+      vetTimeout,
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findingsAfterReview.length);
