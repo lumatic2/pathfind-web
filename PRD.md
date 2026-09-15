@@ -68,7 +68,7 @@
   77611d6b324ff94af76e98eaa7048586715c165842f61375e883f9f393e4931b  assets/lucide-icons.json
   ```
 
-  위 네 값은 현재 레포의 `pathfind-src/`에서 `sha256sum`으로 찍은 값이며, 예선 제출 zip과 같다는 대조 결과를 한 줄로 적어 둔 것이다. 렌더 스크립트 원문은 `scripts/render.py` 그대로이고, 서비스판이 따로 둔 `service_render.py`는 원문 경로 밖에 있어 이 대조 대상이 아니다.
+  위 네 값은 현재 레포의 `pathfind-src/`에서 `sha256sum`으로 찍은 값이며, 예선 제출 zip과 파일 구성·내용이 같다는 대조 결과를 한 줄로 적어 둔 것이다. `pathfind-src/` 안에는 이 네 파일 외에 다른 파일이 없고, 서비스로 늘린 부분은 전부 `api/`와 `frontend/` 쪽 후처리다.
 
 - 판정 4종(가져다 써도 됨·직접 해야 함·섞어야 함·선례를 못 찾음)은 계약 값이며, 저장·서버 응답에는 원문을 그대로 두고 화면에 보여 줄 때만 이미 있음·없음·일부만 있음·못 찾음으로 바꾼다.
 
@@ -97,8 +97,16 @@
 
 | 환경변수 이름 | 용도 | 발급처 |
 |---|---|---|
-|| `SOLAR_API_KEY` | 정렬 인터뷰(5턴) + bigPicture 생성 + 단계별 리서치 + 패스 마크다운 생성. 서버 `/api`에서만 사용. 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 값 미기재. | Upstage Solar API (Upstage Console / API 발급) |
+| `SOLAR_API_KEY` | Solar Pro 4 호출(정렬 인터뷰 5턴 + bigPicture 생성 + 단계별 리서치 + 패스 마크다운 생성). 서버 `/api`에서만 사용. 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 값 미기재. | Upstage Solar API (Upstage Console / API 발급) |
+| `SOLAR_API_URL` | Solar API 엔드포인트 URL. 선택. 기본값 `https://api.upstage.ai/v1/chat/completions`. | Upstage Solar API (Upstage Console / API 발급) |
+| `SOLAR_MODEL` | Solar 모델 ID. 선택. 기본값 `solar-pro4`. | Upstage Solar API (Upstage Console / API 발급) |
 | `SEARCH_API_KEY` | 단계별 리서치에서 웹 검색 대행(Tavily 계열 기본). `/api/stage`에서만 사용. 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 값 미기재. | Tavily (Tavily API 발급) |
+| `SEARCH_API_URL` | 검색 API 엔드포인트 URL. 선택. 기본값 `https://api.tavily.com/search`. | Tavily (Tavily API 발급) |
+| `NAVER_CLIENT_ID` | 네이버 검색 API 클라이언트 ID. `/api/_channels/naver.js`에서 사용. 선택. | 네이버 검색 API (Naver Cloud Platform 발급) |
+| `NAVER_CLIENT_SECRET` | 네이버 검색 API 클라이언트 시크릿. `/api/_channels/naver.js`에서 사용. 선택. | 네이버 검색 API (Naver Cloud Platform 발급) |
+| `KOSIS_API_KEY` | KOSIS 공공데이터 API 키. `/api/_channels/kosis.js`에서 사용. 선택. | KOSIS (국가통계포털 API 발급) |
+| `LAW_API_OC` | 국가법령정보센터 오픈 API 인증 파라미터. `/api/_channels/law.js`에서 사용. 선택. | 국가법령정보센터 (법제처 오픈 API 발급) |
+| `GITHUB_MCP_TOKEN` | GitHub MCP 토큰. `/api/_channels/github.js`에서 사용. 선택. | GitHub (Personal Access Token 발급) |
 
 - 실제 발급 가능 여부·구체적 값은 Vercel 환경변수 등록 시점에 확인. (값 아님; 이름·용도·발급처만 예비 기술.)
 - 검색 공급자 교체 시 `api/stage.js`의 요청 형식만 바꾼다(공급자 추상화).
