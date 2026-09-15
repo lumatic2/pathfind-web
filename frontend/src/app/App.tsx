@@ -237,10 +237,27 @@ export default function App() {
 
   const renderCitation = useCallback((citation: ChatCitation, index: number) => {
     const doc = resolveCitation(sourceTree(session), citation)
+    let bodyNode: React.ReactNode | null = null
+    if (doc != null) {
+      const cards = session.sourceCards ?? {}
+      const raw =
+        cards[doc.id] ??
+        doc.markdown ??
+        doc.evidence ??
+        ''
+      if (raw.trim().length > 0) {
+        const firstLineEnd = raw.indexOf('\n')
+        const content = firstLineEnd >= 0 ? raw.slice(firstLineEnd + 1) : ''
+        bodyNode = content.trim().length > 0
+          ? renderMarkdown(content, { staged: false })
+          : null
+      }
+    }
     return (
       <CitationBadge
         citation={citation}
         doc={doc}
+        bodyNode={bodyNode}
         open={openCitationN === citation.n}
         onOpenChange={(n) => setOpenCitationN(n)}
         onOpen={(id) => leftPanelRef.current?.openSourceDoc(id)}
@@ -965,7 +982,7 @@ function MindmapLegend() {
   )
 }
 
-function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation: ChatCitation; doc: SourceDoc | null; open: boolean; onOpenChange: (n: number | null) => void; onOpen: (id: string) => void }) {
+function CitationBadge({ citation, doc, bodyNode, open, onOpenChange, onOpen }: { citation: ChatCitation; doc: SourceDoc | null; bodyNode?: React.ReactNode | null; open: boolean; onOpenChange: (n: number | null) => void; onOpen: (id: string) => void }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const timer = useRef<number | null>(null)
@@ -1159,9 +1176,9 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
           {doc ? (
             <>
               <p className="text-sm text-muted-foreground">{doc.subtitle ?? '자료'}</p>
-              <p className="mt-1 text-sm leading-relaxed">
-                {doc.evidence ?? doc.markdown}
-              </p>
+              <div className="mt-1 text-sm leading-relaxed">
+                {bodyNode ?? (doc.evidence ?? doc.markdown)}
+              </div>
             </>
           ) : (
             <span className="text-sm text-muted-foreground">{citation.title}</span>
