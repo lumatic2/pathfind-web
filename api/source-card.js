@@ -156,7 +156,7 @@ function buildMarkdown(finding, stage, modelOut) {
     } else if (verdict === '섞어야 함') {
       md.push('→ 이 자료는 뼈대로 쓰고 일부는 직접 채웁니다.');
     } else if (verdict === '선례를 못 찾음') {
-      md.push('→ 이 단계 선례를 못 찾은 상태라 이 자료도 참고용입니다.');
+      md.push('→ 이 단계에서 쓸 만한 자료를 찾지 못한 상태라 이 자료도 참고용입니다.');
     }
   }
 

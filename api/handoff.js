@@ -37,13 +37,23 @@ function isValidHandoffMarkdown(text) {
   return true;
 }
 
+// 판정 4종 → 화면·출력 문구 (계약 값은 저장·비교에 그대로 쓰고, 표시만 바꾼다)
+// chat.js와 동일한 표. 가져다 써도 됨 → 이미 있음, 직접 해야 함 → 없음,
+// 섞어야 함 → 일부만 있음, 선례를 못 찾음 → 못 찾음.
+const VERDICT_LABELS = {
+  '가져다 써도 됨': '이미 있음',
+  '직접 해야 함': '없음',
+  '섞어야 함': '일부만 있음',
+  '선례를 못 찾음': '못 찾음',
+};
+
 // 단계 데이터에서 마크다운 섹션 하나 조립.
 function buildMarkdownSection(stageResult) {
   const s = stageResult;
   if (!s) return '';
   const lines = [];
   const verdict = s.verdict || '확인 불가';
-  lines.push(`### ${s.no}. ${s.title} — ${verdict}`);
+  lines.push(`### ${s.no}. ${s.title} — ${VERDICT_LABELS[verdict] ?? verdict}`);
   lines.push('');
   lines.push(`- 설명: ${s.desc || '확인 불가'}`);
   lines.push(`- 판정 근거: ${s.verdictReason || '확인 불가'}`);
@@ -59,7 +69,7 @@ function buildMarkdownSection(stageResult) {
     }
     lines.push('');
   } else {
-    lines.push('**찾은 자료:** 없음 (검색 상한 내 유효한 선례를 못 찾음)');
+    lines.push('**찾은 자료:** 없음 (조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다)');
     lines.push('');
   }
   if (s.todos && s.todos.length) {
