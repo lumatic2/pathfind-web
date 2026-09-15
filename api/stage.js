@@ -9,6 +9,7 @@ import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from 
 import { lawAvailable, searchLaw, NAME as LAW_NAME, isRelevantHit } from './_channels/law.js';
 import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './_channels/public-data.js';
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
+import { reviewFindings } from './_lib/review-findings.js';
 
 // ---------- 상수 ----------
 
@@ -499,60 +500,6 @@ async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTok
   }
 }
 
-// ---------- 스텝34: 규칙 통과 자료 모델 재확인 ----------
-
-function reviewedSection(items) {
-  if (!items || items.length === 0) return '';
-  return items
-    .map(
-      (r, i) =>
-        `${i + 1}. id: ${r.id}\n   제목: ${r.title || '제목 없음'}\n   URL: ${r.url || '없음'}\n   요약: ${(r.snippet || '').slice(0, 250)}`,
-    )
-    .join('\n\n');
-}
-
-async function modelReviewPass(stage, reviewed) {
-  if (!stage || !reviewed || reviewed.length === 0) return [];
-  const prompt = `당신은 통계·공공데이터 결과 중 이 단계에 실제로 참고가 되는 것만 고르는 어시스턴트입니다.
-
-아래 결과를 보고, 이 단계의 제목과 설명에 비추어 참고할 만한 결과의 id만 번호 배열로 답하세요.
-- 참고 번호가 없으면 빈 배열 [] 로 답합니다.
-- 마크다운 없이 JSON 배열만 출력합니다.
-
-[단계 제목] ${stage.title}
-[단계 설명] ${stage.desc}
-
-[통계·공공데이터 결과]
-${reviewedSection(reviewed)}
-
-답변: `;
-  const messages = [
-    { role: 'system', content: '당신은 JSON 배열만 출력하며, id 번호만 고릅니다.' },
-    { role: 'user', content: prompt },
-  ];
-
-  try {
-    const res = await callSolar(messages, {
-      tools: false,
-      tool_choice: 'auto',
-      maxTokens: 400,
-      timeoutMs: MODEL_REVIEW_TIMEOUT_MS,
-    });
-    if (!res.content) return { ok: false, ids: [] };
-    const parsed = JSON.parse(res.content.trim());
-    if (!Array.isArray(parsed)) return { ok: false, ids: [] };
-    return {
-      ok: true,
-      ids: parsed
-        .filter((id) => typeof id === 'string' && id.length > 0)
-        .map((id) => id.trim()),
-    };
-  } catch (e) {
-    logCall('stage.modelReview', 0, 0, { err: String(e) });
-    return { ok: false, ids: [] };
-  }
-}
-
 // ---------- 채널별 실제 검색 실행 ----------
 
 async function runChannelSearch(channelName, query, stage = null) {
@@ -1010,34 +957,6 @@ export async function POST(request) {
 
     const webReviewUsed = preResults.some((r) => r.channel === 'web_review');
 
-    // ---------- 스텝34: 규칙 통과 자료 모델 재확인 (통계·공공데이터만) ----------
-    const modelReviewedIds = new Set();
-    let modelReviewStatus = 'unavailable'; // 'unavailable' | 'empty' | 'applied' | 'failed'
-    const hasStatsOrPublicData = plannedFinal.some((n) => n === 'stats' || n === 'public_data');
-    if (hasStatsOrPublicData) {
-      const reviewed = preResults.filter((r) => r.channel === 'stats' || r.channel === 'public_data');
-      if (reviewed.length > 0) {
-        try {
-          const review = await modelReviewPass(stage, reviewed);
-          if (!review.ok) {
-            // 호출 실패·형식 틀림 → 규칙 결과로 돌아간다
-            modelReviewStatus = 'failed';
-          } else if (review.ids.length === 0) {
-            // 빈 배열 = 통계·공공데이터에서 고르고 남은 자료가 없다는 뜻
-            modelReviewStatus = 'empty';
-          } else {
-            for (const id of review.ids) {
-              if (typeof id === 'string' && id) modelReviewedIds.add(id);
-            }
-            modelReviewStatus = 'applied';
-          }
-        } catch (e) {
-          logCall('stage.modelReview', 0, 0, { err: String(e) });
-          modelReviewStatus = 'failed';
-        }
-      }
-    }
-
     // 4) 분석 호출 (tool_choice auto)
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -1167,28 +1086,25 @@ export async function POST(request) {
     const parsed = parseSolarJson(toolResult.content || '');
     const findings = assembleFindings(parsed, catalog);
 
-    // 스텝34: 모델 재확인은 통계·공공데이터 찾음에만 적용한다.
-    // 다른 채널(웹·OSS·법령)은 모델 재심 결과를 받지 않고 규칙·카탈로그 결과 그대로 남긴다.
-    const TARGET_CHANNELS = new Set(['stats', 'public_data']);
-    function isTargetChannel(f) {
-      return TARGET_CHANNELS.has(f.channel);
-    }
-
-    let reviewedFindings;
-    if (modelReviewStatus === 'applied') {
-      // 모델 재심 ID가 있으면 통계·공공데이터는 그 ID만 남기고, 나머지 채널은 원본 그대로
-      reviewedFindings = [
-        ...findings.filter((f) => isTargetChannel(f) && modelReviewedIds.has(f.id)),
-        ...findings.filter((f) => !isTargetChannel(f)),
-      ];
-    } else if (modelReviewStatus === 'empty') {
-      // 모델이 빈 배열 = 통계·공공데이터에서 고르고 남은 자료가 없음 → 해당 채널 findings 비움
-      reviewedFindings = findings.filter((f) => !isTargetChannel(f));
+    // ----- 고른 근거 자료를 뜻으로 다시 확인 (law / stats / public_data) -----
+    const TARGET_CHANNELS = new Set(['law', 'stats', 'public_data']);
+    const targetFindings = findings.filter((f) => TARGET_CHANNELS.has(f.channel));
+    let reviewResult;
+    if (targetFindings.length > 0) {
+      try {
+        reviewResult = await reviewFindings(stage, targetFindings, callSolar, MODEL_REVIEW_TIMEOUT_MS);
+      } catch (e) {
+        logCall('stage.reviewFindings', 0, 0, { err: String(e) });
+        reviewResult = { kept: [], dropped: targetFindings.length, timedOut: false };
+      }
     } else {
-      // 'unavailable'(호출 안 함) 또는 'failed'(호출 실패·형식 틀림) → 규칙 결과로 돌아간다
-      reviewedFindings = findings;
+      reviewResult = { kept: [], dropped: 0, timedOut: false };
     }
-    const findingsAfterReview = reviewedFindings;
+    const findingsAfterReview = [
+      ...reviewResult.kept,
+      ...findings.filter((f) => !TARGET_CHANNELS.has(f.channel)),
+    ];
+
     const calledChannels = new Set();
     for (const f of findingsAfterReview) calledChannels.add(f.channel);
 
