@@ -336,13 +336,15 @@ function followups(node, modelOut) {
 
 function buildFromModel(node, stage, modelOut) {
   const explanation = typeof modelOut?.explanation === 'string' ? modelOut.explanation : '';
-  const rawTitles = Array.isArray(modelOut?.citationTitles) ? modelOut.citationTitles : [];
+  // 새 모양: [{n, name}, ...] / 옛 모양: ["이름", ...] 양쪽을 받는다.
+  const rawCitations = Array.isArray(modelOut?.citationTitles) ? modelOut.citationTitles : [];
   const rawIds = Array.isArray(modelOut?.citations) ? modelOut.citations : [];
 
-  // 자료 잎이면 단계 findings 라벨을 끌어와서 재번호화에 쓴다.
-  const findingNames = nodeType(node) === 'finding' ? findingLabelsForNode(node, stage) : [];
-  // titles가 이미 라벨/이름이면 renumber가 순서를 재정렬한다.
-  const { body, citationTitles, citationIds } = renumber(explanation, rawTitles, rawIds);
+  // 새 모양이면 먼저 이름 대조로 어긋난 것을 버리고 제목 배열을 만든다.
+  const { citationTitles: namedTitles, dropped } = filterCitationsByName(rawCitations, rawIds, stage);
+
+  // 이름을 거친 뒤의 제목 배열로 본문 재번호화를 한다(옛 모양이면 namedTitles===rawCitations).
+  const { body, citationTitles, citationIds } = renumber(explanation, namedTitles, rawIds);
 
   // citationIds를 실제 문서 id로 채운다(매칭은 stage.findings 기준).
   const filledIds = fillIds(citationTitles, stage);
@@ -353,6 +355,7 @@ function buildFromModel(node, stage, modelOut) {
     citationIds: filledIds,
     followups: followups(node, modelOut),
     fallback: false,
+    dropped,
   };
 }
 
@@ -382,6 +385,51 @@ function fillIds(titles, stage) {
     if (idx === -1) return '';
     return docIdFromNodeId(`s${stage?.no || 0}-finding-${idx}`, stage?.no);
   });
+}
+
+// ---------- 이름 대조로 어긋난 인용 버리기 ----------
+
+// citationTitles가 객체 배열({n, name})이면, 요청에 담긴 자료 목록 이름과
+// trim() 결과로 대조해 일치하는 것만 남긴다. 일치하지 않는 것은 버리고 개수를 센다.
+// citationTitles가 문자열 배열(옛 모양)이면 그대로 두고 dropped=0을 반환한다.
+function filterCitationsByName(citations, ids, stage) {
+  if (!Array.isArray(citations) || !Array.isArray(ids) || citations.length === 0) {
+    return { citationTitles: citations, citationIds: ids, dropped: 0 };
+  }
+
+  // 첫 요소가 객체면 새 모양으로 간주
+  const first = citations[0];
+  if (typeof first !== 'object' || first === null || Array.isArray(first)) {
+    return { citationTitles: citations, citationIds: ids, dropped: 0 };
+  }
+
+  if (!Array.isArray(stage?.findings)) {
+    return { citationTitles: [], citationIds: [], dropped: citations.length };
+  }
+
+  const findingNames = stage.findings.map((f) => {
+    const name = typeof f?.name === 'string' ? f.name : '';
+    return name.trim();
+  });
+  const findingSet = new Set(findingNames);
+
+  const keptTitles = [];
+  const keptIds = [];
+  let dropped = 0;
+
+  for (let i = 0; i < citations.length; i++) {
+    const c = citations[i];
+    const nameRaw = typeof c?.name === 'string' ? c.name : '';
+    const name = nameRaw.trim();
+    if (!name || !findingSet.has(name)) {
+      dropped++;
+      continue;
+    }
+    keptTitles.push(name);
+    keptIds.push(Array.isArray(ids) && ids[i] != null ? ids[i] : '');
+  }
+
+  return { citationTitles: keptTitles, citationIds: keptIds, dropped };
 }
 
 // ---------- 폴백 설명 ----------
@@ -577,14 +625,14 @@ export async function POST(request) {
 출력은 아래 JSON 객체 하나만 반환합니다. 코드펜스 마커나 앞뒤 설명 문장은 넣지 않습니다.
 {
   "explanation": "마크다운 문단+목록 (자료의 인용은 자료 목록 번호를 대괄호로, 예: [1], [2])",
-  "citationTitles": ["자료1 이름", "자료2 이름", ...] (본문에서 실제 인용한 자료 이름, 인용 순서),
+  "citationTitles": [{"n": 1, "name": "자료1 이름"}, {"n": 2, "name": "자료2 이름"}, ...] — 인용한 각 자료의 자료 목록 번호(n)와 이름(name)을 함께 적은 객체 배열, 본문에서 실제 인용한 것만 인용 순서,
   "citations": ["문서 id1", "문서 id2", ...] (citationTitles와 같은 순서의 문서 id),
   "followups": ["후속 질문1", "후속 질문2", ...]
 }
 
 규칙:
 - 자료 목록 번호는 아래 "자료 목록"의 순서(1부터) 그대로입니다. 본문에서는 이 번호를 대괄호로 인용합니다.
-- citationTitles와 citations는 같은 길이, 같은 순서이며 본문에서 실제로 인용한 것만 넣습니다.
+- citationTitles는 인용한 자료의 정보를 담은 객체 배열로 냅니다. 각 객체는 { "n": <자료 목록 번호(1부터)>, "name": "<자료 이름>" } 꼴입니다.
 - 문서 id는 왼쪽 패널 문서 id와 같은 꼴로 적습니다(아래 문서 id 규칙 참조).
 - 자료 목록에 없는 번호나 틀린 번호는 인용하지 마세요.
 - 설명은 한국어입니다.
