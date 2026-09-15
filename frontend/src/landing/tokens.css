@@ -44,6 +44,11 @@
   --path-lavender: #B298DC;
   --path-sky: #B8D0EB;
   --path-mint: #B9FAF8;
+  --askewly-violet: var(--path-violet);
+  --askewly-orchid: var(--path-orchid);
+  --askewly-lavender: var(--path-lavender);
+  --askewly-sky: var(--path-sky);
+  --askewly-mint: var(--path-mint);
   --space-1: 4px;
   --space-2: 8px;
   --space-4: 16px;
