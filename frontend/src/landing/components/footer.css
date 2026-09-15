@@ -19,18 +19,38 @@
   .ft__main { grid-template-columns: 1fr 2fr; gap: var(--space-16); }
 }
 
-/* 원본 30px/42 weight **500** — 제목보다 가볍다. 700 으로 올리면 내비와 경쟁한다. */
-.ft__tagline {
+/* 원본 30px/42 weight **500** — 제목보다 가볍다. 700 으로 올리면 내비와 경쟁한다.
+   원본은 문장이었지만 우리는 크레딧을 세운다(2026-09-15) — 마크 + 한 줄, 만든 쪽으로 나가는 링크. */
+.ft__powered {
+  display: inline-flex;
+  align-items: center;
+  /* 격자 칸이 옆 열만큼 높다 — 늘어나면 글이 그 한가운데로 내려앉는다 */
+  align-self: start;
+  justify-self: start;
+  gap: var(--space-3);
   font-size: var(--fs-foot);
   font-weight: 500;
   line-height: var(--lh-quote);
   color: var(--primary-foreground);
-  max-width: 18ch;
+  text-decoration: none;
+  white-space: nowrap;
+}
+/* 워드마크는 글자에 매인다 — px 로 박으면 글자가 줄어드는 폭에서 혼자 커 보인다.
+   PNG 라 `currentColor` 를 못 따르므로 로고와 같은 방식으로 흰색으로 뒤집는다. */
+.ft__powered img {
+  height: 0.92em;
+  width: auto;
+  filter: brightness(0) invert(1);
+}
+.ft__powered:focus-visible {
+  outline: var(--focus-ring-width) solid var(--primary-foreground);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .tmfn { display: grid; gap: var(--space-4); }
 @media (min-width: 768px) {
-  .tmfn { grid-template-columns: repeat(4, 1fr); gap: var(--space-8); }
+  /* 열 수는 `content.footer.columns` 가 정한다 — 숫자를 박으면 칸을 줄였을 때 오른쪽이 빈다 */
+  .tmfn { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-8); }
 }
 
 .tmfn__head { display: flex; align-items: center; justify-content: space-between; }
@@ -44,8 +64,8 @@
   display: inline-flex;
   align-items: center;
 }
-.tmfn__title:hover { text-decoration: underline; }
-
+/* 칸 제목에는 hover 밑줄을 두지 않는다 — 셋은 링크가 아닌 `<span>` 인데도 밑줄이 그어져
+   누를 수 있는 것처럼 보였다(2026-09-15 사용자 지적). 실제 링크는 아래 `.tmfn__link` 다. */
 .tmfn__toggle {
   width: var(--touch-min);
   height: var(--touch-min);
@@ -124,6 +144,7 @@
 }
 /* 색면 위에서는 흰 로고 — `currentColor` 로 마크와 워드마크가 같이 바뀐다. 문(accent)만 라벤더로 남긴다. */
 .ft__logo { color: var(--primary-foreground); display: inline-flex; }
+/* pathfind 국소 수정 — 로고가 PNG 라 currentColor 를 못 따른다. 보라 색면 위에서는 흰색으로 뒤집는다 */
 .ft__logo img { filter: brightness(0) invert(1); }
 .ft__terms { display: flex; gap: var(--space-6); }
 .ft__terms a {
