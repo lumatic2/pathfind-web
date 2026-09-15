@@ -6,7 +6,7 @@
 import { sendError, logCall } from './_lib/http.js';
 import { available as naverAvailable, searchNaver, name as NAVER_NAME } from './_channels/naver.js';
 import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from './_channels/github.js';
-import { lawAvailable, searchLaw, NAME as LAW_NAME } from './_channels/law.js';
+import { lawAvailable, searchLaw, NAME as LAW_NAME, isRelevantHit } from './_channels/law.js';
 import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './_channels/public-data.js';
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 
@@ -119,6 +119,71 @@ function clampWords(text, maxWords) {
     .map((t) => t.trim())
     .filter(Boolean);
   return tokens.slice(0, maxWords).join(' ');
+}
+
+// ---------- 단계 낱말 추출 ----------
+
+/**
+ * 단계의 제목과 설명을 붙여, 한글·숫자·영문이 아닌 것으로 자르고,
+ * 두 글자 이상만 남기고 중복을 없앤 낱말 목록을 반환한다.
+ *
+ * @param {object} stage  - { title?: string, desc?: string }
+ * @returns {string[]}
+ */
+export function extractStageWords(stage) {
+  const raw = [stage?.title, stage?.desc].filter(Boolean).join('\n');
+  if (!raw) return [];
+
+  const tokens = raw
+    .split(/[^가-힣0-9a-zA-Z]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2);
+
+  return [...new Set(tokens)];
+}
+
+// ---------- 관문: 통계·공공데이터 결과 관련성 필터 ----------
+
+/**
+ * 채널이 통계나 공공데이터가 아니거나, 단계가 없거나, 결과가 비면 그대로 돌려준다.
+ * 그 외에는 단계 낱말을 뽑아 결과마다 isRelevantHit 을 부르고 참인 것만 남긴다.
+ *
+ * @param {string} channelName
+ * @param {string} query        - 모델이 지은 검색어(이 관문 안에서는 law 쪽과 같은 의미론 없이 isRelevantHit 에 그대로 넘긴다)
+ * @param {object} stage        - { title?, desc?, ... }
+ * @param {object[]} results    - 검색 결과 목록
+ * @param {string[]} stageWords - extractStageWords 결과
+ * @returns {{ kept: object[], dropped: number }}
+ */
+function gateResultsIfNeeded(channelName, query, stage, results, stageWords) {
+  if (channelName !== 'stats' && channelName !== 'public_data') {
+    return { kept: results.slice(), dropped: 0 };
+  }
+  if (!stage || !stage.title && !stage.desc) {
+    return { kept: results.slice(), dropped: 0 };
+  }
+  if (!results || results.length === 0) {
+    return { kept: [], dropped: 0 };
+  }
+
+  const kept = [];
+  let dropped = 0;
+  for (const r of results) {
+    try {
+      const relevant = isRelevantHit(r, [], stageWords, { query: String(query || '') });
+      if (relevant) {
+        kept.push(r);
+      } else {
+        dropped++;
+      }
+    } catch (e) {
+      // isRelevantHit 이 던진 오류는 이 관문만 죽이지 않게 삼키고, 해당 결과는 버린다.
+      dropped++;
+      logCall('stage.gate.unexpected', 0, 0, { channel: channelName, err: String(e) });
+    }
+  }
+
+  return { kept, dropped };
 }
 
 // ---------- 근거 등급 (코드 결정) ----------
@@ -435,7 +500,7 @@ async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTok
 
 // ---------- 채널별 실제 검색 실행 ----------
 
-async function runChannelSearch(channelName, query) {
+async function runChannelSearch(channelName, query, stage = null) {
   const ch = CHANNELS.find((c) => c.name === channelName);
   if (!ch || !ch.search) return { results: [], calls: 0 };
   try {
@@ -465,11 +530,15 @@ async function runChannelSearch(channelName, query) {
     }
     if (channelName === 'stats') {
       const results = await searchKosis(query, MAX_RESULTS_PER_CHANNEL);
-      return { results: results.map((r) => ({ ...r, channel: 'stats' })), calls: 1 };
+      const stageWords = extractStageWords(stage || {});
+      const { kept, dropped } = gateResultsIfNeeded('stats', query, stage, results, stageWords);
+      return { results: kept, calls: 1, dropped };
     }
     if (channelName === 'public_data') {
       const results = await searchPublicData(query);
-      return { results: results.map((r) => ({ ...r, channel: 'public_data' })), calls: 1 };
+      const stageWords = extractStageWords(stage || {});
+      const { kept, dropped } = gateResultsIfNeeded('public_data', query, stage, results, stageWords);
+      return { results: kept, calls: 1, dropped };
     }
     return { results: [], calls: 0 };
   } catch (e) {
@@ -875,7 +944,7 @@ export async function POST(request) {
     for (const ch of plannedFinal) {
       if (calls >= MAX_CALLS_PER_STAGE) break; // 단계당 호출 상한 도달
       const q = queryMap.get(ch) || stage.title;
-      const { results, calls: chCalls } = await runChannelSearch(ch, q);
+      const { results, calls: chCalls } = await runChannelSearch(ch, q, stage);
       const slotsLeft = MAX_CALLS_PER_STAGE - calls;
       const takeCalls = Math.min(chCalls, slotsLeft);
       preResults.push(
@@ -940,8 +1009,34 @@ export async function POST(request) {
         } else if (tc.function.name === 'law_search') {
           results = await searchLaw(q, MAX_RESULTS_PER_CHANNEL);
           chname = 'law';
+          if (stage) {
+            const stageWords = extractStageWords(stage);
+            const { kept, dropped } = gateResultsIfNeeded(chname, q, stage, results, stageWords);
+            results = kept;
+            if (dropped > 0) {
+              logCall('stage.toolRun.gate', 0, 0, { channel: chname, query: q, dropped });
+            }
+          }
         } else {
           results = await searchWeb(q);
+        }
+
+        // web 결과에서 stats/public_data로 분류된 항목도 관문을 지나게 한다
+        if (chname === 'web' && stage && results.some((r) => r.channel === 'stats' || r.channel === 'public_data')) {
+          const stageWords = extractStageWords(stage);
+          const routed = [];
+          for (const r of results) {
+            if (r.channel === 'stats' || r.channel === 'public_data') {
+              const { kept, dropped } = gateResultsIfNeeded(r.channel, q, stage, [r], stageWords);
+              if (kept.length) routed.push(kept[0]);
+              if (dropped > 0) {
+                logCall('stage.toolRun.gate', 0, 0, { channel: r.channel, query: q, dropped });
+              }
+            } else {
+              routed.push(r);
+            }
+          }
+          results = routed;
         }
 
         // 낱말 상한 적용
