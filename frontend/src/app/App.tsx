@@ -492,15 +492,32 @@ function CenterPanel({ renderCitation }: { renderCitation?: (citation: ChatCitat
 
   const [onSilence, setOnSilence] = useState(false)
   const waitingLabel: string | undefined =
-    session.pending != null
-      ? "다음 질문을 고르는 중…"
-      : session.phase === "ready" && session.busy
-        ? "조사 문서에서 찾는 중이야"
-        : researchActive && session.runActivity != null
-          ? onSilence
-            ? "조금 오래 걸리는 단계입니다. 계속 기다리는 중이에요."
-            : session.runActivity
-          : undefined
+    session.busy
+      ? (() => {
+          if (session.runActivity != null && session.runActivity.trim().length > 0) {
+            const lastLine = session.runActivity.split('\n').filter((l) => l.trim().length > 0).at(-1)
+            if (lastLine != null && lastLine.trim().length > 0) {
+              return lastLine.trimEnd() + '…'
+            }
+          }
+          const lastMsg = session.messages[session.messages.length - 1]
+          switch (session.phase) {
+            case 'interview':
+              return '다음 질문을 고르는 중…'
+            case 'skeleton':
+              return '이 일이 보통 어떤 단계로 이뤄지는지 찾는 중…'
+            case 'researching':
+              return '단계마다 자료를 찾는 중…'
+            case 'ready':
+              if (lastMsg?.kind === 'node-explain') {
+                return '노드를 설명할 말을 고르는 중…'
+              }
+              return '조사 문서에서 찾는 중…'
+            default:
+              return '준비하는 중…'
+          }
+        })()
+      : undefined
 
   const renderAssistantMark = researchActive && session.runActivity != null
     ? () => <span className="research-run-mark">{session.runActivity}</span>
@@ -539,6 +556,9 @@ function CenterPanel({ renderCitation }: { renderCitation?: (citation: ChatCitat
         suggestionsPrompt={suggestionsPrompt}
         waitingLabel={waitingLabel}
         renderAssistantMark={renderAssistantMark}
+        assistantMarkPlacement="trailing"
+        showHeaderActions={false}
+        scopeLabel={doneCount > 0 ? `소스 ${doneCount}개` : undefined}
         renderCitation={renderCitation}
       />
       {session.phase === "interview" && session.busy ? (

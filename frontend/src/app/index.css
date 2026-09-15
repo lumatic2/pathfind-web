@@ -62,3 +62,15 @@ body {
   background-color: var(--background);
   color: var(--foreground);
 }
+
+@keyframes chat-message-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message-in,
+  * {
+    animation: none !important;
+  }
+}
