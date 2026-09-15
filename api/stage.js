@@ -501,20 +501,6 @@ async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTok
 
 // ---------- 스텝34: 규칙 통과 자료 모델 재확인 ----------
 
-const MODEL_REVIEW_PROMPT = `당신은 통계·공공데이터 결과 중 이 단계에 실제로 참고가 되는 것만 고르는 어시스턴트입니다.
-
-아래 결과를 보고, 이 단계의 제목과 설명에 비추어 참고할 만한 결과의 id만 번호 배열로 답하세요.
-- 참고 번호가 없으면 빈 배열 [] 로 답합니다.
-- 마크다운 없이 JSON 배열만 출력합니다.
-
-[단계 제목] ${stage.title}
-[단계 설명] ${stage.desc}
-
-[통계·공공데이터 결과]
-${reviewedSection}
-
-답변: `;
-
 function reviewedSection(items) {
   if (!items || items.length === 0) return '';
   return items
@@ -527,9 +513,22 @@ function reviewedSection(items) {
 
 async function modelReviewPass(stage, reviewed) {
   if (!stage || !reviewed || reviewed.length === 0) return [];
+  const prompt = `당신은 통계·공공데이터 결과 중 이 단계에 실제로 참고가 되는 것만 고르는 어시스턴트입니다.
+
+아래 결과를 보고, 이 단계의 제목과 설명에 비추어 참고할 만한 결과의 id만 번호 배열로 답하세요.
+- 참고 번호가 없으면 빈 배열 [] 로 답합니다.
+- 마크다운 없이 JSON 배열만 출력합니다.
+
+[단계 제목] ${stage.title}
+[단계 설명] ${stage.desc}
+
+[통계·공공데이터 결과]
+${reviewedSection(reviewed)}
+
+답변: `;
   const messages = [
     { role: 'system', content: '당신은 JSON 배열만 출력하며, id 번호만 고릅니다.' },
-    { role: 'user', content: MODEL_REVIEW_PROMPT },
+    { role: 'user', content: prompt },
   ];
 
   try {
