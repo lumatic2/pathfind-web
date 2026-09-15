@@ -31,9 +31,8 @@
   --background:         var(--surface);
   --foreground:         var(--text);
   --card:               var(--surface);
-  --border:             var(--border);
   --input:              var(--surface);
-  --muted:              var(--surface);
+  --muted:              var(--accent-soft);
   --muted-foreground:   var(--text-secondary);
   --primary:            #6F2DBD;
   --primary-foreground: var(--on-accent);
