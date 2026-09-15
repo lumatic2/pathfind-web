@@ -11,6 +11,7 @@ import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 import { reviewFindings } from './_lib/review-findings.js';
 import { selectFindings } from './_lib/select-findings.js';
+import { renumberBody } from './_lib/citation-marks.js';
 
 // ---------- 상수 ----------
 
@@ -1121,10 +1122,18 @@ export async function POST(request) {
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findingsAfterReview.length);
-    const verdictReason = composeReason(
+    const rawVerdictReason = composeReason(
       parsed?.verdictReason,
       parsed?.reasonPoints,
     ) || (findingsAfterReview.length ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
+
+    // 최종 선정 자료로 본문 인용 번호를 다시 매긴다 (버린 자료 마크는 제거, 남은 자료는 최종 순서로).
+    const fieldsByMark = (parsed?.findings || []).reduce((acc, f, idx) => {
+      const mark = `[${idx + 1}]`;
+      acc[mark] = { id: f.id };
+      return acc;
+    }, {});
+    const verdictReason = renumberBody(rawVerdictReason, findingsAfterReview, fieldsByMark);
 
     let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
