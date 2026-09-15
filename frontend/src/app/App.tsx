@@ -13,7 +13,7 @@ import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestor
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { downloadText, sourceCard } from '../lib/api'
 import { saveRoadmap, newRoadmapId, getRoadmap, toCurrentSession } from '../state/roadmaps'
-import { listRoadmaps } from '../state/roadmaps'
+import { listRoadmaps, renameRoadmap, deleteRoadmap } from '../state/roadmaps'
 import type { SavedRoadmap } from '../state/roadmaps'
 import type { GroundedSource } from '../components/grounded-source-panel'
 import { GroundedSourcePanel } from '../components/grounded-source-panel'
@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
+import { EditableText } from '@/components/editable-text'
 
 type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 
@@ -171,6 +172,38 @@ export default function App() {
     [archiveCurrent, replace],
   )
 
+  const handleRename = useCallback(
+    (id: string, next: string) => {
+      renameRoadmap(id, next)
+      setArchiveItems(listRoadmaps())
+    },
+    [],
+  )
+
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteSecond, setConfirmDeleteSecond] = useState<boolean>(false)
+
+  const handleDeleteAsk = useCallback(
+    (id: string) => {
+      setDeletingId(id)
+      setConfirmDeleteSecond(true)
+    },
+    [],
+  )
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeletingId(null)
+    setConfirmDeleteSecond(false)
+  }, [])
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (deletingId == null) return
+    const id = deletingId
+    setDeletingId(null)
+    deleteRoadmap(id)
+    setArchiveItems(listRoadmaps())
+  }, [deletingId])
+
   useEffect(() => {
     if (session.phase === 'ready') {
       archiveCurrent()
@@ -249,6 +282,12 @@ export default function App() {
         items={archiveItems}
         currentSessionId={session.id ?? null}
         onItemOpen={handleItemOpen}
+        onRename={handleRename}
+        onDeleteAsk={handleDeleteAsk}
+        deletingId={deletingId}
+        confirmDeleteSecond={confirmDeleteSecond}
+        onDeleteCancel={handleDeleteCancel}
+        onDeleteConfirm={handleDeleteConfirm}
       />
     </div>
   )
@@ -910,12 +949,18 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
   )
 }
 
-function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen }: {
+function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen, onRename, onDeleteAsk, deletingId, confirmDeleteSecond, onDeleteCancel, onDeleteConfirm }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   items: SavedRoadmap[]
   currentSessionId: string | null
   onItemOpen: (id: string) => void
+  onRename: (id: string, next: string) => void
+  onDeleteAsk: (id: string) => void
+  deletingId: string | null
+  confirmDeleteSecond: boolean
+  onDeleteCancel: () => void
+  onDeleteConfirm: () => void
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -937,7 +982,7 @@ function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen
               <li key={item.id} className="border-t border-border pt-4 first:pt-0">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium text-foreground">{item.title}</div>
+                    <EditableText as="div" value={item.title} onChange={(next) => onRename(item.id, next)} className="font-medium text-foreground cursor-text" />
                     <div className="text-sm text-muted-foreground mt-0.5">
                       {item.savedAt}
                       {' · '}
@@ -949,7 +994,7 @@ function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen
                       ) : null}
                     </div>
                   </div>
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col items-end gap-1">
                     {item.session === currentSessionId ? (
                       <button
                         type="button"
@@ -967,6 +1012,33 @@ function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen
                         열기
                       </button>
                     )}
+                    {confirmDeleteSecond && deletingId === item.id ? (
+                      <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                        이 패스를 지울까요
+                        <button
+                          type="button"
+                          onClick={onDeleteConfirm}
+                          className="text-sm text-foreground underline underline-offset-2 hover:text-muted-foreground"
+                        >
+                          지우기
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onDeleteCancel}
+                          className="text-sm text-foreground underline underline-offset-2 hover:text-muted-foreground"
+                        >
+                          두기
+                        </button>
+                      </span>
+                    ) : deletingId === item.id ? (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteAsk(item.id)}
+                        className="text-sm text-muted-foreground underline underline-offset-2 hover:text-muted-foreground"
+                      >
+                        이 패스를 지울까요
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </li>
