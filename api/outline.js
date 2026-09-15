@@ -2,6 +2,7 @@
 // 계약: docs/api-contract.md / roadmap/M05-조사결과패널/M05-스텝5.md
 
 import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
+import { logCall } from './_lib/http.js';
 
 const MAX_ITEMS_BEFORE_MODEL = 3; // 미만이면 모델 안 부름
 const OUTLINE_MAX_TOKENS = 1024;
@@ -212,7 +213,7 @@ export async function POST(request) {
     const topics = sanitizeTopics(parsed, itemCount);
     return makeOkResponse(topics, 'solar');
   } catch (err) {
-    console.error('outline.js 오류:', err.message);
+    logCall('outline.POST', 0, 200, { 'x-outline-source': 'fallback' });
     if (err.code === 'NO_KEY') {
       return makeDegradedResponse('fallback');
     }

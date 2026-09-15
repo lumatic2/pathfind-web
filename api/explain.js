@@ -2,6 +2,7 @@
 // 새로 추가. 계약: docs/api-contract.md (solar-pro4, 키 process.env, max_tokens 명시)
 // 노드 id 규칙: docs/app-state.md §2 (s<no>, s<no>-t<i>, s<no>-finding-<i>, s<no>-task-<i>, s<no>-todo-<i>)
 // 판정 표시: 단계 노드 설명에서만 화면 문구 4개 중 하나만. 계약 값 원문은 이 파일 밖으로 안 냄.
+import { logCall } from './_lib/http.js';
 
 const SOLAR_MODEL = 'solar-pro4';
 const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/chat/completions';
@@ -225,7 +226,7 @@ async function callSolar(messages) {
     });
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
-      throw new Error(`Solar API 오류 (${res.status}): ${errBody.slice(0, 300)}`);
+      throw new Error(`Solar API 오류 (${res.status})`);
     }
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
@@ -649,12 +650,13 @@ export async function POST(request) {
     const content = await callSolar(messages);
     const parsed = parseExplainJson(content);
     const out = buildFromModel(node, stage, parsed);
+    logCall('explain.POST', 0, 200, { 'x-explain-source': 'solar' });
     return new Response(JSON.stringify(out), {
       status: 200,
       headers: { 'Content-Type': 'application/json', [SOURCE_HEADER]: 'solar' },
     });
   } catch (err) {
-    console.error('explain.js 오류:', err.message);
+    logCall('explain.POST', 0, 200, { 'x-explain-source': 'fallback' });
     const fb = buildFallback(node, stage);
     return new Response(JSON.stringify(fb), {
       status: 200,
