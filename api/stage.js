@@ -532,15 +532,11 @@ async function runChannelSearch(channelName, query, stage = null) {
     }
     if (channelName === 'stats') {
       const results = await searchKosis(query, MAX_RESULTS_PER_CHANNEL);
-      const stageWords = extractStageWords(stage || {});
-      const { kept, dropped } = gateResultsIfNeeded('stats', query, stage, results, stageWords);
-      return { results: kept, calls: 1, dropped };
+      return { results, calls: 1 };
     }
     if (channelName === 'public_data') {
       const results = await searchPublicData(query);
-      const stageWords = extractStageWords(stage || {});
-      const { kept, dropped } = gateResultsIfNeeded('public_data', query, stage, results, stageWords);
-      return { results: kept, calls: 1, dropped };
+      return { results, calls: 1 };
     }
     return { results: [], calls: 0 };
   } catch (e) {
@@ -1011,14 +1007,6 @@ export async function POST(request) {
         } else if (tc.function.name === 'law_search') {
           results = await searchLaw(q, MAX_RESULTS_PER_CHANNEL);
           chname = 'law';
-          if (stage) {
-            const stageWords = extractStageWords(stage);
-            const { kept, dropped } = gateResultsIfNeeded(chname, q, stage, results, stageWords);
-            results = kept;
-            if (dropped > 0) {
-              logCall('stage.toolRun.gate', 0, 0, { channel: chname, query: q, dropped });
-            }
-          }
         } else {
           results = await searchWeb(q);
         }
