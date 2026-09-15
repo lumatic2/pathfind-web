@@ -376,6 +376,7 @@ const SYSTEM_PROMPT = `당신은 특정 구현 단계의 리서치 결과를 정
   "claimType": "기술"|"정량/법적"|"맥락",
   "verdict": "가져다 써도 됨"|"직접 해야 함"|"섞어야 함"|"쓸 만한 자료 없음",
   "verdictReason": "판정 근거의 첫 한두 문장. 사람에게 설명하는 자리이므로 합니다·입니다로 끝맺습니다.",
+  "verdictLine": "판정 첫 문장. verdict를 한 줄로 짧게 다시 말한다. 사람이 가장 먼저 읽는 한 줄.",
   "reasonPoints": [
     { "label": "무엇에 대한 이야기인지 서너 낱말", "text": "그 한 줄 설명" }
   ] — 항목은 둘에서 넷. label과 text를 적고 빈 text 항목은 넣지 않습니다.
@@ -840,6 +841,7 @@ function extractHost(url) {
 function buildResponse(stage, modelOutput, findings, queries, plannedChannels, calledChannels, calls, source) {
   const findingsCount = findings.length;
   const verdict = normalizeVerdict(modelOutput?.verdict, findingsCount);
+  const verdictLine = modelOutput?.verdictLine || '';
   const verdictReason = composeReason(
     modelOutput?.verdictReason,
     modelOutput?.reasonPoints,
@@ -1320,6 +1322,7 @@ export async function POST(request) {
       icon: stage.icon || '',
       tasks: stage.tasks,
       verdict,
+      verdictLine,
       finalVerdictReason,
       findings: frontendFindings,
       choices: stage.choices || [],
