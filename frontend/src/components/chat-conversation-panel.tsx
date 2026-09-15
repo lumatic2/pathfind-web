@@ -173,27 +173,44 @@ type InlineCtx = { citations?: ChatCitation[]; render?: (c: ChatCitation, i: num
 const INLINE_RE = /\[(\d+)\]|\*\*([^*]+)\*\*|`([^`]+)`/g
 
 function renderInline(text: string, ctx: InlineCtx, keyPrefix: string): ReactNode[] {
+  return renderInlineInner(text, ctx, keyPrefix, 0)[0]
+}
+
+function renderInlineInner(
+  text: string,
+  ctx: InlineCtx,
+  keyPrefix: string,
+  startN: number,
+): [ReactNode[], number] {
+  if (!text) return [[], 0]
   const out: ReactNode[] = []
+  // 모듈 전역 INLINE_RE는 g 플래그라 lastIndex를 건드린다. 재귀 호출이 그 값을 덮어쓰면
+  // 바깥 반복문이 안 끝나므로, 함수 안에서 source로 새 정규식을 매번 만든다(전역은 그대로).
+  const re = new RegExp(INLINE_RE.source, "g")
   let last = 0
-  let n = 0
+  let n = startN
   let m: RegExpExecArray | null
-  INLINE_RE.lastIndex = 0
-  while ((m = INLINE_RE.exec(text))) {
+  let k = 0
+  while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index))
-    const key = `${keyPrefix}-${m.index}`
+    const key = `${keyPrefix}-${k++}`
     if (m[1] !== undefined) {
-      const c = ctx.citations?.find((x) => x.n === Number(m![1]))
+      const n1 = Number(m[1])
+      const c = ctx.citations?.find((x) => x.n === n1)
       // 인용 목록에 없는 번호는 글자 그대로 둔다 — 없는 자료를 가리키는 배지를 만들지 않는다.
       if (c) {
-        out.push(<span key={key}>{ctx.render ? ctx.render(c, n) : <DefaultCitationBadge citation={c} />}</span>)
+        out.push(
+          <span key={key}>
+            {ctx.render ? ctx.render(c, n) : <DefaultCitationBadge citation={c} />}
+          </span>,
+        )
         n += 1
       } else out.push(m[0])
     } else if (m[2] !== undefined) {
-      out.push(
-        <strong key={key} className="font-semibold">
-          {m[2]}
-        </strong>,
-      )
+      // 굵은 글씨 안쪽도 다시 훑는다 — 모델이 심은 [n] 이 배지 로 나오게.
+      const [inner, used] = renderInlineInner(m[2], ctx, `${keyPrefix}-b`, n)
+      out.push(<strong key={key} className="font-semibold">{inner}</strong>)
+      n += used
     } else {
       out.push(
         <code key={key} className="rounded bg-muted px-1 py-0.5 text-[0.9em]">
@@ -204,7 +221,7 @@ function renderInline(text: string, ctx: InlineCtx, keyPrefix: string): ReactNod
     last = m.index + m[0].length
   }
   if (last < text.length) out.push(text.slice(last))
-  return out
+  return [out, n - startN]
 }
 
 const HEADING_RE = /^(#{1,4})\s+(.*)$/
