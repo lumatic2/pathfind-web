@@ -14,47 +14,26 @@ export function renumberBody(body, finalFindings, fieldsByMark) {
   if (!finalFindings || !fieldsByMark) return body;
 
   const finalIds = new Set(finalFindings.map((f) => f.id));
-
-  // 유지할 마크 → 원자료 id / 제거할 마크 목록
-  const keptMarkToId = new Map();
-  const removeMarks = [];
-  for (const [mark, info] of Object.entries(fieldsByMark)) {
-    if (!info || !info.id) continue;
-    if (finalIds.has(info.id)) keptMarkToId.set(mark, info.id);
-    else removeMarks.push(mark);
-  }
-
-  // 최종 자료 배열 순서 → 새 번호 (1부터)
   const idToNewNum = new Map();
   finalFindings.forEach((f, idx) => {
     if (f.id) idToNewNum.set(f.id, idx + 1);
   });
 
-  let out = body;
-
-  // 1) 버릴 마크를 먼저 제거
-  for (const mark of removeMarks) {
-    const escaped = mark.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
-    out = out.replace(new RegExp(escaped, 'g'), '');
-  }
-
-  // 2) 유지 마크를 새 번호로 한 번에 치환 — 유지 마크끼리 서로의 치환 결과가 간섭하지 않게
-  if (keptMarkToId.size > 0) {
-    const markPattern = [...keptMarkToId.keys()]
-      .map((m) => m.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&'))
-      .join('|');
-    out = out.replace(new RegExp(markPattern, 'g'), (match) => {
-      const id = keptMarkToId.get(match);
-      const newNum = idToNewNum.get(id);
-      if (newNum == null) return match;
-      return `[${newNum}]`;
-    });
-  }
-
-  return out;
+  // 본문 인용 마크를 한 번 훑으며 처리
+  // - fieldsByMark에 없는 번호: 그대로 유지
+  // - 원자료와 최종 자료 양쪽에서 식별자를 찾을 수 있을 때만 새 번호
+  // - 못 찾는 번호(최종 자료에 없는 id): 제거
+  // 먼저 바꾼 값이 다시 치환되지 않도록 단일 pass
+  return body.replace(/\[(\d+)\]/g, (match) => {
+    const info = fieldsByMark[match];
+    if (!info || !info.id) return match;       // fieldsByMark에 없거나 id 없음 → 유지
+    if (!finalIds.has(info.id)) return '';     // 최종 자료에 없는 id → 제거
+    const newNum = idToNewNum.get(info.id);
+    return newNum == null ? match : `[${newNum}]`;
+  });
 }
 
-/**
+/***
  * 본문에서 [n] 형태의 인용 마크 개수를 센다.
  * @param {string} body
  * @returns {number}
