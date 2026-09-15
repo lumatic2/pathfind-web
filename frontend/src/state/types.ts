@@ -28,6 +28,9 @@ export type StageScope = {
   calls: number
   queries?: string[]
   planned?: string[]
+  channelStats?: Record<string, { calls: number; returned: number; gated: number; picked: number }>
+  vetRejected?: number
+  vetTimeout?: number
 }
 
 // 큰 그림에서 한 단계가 책임질 개별 할 일.
