@@ -135,7 +135,7 @@ body {
   --orbit-drop: 48px;
   --ring-line: color-mix(in oklch, var(--foreground) 30%, var(--border));
   --avatar: 84px;            /* 인용 카드에 걸터앉는 아바타 */
-  --quote-surface: color-mix(in oklch, var(--askewly-lavender) 16%, var(--card));
+  --quote-surface: color-mix(in oklch, var(--path-lavender) 16%, var(--card));
   --quote-measure: 34ch;     /* 원본 인용 폭 530/1000 */
   --band-overhang: 200px;    /* 카드가 색면 아랫변을 넘어 흰 바탕으로 내려가는 길이 */
   --tile: 56px;              /* 도식의 도구 타일 */

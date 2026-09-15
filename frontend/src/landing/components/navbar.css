@@ -54,7 +54,7 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.logo__accent { fill: var(--askewly-lavender); stroke: currentColor; }
+.logo__accent { fill: var(--path-lavender); stroke: currentColor; }
 .logo__word { translate: 0 -0.04em; }
 
 .nav__menu { display: flex; align-items: center; gap: var(--space-1); }
