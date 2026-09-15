@@ -11,7 +11,7 @@ import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 import { reviewFindings } from './_lib/review-findings.js';
 import { selectFindings } from './_lib/select-findings.js';
-import { renumberBody } from './_lib/citation-marks.js';
+import { renumberBody, countCitationMarks, stripCitationMarks } from './_lib/citation-marks.js';
 
 // ---------- 상수 ----------
 
@@ -744,6 +744,60 @@ function composeReason(leading, points) {
   return lines.join('\n');
 }
 
+/**
+ * 자료가 있는데 본문 인용 번호가 하나도 없으면, 같은 내용으로 한 번만 다시 요청해
+ * 근거 번호만 [n] 형태로 받는다.
+ *
+ * @param {string} originalBody      - composeReason 원본 문장 (마크 포함 가능)
+ * @param {string} renumberedBody    - renumberBody를 통과한 문장
+ * @param {Array}  findings          - 최종 선정 자료 (id 확인용)
+ * @returns {Promise<string>}
+ */
+async function retryMissingCitationNumbers(originalBody, renumberedBody, findings) {
+  // 근거가 될 자료 ids
+  const ids = findings.map((f) => f.id).filter(Boolean);
+  if (ids.length === 0) return renumberedBody;
+
+  // 원문에서 마크를 뺀 것 — 모델과 비교할 때 마크는 의미 없음
+  const originalStripped = stripCitationMarks(originalBody);
+
+  const prompt = [
+    '아래 문장에 근거가 되는 자료 번호를 붙여 주세요.',
+    '자료는 아래 id 목록입니다. 각 자료에 순서대로 [1], [2], ... 번호를 붙입니다.',
+    '문장 안에서 근거가 되는 곳마다 해당 자료의 번호 마크를 붙이되,',
+    '문장 내용은 절대 바꾸지 마세요.',
+    '결과에는 마크가 붙은 문장 하나만 출력하고, 다른 설명은 넣지 마세요.',
+    '',
+    '자료 id: ' + ids.join(', '),
+    '',
+    '원문:',
+    originalBody,
+  ].join('\n');
+
+  try {
+    const messages = [
+      { role: 'system', content: '당신은 근거 번호를 문장에 붙이는 어시스턴트입니다. JSON 없이 문장만 출력합니다.' },
+      { role: 'user', content: prompt },
+    ];
+    const res = await callSolar(messages, { tools: false, tool_choice: 'auto', maxTokens: 1500, timeoutMs: 60_000 });
+    if (!res.content) return renumberedBody;
+
+    const returned = res.content.trim();
+    const returnedStripped = stripCitationMarks(returned);
+    // 마크를 뺀 문장이 원문과 같아야 채택
+    if (returnedStripped !== originalStripped) return renumberedBody;
+
+    // 살아 있는 마크 개수가 원문보다 많아야 채택 (재요청 목적 달성)
+    const returnedMarks = countCitationMarks(returned);
+    if (returnedMarks === 0) return renumberedBody;
+
+    return returned;
+  } catch (e) {
+    logCall('stage.retryMissingCitationNumbers', 0, 0, { err: String(e) });
+    return renumberedBody;
+  }
+}
+
 // ---------- verdictReason / findings 조립 ----------
 
 function assembleFindings(modelOutput, catalog) {
@@ -1135,6 +1189,12 @@ export async function POST(request) {
     }, {});
     const verdictReason = renumberBody(rawVerdictReason, findingsAfterReview, fieldsByMark);
 
+    // ----- 자료가 있는데 살아 있는 인용 번호가 0개면 한 번만 다시 묻는다 -----
+    const markCount = countCitationMarks(verdictReason);
+    const finalVerdictReason = (markCount === 0 && findingsAfterReview.length > 0)
+      ? await retryMissingCitationNumbers(rawVerdictReason, verdictReason, findingsAfterReview)
+      : verdictReason;
+
     let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
       task: t.task,
@@ -1169,7 +1229,7 @@ export async function POST(request) {
       icon: stage.icon || '',
       tasks: stage.tasks,
       verdict,
-      verdictReason,
+      finalVerdictReason,
       findings: frontendFindings,
       choices: stage.choices || [],
       options,

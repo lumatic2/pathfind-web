@@ -53,3 +53,24 @@ export function renumberBody(body, finalFindings, fieldsByMark) {
 
   return out;
 }
+
+/**
+ * 본문에서 [n] 형태의 인용 마크 개수를 센다.
+ * @param {string} body
+ * @returns {number}
+ */
+export function countCitationMarks(body) {
+  if (!body || typeof body !== 'string') return 0;
+  const m = body.match(/\[\d+\]/g);
+  return m ? m.length : 0;
+}
+
+/**
+ * 본문에서 [n] 형태의 인용 마크를 모두 제거한 문자열을 반환한다.
+ * @param {string} body
+ * @returns {string}
+ */
+export function stripCitationMarks(body) {
+  if (!body || typeof body !== 'string') return '';
+  return body.replace(/\[\d+\]/g, '');
+}
