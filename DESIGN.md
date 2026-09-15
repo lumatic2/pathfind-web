@@ -26,7 +26,7 @@ AI 시대, 하려는 일을 한 문단 받아 → 기존 해결책·사례를 �
 | 토큰 | 값 | 용도 |
 | --- | --- | --- |
 | surface | `#ffffff` | 카드·입력창·본문 배경 |
-| accent | `#4f4bcb` | 링크·Primary 버튼·포커스 |
+| accent | `#6F2DBD` | 링크·Primary 버튼·포커스 |
 | accent-soft | `#f3f5ff` | 헤더 배경·Pill 배경 등 오프화이트 톤 |
 | text | `#0a0a0a` | 헤드라인·본문 |
 | text-secondary | `#5a5a5a` | 보조 텍스트 |
