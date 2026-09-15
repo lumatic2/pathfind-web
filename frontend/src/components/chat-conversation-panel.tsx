@@ -212,7 +212,7 @@ type InlineCtx = { citations?: ChatCitation[]; render?: (c: ChatCitation, i: num
  * ⚠ **차례가 뜻을 정한다.** 이미지(`![…](…)`)를 링크보다 먼저, 링크(`[…](…)`)를 인용(`[n]`)보다 먼저 본다 —
  * 링크를 뒤에 두면 `[3](https://…)` 의 앞머리가 인용으로 먼저 잡혀 주소가 글자로 샌다.
  */
-const INLINE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|\[(\d+)\]|\*\*([^*]+)\*\*|`([^`]+)`/g
+const INLINE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)|\[([^\]]+)\]\(([^)\s]+)\)|\[(\d+)\]|\*\*([^*]+)\*\*|`([^`]+)`|https?:\/\/[^)\s<>\[\]{}|\\^`]+|#[^)\s<>\[\]{}|\\^`]+/g
 
 /**
  * 화면에 실을 수 있는 주소인가. **`javascript:` 같은 스킴을 막는다** — 모델이 낸 문자열이 그대로 `href` 가 되는 자리다.
@@ -259,7 +259,7 @@ function renderInlineParts(text: string, ctx: InlineCtx, keyPrefix: string, star
         ),
       )
     } else if (m[4] !== undefined) {
-      // 링크 — 막힌 스킴이면 **글만 남긴다**. 죽은 링크를 만드느니 글로 두는 쪽이 낫다.
+      // 마크다운 링크 — 막힌 스킴이면 글만 남긴다.
       const href = safeUrl(m[4])
       const label = m[3] ?? ""
       out.push(
@@ -294,6 +294,19 @@ function renderInlineParts(text: string, ctx: InlineCtx, keyPrefix: string, star
         <strong key={key} className="font-semibold">
           {inner.nodes}
         </strong>,
+      )
+    } else if (m[8] !== undefined || m[9] !== undefined) {
+      // 본문에 그대로 적힌 웹 주소·페이지 안 앵커 — 안전한 것만 새 창 링크로 그린다.
+      const raw = (m[8] ?? m[9])!
+      const url = safeUrl(raw)
+      out.push(
+        url ? (
+          <a key={key} href={url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 hover:text-foreground">
+            {raw}
+          </a>
+        ) : (
+          <span key={key}>{raw}</span>
+        ),
       )
     } else {
       out.push(
