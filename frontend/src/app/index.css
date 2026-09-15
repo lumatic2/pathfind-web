@@ -73,8 +73,23 @@ body {
   color: var(--foreground);
 }
 
+/* ── 클릭 가능한 것에는 손가락 커서 ── */
+@layer base {
+  button:not(:disabled),
+  summary,
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  a[href]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  [aria-disabled="true"] {
+    cursor: default;
+  }
+}
+
 @keyframes chat-message-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
   to   { opacity: 1; transform: none; }
 }
 
@@ -85,14 +100,9 @@ body {
 
 .chat-block-in {
   animation: chat-block-in 0.32s cubic-bezier(0.2, 0.8, 0.25, 1) both;
-  --block-delay: 0ms;
-  animation-delay: var(--block-delay);
+  animation-delay: var(--block-delay, 0ms);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-message-in,
-  .chat-block-in,
-  * {
-    animation: none !important;
-  }
+  .chat-block-in { animation: none; }
 }
