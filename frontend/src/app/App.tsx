@@ -325,6 +325,8 @@ const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedC
   const [detailId, setDetailId] = useState<string | null>(null)
   const inflightRef = useRef<Set<string>>(new Set())
   const triedRef = useRef<Set<string>>(new Set())
+  const prefillKeyRef = useRef<string | null>(null)
+  const prefillRunningRef = useRef(false)
 
   function sourceDocToGrounded(node: SourceDoc): GroundedSource {
     const children = node.children != null ? node.children.map(sourceDocToGrounded) : undefined
@@ -402,6 +404,69 @@ const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedC
   }, [tree, session.sourceExpandedIds, collapsed, onCollapsedChange, patch, handleDetailChange])
 
   useImperativeHandle(ref, () => ({ openSourceDoc }), [openSourceDoc])
+
+  useEffect(() => {
+    if (session.phase !== 'ready') return
+    if (prefillRunningRef.current) return
+
+    const cards = session.sourceCards ?? {}
+    const inflight = inflightRef.current
+    const toPrefill: string[] = []
+    for (const slot of session.stages) {
+      if (slot.status !== 'done') continue
+      const stage = slot.stage
+      const findings = stage.findings
+      if (findings == null) continue
+      for (let i = 0; i < findings.length; i++) {
+        const id = `stage-${stage.no}-finding-${i}`
+        if (cards[id] != null) continue
+        if (inflight.has(id)) continue
+        toPrefill.push(id)
+      }
+    }
+    if (toPrefill.length === 0) return
+
+    toPrefill.sort((a, b) => a < b ? -1 : a > b ? 1 : 0)
+    const key = toPrefill.join('\n')
+    if (prefillKeyRef.current === key) return
+    prefillKeyRef.current = key
+    prefillRunningRef.current = true
+
+    let index = 0
+    async function drain() {
+      if (index >= toPrefill.length) {
+        prefillRunningRef.current = false
+        return
+      }
+      const batch = toPrefill.slice(index, index + 2)
+      index += batch.length
+      await Promise.allSettled(
+        batch.map(async (id) => {
+          const m = id.match(/^stage-(\d+)-finding-(\d+)$/)
+          if (m == null) return
+          const stageNo = parseInt(m[1], 10)
+          const idx = parseInt(m[2], 10)
+          const slot = session.stages[stageNo - 1]
+          if (slot == null) return
+          const stage = slot.stage
+          const finding = stage.findings?.[idx]
+          if (finding == null) return
+          try {
+            const res = await sourceCard({ finding, stage, summary: session.summary ?? '' })
+            if (!res.degraded && res.markdown.trim().length > 0) {
+              patch({ sourceCards: { ...cards, [id]: res.markdown } })
+            }
+          } catch {
+            // 실패는 조용히 넘기고 tried에는 넣지 않는다
+          }
+        }),
+      )
+      await drain()
+    }
+    drain().catch(() => {
+      prefillRunningRef.current = false
+    })
+  }, [session.phase, session.stages, session.sourceCards, session.summary, patch])
 
   return (
     <div className="panel-left">
