@@ -11,7 +11,8 @@ import { isFoldLine, isSearchLine } from './chatRelevance'
 import { renderMarkdown } from '../components/chat-conversation-panel'
 import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestors } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
-import { sourceCard } from '../lib/api'
+import { downloadText, sourceCard } from '../lib/api'
+import { saveRoadmap, newRoadmapId } from '../state/roadmaps'
 import type { GroundedSource } from '../components/grounded-source-panel'
 import { GroundedSourcePanel } from '../components/grounded-source-panel'
 import {
@@ -57,9 +58,13 @@ function titleForSession(session: ReturnType<typeof useSession>['session']): str
 
 export default function App() {
   const { session, patch } = useSession()
+  const sessionRef = useRef(session)
+  sessionRef.current = session
   const quota = useQuota()
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
+  const [footerAlert, setFooterAlert] = useState<string | null>(null)
+  const pendingArchiveIdRef = useRef<string | null>(null)
 
   const topTitle = titleForSession(session)
 
@@ -99,6 +104,60 @@ export default function App() {
   const leftPanelRef = useRef<LeftPanelHandle>(null)
   const [openCitationN, setOpenCitationN] = useState<number | null>(null)
 
+  const { buildRoadmap } = useFlow()
+  const waitingForRoadmapRef = useRef(false)
+
+  const handleRoadmapDownload = useCallback(() => {
+    const md = session.exportState.roadmapMarkdown
+    if (md != null && md.trim().length > 0) {
+      downloadText('PATH.md', md)
+      return
+    }
+    waitingForRoadmapRef.current = true
+    buildRoadmap()
+  }, [session.exportState.roadmapMarkdown, buildRoadmap])
+
+  const archiveCurrent = useCallback(() => {
+    const current = sessionRef.current
+    if (current.bigPicture == null) return
+
+    const id =
+      current.id ??
+      pendingArchiveIdRef.current ??
+      newRoadmapId()
+    if (current.id == null) {
+      pendingArchiveIdRef.current = id
+    }
+
+    const result = saveRoadmap(current, id)
+    if (!result.ok) {
+      setFooterAlert(
+        '이 패스를 보관하지 못했습니다. 브라우저 저장 공간이 찼습니다.'
+      )
+      return
+    }
+
+    setFooterAlert(null)
+    if (current.id == null) {
+      patch({ id: result.id })
+    }
+  }, [patch])
+
+  useEffect(() => {
+    if (session.phase === 'ready') {
+      archiveCurrent()
+    }
+  }, [session.phase, archiveCurrent])
+
+  useEffect(() => {
+    if (session.exportState.roadmapMarkdown != null && session.exportState.roadmapMarkdown.trim().length > 0) {
+      if (waitingForRoadmapRef.current) {
+        downloadText('PATH.md', session.exportState.roadmapMarkdown)
+        waitingForRoadmapRef.current = false
+      }
+    }
+  }, [session.exportState.roadmapMarkdown])
+
   const renderCitation = useCallback((citation: ChatCitation, index: number) => {
     const doc = resolveCitation(sourceTree(session), citation)
     return (
@@ -122,7 +181,7 @@ export default function App() {
       <NotebookWorkspaceShell
         ratios={[22, 43, 35]}
         left={<LeftPanel ref={leftPanelRef} collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
-        center={<CenterPanel renderCitation={renderCitation} />}
+        center={<CenterPanel renderCitation={renderCitation} onRoadmapDownload={handleRoadmapDownload} />}
         right={<RightPanel />}
         leftCollapsed={leftCollapsed}
         onLeftCollapsedChange={setLeftCollapsed}
@@ -132,10 +191,21 @@ export default function App() {
           <NotebookTopbar
             title={topTitle}
             onTitleChange={handleTitleChange}
-            actions={[]}
+            actions={[
+              {
+                id: 'path',
+                label: session.exportState.busy ? '만드는 중' : 'PATH.md',
+                onClick: handleRoadmapDownload,
+                disabled:
+                  session.phase !== 'ready' ||
+                  session.stages.filter((s) => s.status === 'done').length === 0 ||
+                  session.busy,
+              },
+            ]}
             statusSlot={topStatusSlot}
           />
         }
+        footer={footerAlert}
       />
     </div>
   )
@@ -273,7 +343,7 @@ const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedC
   )
 })
 
-function CenterPanel({ renderCitation }: { renderCitation?: (citation: ChatCitation, index: number) => React.ReactNode }) {
+function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (citation: ChatCitation, index: number) => React.ReactNode; onRoadmapDownload?: () => void }) {
   const { sendAnswer, approve, reviseSummary, retry, resumeResearch, fillMissingOutlines, sendChat } = useFlow()
   const { session, patch } = useSession()
   const resumeRef = useRef(false)
@@ -462,6 +532,10 @@ function CenterPanel({ renderCitation }: { renderCitation?: (citation: ChatCitat
 
   const handleSuggestion = (s: string) => {
     if (s === directInputLabel) return
+    if (s === 'PATH.md 내려받기') {
+      onRoadmapDownload?.()
+      return
+    }
     if (session.phase === "ready") {
       sendChat(s)
       return
