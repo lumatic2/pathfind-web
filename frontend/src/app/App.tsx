@@ -988,7 +988,7 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
           className={cn(
             'ml-1 inline-flex shrink-0 items-center justify-center rounded-full bg-muted align-middle font-medium text-muted-foreground outline-none ring-ring ring-offset-1 ring-offset-background focus-visible:ring-2',
           )}
-          style={{ width: 22, height: 22, fontSize: 11, lineHeight: '16px' }}
+          style={{ width: 18, height: 18, fontSize: 10, lineHeight: '14px' }}
           onPointerEnter={onPointerEnter}
           onPointerLeave={onPointerLeave}
           onFocus={onFocus}
