@@ -929,83 +929,62 @@ function channelTallyHuman(tally: { channel: string; count: number }[]): string 
 }
 
 /**
- * 저장된 결과 줄·진행 줄을 사람 말로 바꿔 돌려준다.
- * 결과 줄도 진행 줄도 아니면 입력 그대로 돌려준다.
- *
- * 결과 줄 저장 형식(flow.ts runStage §8):
- *   `${번호}. ${제목}\n\n**${verdict}**${tal리Suffix}${마커Suffix}`
- *   tallySuffix = ` (웹 2·법령 1)` 형태, markerSuffix = ` [1, 2]` 형태
- *
- * 진행 줄 저장 형식:
- *   `${번호}. ${제목} · ${상태}` — 이음표(·)로 제목과 상태를 잇는다
- */
-export function displayStageResult(text: string, stage?: Stage): string {
+ /** 저장된 결과 줄·진행 줄을 사람 말로 바꿔 돌려준다.
+  * 결과 줄도 진행 줄도 아니면 입력 그대로 돌려준다.
+  *
+  * 결과 줄 저장 형식(flow.ts runStage §8):
+  *   `${번호}. ${제목}\n\n**${verdict}**${tal리Suffix}${마커Suffix}`
+  *   tallySuffix = ` (웹 2·법령 1)` 형태, markerSuffix = ` [1, 2]` 형태
+  *
+  * 진행 줄 저장 형식:
+  *   `${번호}. ${제목} · ${상태}` — 이음표(·)로 제목과 상태를 잇는다
+  */
+ function stageResultLine(
+   numStr: string,
+   title: string,
+   verdict: string,
+   markerRaw: string | undefined,
+   stage?: Stage,
+ ): string {
+   const first = `## ${numStr}. ${title}`
+   const humanVerdict = VERDICT_TO_HUMAN[verdict as Verdict]
+   let second = `**${humanVerdict}**`
+   if (markerRaw) {
+     const inner = markerRaw.slice(1, -1).trim()
+     if (inner.length > 0) {
+       const nums = inner.split(',').map((s) => s.trim()).filter(Boolean)
+       if (nums.length > 0) {
+         second += ' ' + nums.map((n) => `[${n}]`).join(' ')
+       }
+     }
+   }
+   const out = [first, second]
+   if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
+     const reason = stage.verdictReason.trim()
+     if (!SERVER_FILLED_VERDICT_REASONS.includes(reason as (typeof SERVER_FILLED_VERDICT_REASONS)[number])) {
+       out.push(reason)
+     }
+   }
+   return out.join('\n\n')
+ }
+
+ export function displayStageResult(text: string, stage?: Stage): string {
   // 결과 줄: "번호. 제목\n\n**계약값** (채널집계)[마커]" — 두 문단+α로 폰다
   const resultRe =
     /^(\d+)\. (.+)\n\n\*\*(가져다 써도 됨|직접 해야 함|섞어야 함|선례를 못 찾음)\*\*\s*(\(.*?\))?(\[.*?\])?$/
   const resultMatch = text.match(resultRe)
   if (resultMatch) {
-    const [, numStr, title, verdict, tallyRaw] = resultMatch
-    const first = `${numStr}. ${title}`
-    const humanVerdict = VERDICT_TO_HUMAN[verdict as Verdict]
-    let second = `**${humanVerdict}**`
-    if (tallyRaw) {
-      const inner = tallyRaw.slice(1, -1).trim()
-      if (inner.length > 0) {
-        const items = inner.split("·").map((s) => s.trim()).filter(Boolean)
-        const parts = items.map((item) => {
-          const m = item.match(/^(.+?) (\d+)$/)
-          if (m) {
-            const chName = CHANNEL_HUMAN[m[1]] ?? m[1]
-            return `${chName}에서 자료 ${m[2]}건`
-          }
-          return item
-        })
-        if (parts.length > 0) second += ` ${parts.join(" · ")}`
-      }
-    }
-    const out = [first, second]
-    if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
-      const reason = stage.verdictReason.trim()
-      if (!SERVER_FILLED_VERDICT_REASONS.includes(reason as (typeof SERVER_FILLED_VERDICT_REASONS)[number])) {
-        out.push(reason)
-      }
-    }
-    return out.join("\n\n")
+    const [, numStr, title, verdict, , markerRaw] = resultMatch
+    return stageResultLine(numStr, title, verdict, markerRaw, stage)
   }
 
   // 결과 줄(구형): "번호. 제목 → **계약값** (채널집계)[마커]" — 한 줄에 화살표+계약값
   const arrowResultRe =
-    /^(\d+)\. (.+) → \*\*(가져다 써도 됨|직접 해야 함|섞어야 함|선례를 못 찾음)\*\*\s*(\(.*?\))?(\[.*?\])?$/
+    /^(\d+)\. (.+) → \*\*(가져다 써도 됨|직접 해야 함|섞어야 함|선례를 못 찾음)\*\*\s*(\(.*?\))?(\[.*?])?$/
   const arrowResultMatch = text.match(arrowResultRe)
   if (arrowResultMatch) {
-    const [, numStr, title, verdict, tallyRaw, markerRaw] = arrowResultMatch
-    const first = `${numStr}. ${title}`
-    const humanVerdict = VERDICT_TO_HUMAN[verdict as Verdict]
-    let second = `**${humanVerdict}**`
-    if (tallyRaw) {
-      const inner = tallyRaw.slice(1, -1).trim()
-      if (inner.length > 0) {
-        const items = inner.split("·").map((s) => s.trim()).filter(Boolean)
-        const parts = items.map((item) => {
-          const m = item.match(/^(.+?) (\d+)$/)
-          if (m) {
-            const chName = CHANNEL_HUMAN[m[1]] ?? m[1]
-            return `${chName}에서 자료 ${m[2]}건`
-          }
-          return item
-        })
-        if (parts.length > 0) second += ` ${parts.join(" · ")}`
-      }
-    }
-    const out = [first, second]
-    if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
-      const reason = stage.verdictReason.trim()
-      if (!SERVER_FILLED_VERDICT_REASONS.includes(reason as (typeof SERVER_FILLED_VERDICT_REASONS)[number])) {
-        out.push(reason)
-      }
-    }
-    return out.join("\n\n")
+    const [, numStr, title, verdict, , markerRaw] = arrowResultMatch
+    return stageResultLine(numStr, title, verdict, markerRaw, stage)
   }
 
   // 진행 줄: "번호. 제목 · 상태" — 이음표를 두고 한 줄로 편다
