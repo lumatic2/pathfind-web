@@ -4,7 +4,7 @@ import { FileText } from 'lucide-react'
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
-import type { ChatEntry } from '../state/types'
+import type { ChatEntry, GrillChoice } from '../state/types'
 import type { ChatMessage, ChatStatus } from '../components/chat-conversation-panel'
 import { ChatConversationPanel } from '../components/chat-conversation-panel'
 import { isFoldLine, isSearchLine } from './chatRelevance'
@@ -239,7 +239,7 @@ function LeftPanel({ collapsed, onCollapsedChange }: { collapsed: boolean; onCol
 
 
 function CenterPanel() {
-  const { sendAnswer, approve, reviseSummary, retry, resumeResearch, fillMissingOutlines } = useFlow()
+  const { sendAnswer, approve, reviseSummary, retry, resumeResearch, fillMissingOutlines, sendChat } = useFlow()
   const { session, patch } = useSession()
   const resumeRef = useRef(false)
 
@@ -316,9 +316,28 @@ function CenterPanel() {
           "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
           directInputLabel,
         ]
-      : isApproval
-        ? lastMessage.suggestions ?? []
-        : session.pending?.exampleButtons ?? []
+      : session.phase === "ready"
+        ? lastMessage.suggestions == null
+          ? [
+              "이 로드맵에서 먼저 할 일은",
+              "직접 만들 것만 순서대로 정리해 줘",
+              "PATH.md 내려받기",
+              directInputLabel,
+            ]
+          : lastMessage.suggestions.map((s): string =>
+              typeof s === "string" ? s : (s as GrillChoice).label
+            )
+        : isApproval
+          ? lastMessage.suggestions == null
+            ? []
+            : lastMessage.suggestions.map((s): string =>
+                typeof s === "string" ? s : (s as GrillChoice).label
+              )
+          : session.pending?.exampleButtons == null
+            ? []
+            : session.pending.exampleButtons.map((s): string =>
+                typeof s === "string" ? s : (s as GrillChoice).label
+              )
 
   const chatMessages: AppChatMessage[] = (() => {
     const out: AppChatMessage[] = []
@@ -374,6 +393,10 @@ function CenterPanel() {
 
   const handleSend = (text: string) => {
     if (text === directInputLabel) return
+    if (session.phase === "ready") {
+      sendChat(text)
+      return
+    }
     if (isApproval && !editIntent) {
       reviseSummary()
     }
@@ -382,6 +405,10 @@ function CenterPanel() {
 
   const handleSuggestion = (s: string) => {
     if (s === directInputLabel) return
+    if (session.phase === "ready") {
+      sendChat(s)
+      return
+    }
     if (isApproval) {
       if (s === "맞아요, 이대로 조사해 주세요") {
         approve()
@@ -411,11 +438,13 @@ function CenterPanel() {
   const waitingLabel: string | undefined =
     session.pending != null
       ? "다음 질문을 고르는 중…"
-      : researchActive && session.runActivity != null
-        ? onSilence
-          ? "조금 오래 걸리는 단계입니다. 계속 기다리는 중이에요."
-          : session.runActivity
-        : undefined
+      : session.phase === "ready" && session.busy
+        ? "조사 문서에서 찾는 중이야"
+        : researchActive && session.runActivity != null
+          ? onSilence
+            ? "조금 오래 걸리는 단계입니다. 계속 기다리는 중이에요."
+            : session.runActivity
+          : undefined
 
   const renderAssistantMark = researchActive && session.runActivity != null
     ? () => <span className="research-run-mark">{session.runActivity}</span>

@@ -231,7 +231,7 @@ export async function explain(
 // 6. chat
 export interface ChatRequest {
   summary: string;
-  bigPicture: BigPicture;
+  bigPicture?: BigPicture;
   stages: Stage[];
   history: { role: 'user' | 'assistant'; text: string; kind?: string }[];
 }

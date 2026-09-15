@@ -2,17 +2,21 @@ import { useCallback, useRef } from 'react'
 
 import { useSession } from './store'
 import {
+  chat,
+  downloadText,
   grill,
+  handoff,
   pathfind,
   outline,
   runPool,
   stage,
   RateLimited,
+  type ChatRequest,
   type PoolItem,
 } from '../lib/api'
 import { consumeQuota, readQuota } from './quota'
 import { normalizeVerdict, channelTally, channelShort } from './derive'
-import type { Finding, GrillResponse, GrillTurn, StageSlot, Stage } from './types'
+import type { Finding, GrillChoice, GrillResponse, GrillTurn, StageSlot, Stage } from './types'
 
 let nextId = 1
 
@@ -23,9 +27,16 @@ function msgId(): string {
 /** GrillTurn → api.grill의 history 행(답변 필드 제거) */
 function questionMeta(turn: GrillTurn) {
   const { answer: _a, ...meta } = turn
-  return meta
+  const exampleButtons:
+    | string[]
+    | { questionTitle: string; questionBody: string; suggestion: string; exampleButtons: string[]; }
+    = Array.isArray(meta.exampleButtons)
+      ? meta.exampleButtons.map((b) =>
+          typeof b === 'string' ? b : (b as GrillChoice).label
+        )
+      : []
+  return { ...meta, exampleButtons }
 }
-
 
 export function useFlow() {
   const { session, patch } = useSession()
@@ -590,5 +601,94 @@ export function useFlow() {
       })
   }
 
-  return { sendAnswer, approve, reviseSummary, startResearch, retry, resumeResearch, fillMissingOutlines }
+  const sendChat = useCallback(
+    (text: string) => {
+      const current = sessionRef.current
+
+      if (current.phase !== 'ready') return
+
+      const history: ChatRequest['history'] = [
+        ...current.messages
+          .filter((m) => m.kind === 'chat' || m.kind === 'node-explain')
+          .map((m) => ({ role: m.role, text: m.text, kind: m.kind })),
+        { role: 'user', text, kind: 'chat' },
+      ]
+
+      patch({
+        messages: [
+          ...current.messages,
+          {
+            id: msgId(),
+            role: 'user',
+            text,
+            kind: 'chat',
+            suggestions: [],
+          },
+        ],
+        busy: true,
+        error: null,
+      })
+
+      chat({
+        summary: current.summary,
+        bigPicture: current.bigPicture ?? undefined,
+        stages: current.stages.map((s) => s.stage),
+        history,
+      })
+        .then((res) => {
+          const latest = sessionRef.current
+          const followupChips: string[] =
+            res.followups.length > 0
+              ? res.followups
+              : ['이 로드맵에서 먼저 할 일은', '직접 만들 것만 순서대로 정리해 줘', 'ROADMAP.md 내려받기']
+
+          patch({
+            messages: [
+              ...latest.messages,
+              {
+                id: msgId(),
+                role: 'assistant',
+                text: res.answer,
+                kind: 'chat',
+                citationTitles: res.citationTitles,
+                citationIds: res.citationIds,
+                suggestions: [...followupChips, '직접 입력'],
+              },
+            ],
+            busy: false,
+          })
+        })
+        .catch(() => {
+          patch({
+            error: '잠시 문제가 있었습니다. 다시 시도해 주세요.',
+            busy: false,
+          })
+        })
+    },
+    [patch],
+  )
+
+  const downloadRoadmap = useCallback(() => {
+    const current = sessionRef.current
+    if (current.bigPicture == null) return
+    handoff({
+      bigPicture: current.bigPicture,
+      stages: current.stages.map((s) => s.stage),
+      summary: current.summary,
+    }).then((res) => {
+      downloadText('ROADMAP.md', res.handoffMarkdown)
+    })
+  }, [patch])
+
+  return {
+    sendAnswer,
+    approve,
+    reviseSummary,
+    startResearch,
+    retry,
+    resumeResearch,
+    fillMissingOutlines,
+    sendChat,
+    downloadRoadmap,
+  }
 }
