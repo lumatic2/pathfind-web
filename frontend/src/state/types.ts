@@ -117,7 +117,7 @@ export type ChatEntry = {
   role: ChatRole
   text: string
   kind?: "question" | "summary-approval" | "progress" | "node-explain" | "chat"
-  suggestions?: string[]
+  suggestions?: string[] | GrillChoice[]
   citationTitles?: string[]
   citationIds?: string[]
 }

@@ -66,7 +66,8 @@ function setMsg(el, text, ok) {
 }
 
 function exampleBtnHTML(btn) {
-  return `<button class="example-btn" type="button">${btn}</button>`;
+  const label = typeof btn === 'string' ? btn : (btn && btn.label ? btn.label : '');
+  return `<button class="example-btn" type="button">${label}</button>`;
 }
 
 export { $, q, state, dom, show, hide, setMsg, exampleBtnHTML };
