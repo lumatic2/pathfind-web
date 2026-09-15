@@ -12,7 +12,47 @@
 
 export type Asset = { src: string; ratio: string };
 
-export const content = {
+export type Quote = { idx: number; text: string; name: string; role?: string };
+
+export const content: {
+  brand: { name: string; wordmark: string };
+  nav: {
+    menus: Array<{ label: string; href: string; size: 'lg'; items: Array<{ label: string; href: string; desc: string }> }>;
+    links: Array<{ label: string; href: string }>;
+    end: Array<{ label: string; href: string; marked: boolean }>;
+  };
+  hero: {
+    title: string[];
+    lede: string[];
+    cta: { label: string; href: string };
+    layers: { far: { src: string }; mid: { src: string }; near: { src: string } };
+    lights: string[];
+    clouds: Array<Asset & { width: number; left?: number; right?: number; top: number }>;
+  };
+  trust: {
+    title: { before: string; number: string; after: string; line2: string[] };
+    avatars: { src: string; cols: number; rows: number };
+    nodes: Array<{ angle: number; r: number; size: number; idx: number; bubble?: 'a' | 'b' }>;
+    bubbles: { a: string; b: string };
+  };
+  quotes: Quote[];
+  compare: {
+    title: string[];
+    lede: string;
+    left: { heading: string; tiles: Array<{ label: string; icon: string; left: number; top: number }> };
+    right: { heading: string; hub: string; spokes: Array<{ label: string; icon: string; left: number; top: number }> };
+    cta: { label: string; href: string };
+  };
+  team: { title: string[]; items: Array<{ icon: string; lead: string; rest: string }> };
+  cta: { title: string[]; text: string[]; button: { label: string; href: string }; figure: Asset };
+  start: { title: string[]; links: Array<{ label: string[]; href: string; tone: 'solid' | 'quiet' }> };
+  footer: {
+    tagline: string;
+    columns: Array<{ title: string; href: string; links: Array<{ label: string; href: string }> }>;
+    copyright: string;
+    terms: Array<{ label: string; href: string }>;
+  };
+} = {
   brand: {
     /** 접근성 라벨·저작권에 쓰는 이름 */
     name: 'Pathfinder',
@@ -28,15 +68,15 @@ export const content = {
         href: '#compare',
         size: 'lg' as const,
         items: [
-          { label: '인터뷰', href: '#compare', desc: '하려는 일을 묻고 정리합니다' },
-          { label: '조사', href: '#compare', desc: '이미 있는 것을 찾습니다' },
-          { label: '판정', href: '#compare', desc: '가져다 쓸지 직접 할지 가릅니다' },
-          { label: '패스', href: '#compare', desc: '단계별로 그려 드립니다' },
+          { label: '인터뷰', href: '#start', desc: '하려는 일을 묻고 정리합니다' },
+          { label: '조사', href: '#trust', desc: '이미 있는 것을 찾습니다' },
+          { label: '판정', href: '#compare', desc: '가져다 쓸 것과 만들 것을 판단합니다' },
+          { label: '패스', href: '#team', desc: '단계별로 그려 드립니다' },
         ],
       },
     ],
     /** 패널 없는 단순 링크 */
-    links: [{ label: '누구에게 맞나요', href: '#team' }],
+    links: [{ label: '누구에게 필요한가요', href: '#team' }],
     /** 오른쪽 끝 — 두 번째만 밑줄 강조 */
     end: [
       { label: '로그인', href: '#cta', marked: false },
@@ -86,7 +126,7 @@ export const content = {
 
   trust: {
     /** "<b>4곳</b>에서 찾습니다" — 강조 숫자만 따로 */
-    title: { before: '', number: '4곳', after: '에서 찾습니다', line2: '웹 검색, 국가법령, 국가통계, 공공데이터' },
+    title: { before: '', number: '다섯 곳', after: '에서 찾습니다', line2: ['웹 검색 · 오픈소스', '국가법령 · 국가통계 · 공공데이터'] },
     /** 아바타 시트 5열 × 2행. `idx` 0~9 로 칸을 고른다 */
     avatars: { src: '/avatars.png', cols: 5, rows: 2 },
     /** 동심원 위 아바타 9 — **극좌표**다.
@@ -114,20 +154,17 @@ export const content = {
     {
       idx: 9,
       text: '동네 카페 창업을 넣었더니 임대차·위생·간판 단계가 갈려서, 뭘 먼저 알아봐야 할지 보이더라고요.',
-      name: '예시 패스: 동네 카페 창업',
-      role: '예시 패스 · 6단계 · 12자료',
+      name: '동네 카페 창업',
     },
     {
       idx: 7,
       text: '동아리 회비 정산을 넣었더니 회계를 직접 해야 하는 부분과 이미 있는 서식·툴을 가져다 쓸 부분이 나뉘었어요.',
-      name: '예시 패스: 동아리 회비 정산',
-      role: '예시 패스 · 4단계 · 8자료',
+      name: '동아리 회비 정산',
     },
     {
       idx: 2,
       text: '논문 정리 서비스를 넣었더니 문헌 검색과 목차 설계는 조사로, 편집 도구 선택은 판정으로 갈리더라고요.',
-      name: '예시 패스: 논문 정리 서비스',
-      role: '예시 패스 · 5단계 · 10자료',
+      name: '논문 정리 서비스',
     },
   ],
 
