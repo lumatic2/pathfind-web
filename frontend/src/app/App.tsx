@@ -649,21 +649,68 @@ function CenterPanel({ renderCitation, onRoadmapDownload }: { renderCitation?: (
       return verdictRe.test(text)
     }
 
-    const entryToMessage = (m: ChatEntry, sectionStart?: boolean): AppChatMessage => ({
-      id: m.id,
-      role: m.role,
-      text: m.text,
-      kind: m.kind,
-      sectionStart,
-      citations:
-        m.citationTitles != null
-          ? m.citationTitles.map((t, i) => ({
-              n: i + 1,
-              title: t,
-              id: m.citationIds?.[i] ?? undefined,
-            }))
-          : undefined,
-    })
+    const entryToMessage = (m: ChatEntry, sectionStart?: boolean): AppChatMessage => {
+      const stage = isStageResultLine(m.text)
+        ? stageSlotByResultLine(m.text)
+        : undefined
+      let citations: AppChatMessage['citations']
+      if (m.citationTitles != null) {
+        const saved = m.citationTitles
+        if (
+          stage != null &&
+          stage.findings != null &&
+          saved.length < stage.findings.length
+        ) {
+          const out: ChatCitation[] = []
+          const used = new Set<number>()
+          for (let i = 0; i < saved.length; i++) {
+            const t = saved[i]
+            const fidx = stage.findings.findIndex((f) => (f.name ?? '') === t)
+            if (fidx >= 0) {
+              used.add(fidx)
+              out.push({
+                n: out.length + 1,
+                title: t,
+                id: `stage-${stage.no}-finding-${fidx}`,
+              })
+            } else {
+              out.push({
+                n: out.length + 1,
+                title: t,
+                id: m.citationIds?.[i] ?? undefined,
+              })
+            }
+          }
+          for (let i = 0; i < stage.findings.length; i++) {
+            if (!used.has(i)) {
+              const f = stage.findings[i]
+              out.push({
+                n: out.length + 1,
+                title: f.name ?? '',
+                id: `stage-${stage.no}-finding-${i}`,
+              })
+            }
+          }
+          citations = out
+        } else {
+          citations = saved.map((t, i) => ({
+            n: i + 1,
+            title: t,
+            id: m.citationIds?.[i] ?? undefined,
+          }))
+        }
+      } else {
+        citations = undefined
+      }
+      return {
+        id: m.id,
+        role: m.role,
+        text: m.text,
+        kind: m.kind,
+        sectionStart,
+        citations,
+      }
+    }
 
     const flushBuffer = (attachLast: boolean) => {
       if (buffer.length === 0) return
