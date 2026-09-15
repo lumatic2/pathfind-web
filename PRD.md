@@ -35,27 +35,42 @@
 - three.js 등 고급 시각화
 - 주제별 특화 경질 프롬프트 다수
 
-**다음 단계 (코어 화면 3분할 방향)**
+**화면 구성**
 
-코어 화면을 세 영역으로 나누는 방향을 검토한다: 왼쪽 출처/리서치 자료 목록, 중앙 정렬 인터뷰·대화, 오른쪽 단계 카드 마인드맵·로드맵. 이 3분할은 현재 two-pane(좌 대화 / 우 결과) 구조를 확장하는 다음 단계 옵션으로만 적어둔다.
+코어 화면은 세 영역이다: 왼쪽 출처/리서치 자료 목록, 중앙 정렬 인터뷰·대화, 오른쪽 단계 카드 마인드맵·로드맵.
 
 ## 6) 스킬 매핑
 
-| pathfind SKILL.md 절 (예선 당선 스킬) | pathfind-web에서의 대응 | 비고 |
-|---|---|---|
-| 판정(첫 줄 판정 A/B) — 입력 대상 여부 판정 | 서비스에서는 grill 인터뷰(정렬 인터뷰)가 아이디어 명료화 역할. pathfind 본선 판정 로직은 /api에 그대로 이식되지 않음. | grill-me 흡수 |
-| 조사 절차 — 단계마다 웹 검색 1회 | `api/stage.js`가 Solar 도구 호출로 웹 검색 수행(검색 공급자 추상화: SEARCH_API_URL + SEARCH_API_KEY). 머리 주석에 SKILL.md §조사 절차 원문 + 서비스화 수정 문단 수록. | 원문 이식 |
-| 조사 결과 JSON 스키마(steps[], verdict, findings 등) | `api/stage.js` 출력에 verdict·findings·options·todos로 반영. 머리 주석에 SKILL.md §조사 결과 JSON 스키마 원문 + 서비스화 수정 문단 수록. `api/pathfind.js`는 bigPicture.stages(title, desc, tasks, choices, icon) 구조. | 원문 이식 |
-| render.py — stdin JSON → 연구노트.md + 흐름도.html 생성, 템플릿 주입 | 웹 MVP에서는 render.py를 사용하지 않음. 큰 그림 JSON은 `api/pathfind.js`가 Solar로 직접 생성, 단계 카드는 프론트(frontend/js/render.js)가 렌더링, handoff.md는 `api/handoff.js`가 생성. | 대체 |
-| 단계 분해 (단계 수 4~7, 제목 24자 이내, 실제 작업 순서) | `api/pathfind.js`가 이 절 원문을 머리 주석에 수록하고, bigPicture.stages(title·desc·tasks·choices·icon)로 반환. 단계 카드 렌더링은 프론트가 담당. | 원문 이식 |
-| 응답 섹션(판정/저장결과/채팅요약/조정안내) | 서비스에서는 해당 절 구성을 그대로 쓰지 않음. handoff가 리서치 결과 전달 역할 일부 대체. | 미이식 — 판정·저장결과·채팅요약·조정안내 4섹션은 숙련 스킬의 채팅 출력 전용이라, 웹 MVP는 card 렌더링 + handoff.md 다운로드로 결과를 전달하므로 그대로 이식하지 않음 |
-| 매 실행에서 할 일(웹검색+render.py+share_file) | 서비스에서는 `/api/stage` 호출(웹 검색) + 프론트 카드 렌더링 + `/api/handoff` 다운로드로 대체. | 대체 |
-| 아이콘 이름 표(steps[].icon) | `api/pathfind.js`가 icon 필드를 받고, 프론트가 lucide 아이콘으로 렌더링. `api/stage.js`도 stage.icon 전달. | 이식 |
+예선 스킬 원문 `pathfind-src`는 바이트 단위로 예선 제출본과 같고, 서비스화 수정과 확장은 전부 `api`와 `frontend` 코드에서 후처리로 한다.
 
-- **grill-me / grilling 패턴 (mattpocock/skills, 공개 레포)**: 정렬 인터뷰 로직. 서비스에 흡수된 단계로 쓰며, 특정 스킬명을 노출하지 않음.
-- **pathfind (예선 당선 스킬)**: 단계 분해·리서치·판단 로직. 서비스에서는 /api에서 pathfind의 데이터 경로(큰 단계 + 각 단계 verdict·findings·선택지)를 이식·변형해 사용. 필요 시 서비스에 pathfind 재적용을 제안하는 흐름도 포함.
+| pathfind SKILL.md 절차(원문 단계) | pathfind-web 서비스 코드 위치 | 이식·변형·대체·미이식 | 한 줄 설명 |
+|---|---|---|---|
+| 판정 A/B(첫 줄 판정) — 입력 대상 여부 | `api/grill.js` | 변형(인터뷰 흡수) | 예선 원문의 첫 줄 판정 로직을 서비스에서는 grill 인터뷰로 바꿔 흡수한다. 원문의 판정 문장 형식은 프론트가 그대로 표시하지 않는다. |
+| 단계 분해(단계 수 4~7, 제목 24자 이내, 실제 작업 순서) | `api/pathfind.js`(머리 주석에 원문 수록) → 프론트 렌더링 | 이식 | 큰 단계·할 일·선택지·아이콘을 bigPicture.stages로 반환하고, 카드는 프론트가 그린다. |
+| 조사 절차 — 단계마다 웹 검색 1회 | `api/stage.js` + `api/channels/`(naver·github·law·public-data·kosis) | 변형(채널·등급) | 원문은 단일 웹 검색이었으나 서비스는 규칙 기반 채널 5종과 근거 등급을 단계 텍스트 키워드로 선택한다. 채널과 등급은 stage 응답의 scope·grade로 내려간다. |
+| 조사 결과 JSON 스키마(steps[], verdict, findings 등) | `api/stage.js` 출력(verdict·findings·options·todos) / `api/pathfind.js`(stages) | 이식 | 원문의 steps·verdict·findings 골격을 유지한다. verdict는 판정 4종 계약 값, findings는 kind·evidence·url을 그대로 쓴다. |
+| handoff.md — 구현 에이전트로 넘길 문서 | `api/handoff.js` → `handoffMarkdown` | 이식·확장 | 원문의 handoff.md 작성 의도를 마크다운 다운로드·복사로 이어간다. 서버 조립 폴백을 두고, x-handoff-source로 solar·retry·assembled 중 하나를 표기한다. |
+| render.py — stdin JSON → 연구노트.md + 흐름도.html | 쓰지 않음. 큰 그림은 `api/pathfind.js`, 카드는 프론트, handoff는 `api/handoff.js` | 대체 | 웹 MVP에서는 render.py를 실행하지 않는다. 원문의 파일 생성 단계를 서비스 함수 3개로 나눠 처리한다. |
+| 매 실행에서 할 일(웹검색 + render.py + share_file) | `/api/stage` + 프론트 카드 렌더링 + `/api/handoff` 다운로드 | 대체 | 원문의 한 번 실행 절차를 웹 요청 흐름으로 바꾼다. |
+|| 판정 기준(무엇을 pathfind 대상으로 보는가) — 대상·대상 아님 구분과 예시로 판정 A/B를 보완 | 서비스에서는 grill 인터뷰에서 대상이 아니라고 나올 때의 안내 문장에만 원문 판정 기준 취지를 반영한다. 원문의 대상·대상 아님 예시는 프론트 안내문에만 쓰고, 서비스 판정 함수나 /api 계약에는 그대로 옮기지 않는다. | 이식 안 함 — 기준은 grill 안내로만 반영 |
+| (원문에 없는 신설) 노드 설명 | `api/explain.js`(노드 설명 문단·목록·후속 질문) | 신설 — 원문 산출을 화면에서 다시 꺼내 쓰는 층 | 마인드맵 노드 하나를 누르면 중앙이 그 노드를 설명한다. 단계 노드는 판정 화면 문구(이미 있음·없음·일부만 있음·못 찾음)를 넣는다. |
+| (원문에 없는 신설) 조사 후 대화 | `api/chat.js`(자료 번호 인용 답변) | 신설 — 원문 산출을 화면에서 다시 꺼내 쓰는 층 | 조사 결과를 근거 삼아 사용자가 묻고, 서버는 자료 번호를 인용한 답과 후속 질문을 돌려준다. |
+| (원문에 없는 신설) 단계 항목 소주제 묶기 | `api/outline.js`(finding·task·todo를 2~4개 소주제로) | 신설 — 원문 산출을 화면에서 다시 꺼내 쓰는 층 | 단계 안의 자료·할 일·역할 나눔을 뜻이 가까운 것끼리 묶어 왼쪽 패널 문서 묶음으로 쓴다. |
+| (원문에 없는 신설) 자료 카드 | `api/source-card.js`(한 자료 설명 markdown 5값) | 신설 — 원문 산출을 화면에서 다시 꺼내 쓰는 층 | 찾은 자료 하나를 한 줄 요약·무엇인가·어떻게 쓰나·피할 때·제약으로 정리해 왼쪽 패널 문서로 보여준다. |
+| 원문의 단계 목록 | 왼쪽 패널의 폴더·파일 + 오른쪽 마인드맵 | 이식·확장 | 원문이 내려주던 단계 목록을 왼쪽에는 문서 묶음으로, 오른쪽에는 단계 카드 마인드맵으로 다시 꺼낸다. |
 
-| 디자인 시스템 | 본인 소유 ui-dictionary(MIT); 앱 자산은 `https://ui.askewly.com/r/<name>.json`로 설치, 코드 자산 레지스트리 fetch → 프로젝트 토큰 재스타일. 원본 보존 + 서비스판 새 폴더. | 원본 pathfind-src commit: `6a8e6a4` (2026-09-11) |
+- **pathfind-src 파일 넷(SKILL.md, scripts/render.py, assets/steps-flow-template.html, assets/lucide-icons.json)** 해시 대조:
+
+  ```
+  b2e678a6d41b3538e68852296d9f3156762bf805e12fd56412c17e53988c9caf  SKILL.md
+  385dc9f8bf360c038c2ee940ad1157f7cbd9455231e3407b7e3b9103a84b8f9c  scripts/render.py
+  d200ff84e07f2a73782a06de90ab05da5a4508f43a4022a8b40f61ca2cfc8077  assets/steps-flow-template.html
+  77611d6b324ff94af76e98eaa7048586715c165842f61375e883f9f393e4931b  assets/lucide-icons.json
+  ```
+
+  위 네 값은 현재 레포의 `pathfind-src/`에서 `sha256sum`으로 찍은 값이며, 예선 제출 zip과 같다는 대조 결과를 한 줄로 적어 둔 것이다. 렌더 스크립트 원문은 `scripts/render.py` 그대로이고, 서비스판이 따로 둔 `service_render.py`는 원문 경로 밖에 있어 이 대조 대상이 아니다.
+
+- 판정 4종(가져다 써도 됨·직접 해야 함·섞어야 함·선례를 못 찾음)은 계약 값이며, 저장·서버 응답에는 원문을 그대로 두고 화면에 보여 줄 때만 이미 있음·없음·일부만 있음·못 찾음으로 바꾼다.
 
 ## 7) 입력·출력
 
@@ -83,7 +98,7 @@
 | 환경변수 이름 | 용도 | 발급처 |
 |---|---|---|
 | `SOLAR_API_KEY` | 정렬 인터뷰(5턴) + bigPicture 생성 + 단계별 리서치 + handoff 마크다운 생성. 서버 `/api`에서만 사용. 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 값 미기재. | Upstage Solar API (Upstage Console / API 발급) |
-| `SEARCH_API_KEY` | 단계별 리서치에서 웹 검색 대행(Tavily 계열 기본). 서버 `/api/stage`에서만 사용. 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 값 미기재. | Tavily (Tavily API 발급) |
+| `SEARCH_API_KEY` | 단계별 리서치에서 웹 검색 대행(Tavily 계열 기본). `/api/stage`에서만 사용. 클라이언트 소스·응답 JSON·PRD·커밋 어디에도 값 미기재. | Tavily (Tavily API 발급) |
 
 - 실제 발급 가능 여부·구체적 값은 Vercel 환경변수 등록 시점에 확인. (값 아님; 이름·용도·발급처만 예비 기술.)
 - 검색 공급자 교체 시 `api/stage.js`의 요청 형식만 바꾼다(공급자 추상화).
@@ -143,8 +158,8 @@
 
 - LLM 호출용 키 (`SOLAR_API_KEY`): 버셀에 환경변수 등록 완료. 값은 PRD·클라이언트·커밋 어디에도 미기재.
 - 웹 검색 키 (`SEARCH_API_KEY`): Tavily 기준으로 버셀 환경변수 등록 완료. `/api/stage`에서만 사용.
-- 큰 그림·단계 리서치 오케스트레이션 방식: `/api/pathfind.js`(큰 그림) + `/api/stage.js`(단계별 리서치, Solar 도구 호출, 검색 상한 2회) + `/api/handoff.js`(마크다운 생성)로 구성. **병렬 리서치 최적화는 아직 적용되지 않음** — 단계 순서대로 순차적으로 진행.
-- render.py 웹 변환 상세: MVP에서는 render.py를 사용하지 않음. bigPicture JSON은 `api/pathfind.js`가 Solar로 직접 생성, 단계 카드는 프론트(frontend/js/render.js), handoff.md는 `api/handoff.js`가 생성.
+- 큰 그림·단계 리서치 오케스트레이션 방식: `/api/pathfind.js`(큰 그림) + `/api/stage.js`(단계별 리서치, 채널 5종 프리서치 병렬 + 분석 호출, 호출 상한 8회) + `/api/handoff.js`(마크다운 생성)로 구성. 프리서치는 규칙 기반 채널 선택 후 병렬로 수행한다.
+- render.py 웹 변환 상세: MVP에서는 render.py를 사용하지 않는다. bigPicture JSON은 `api/pathfind.js`가 Solar로 직접 생성, 단계 카드는 프론트, handoff.md는 `api/handoff.js`가 생성한다.
 
 ---
 
@@ -155,4 +170,4 @@
 ---
 
 *승인: 2026-09-10 (skill-to-service B 모드 → C-계획 승인)*
-*파일: PRD.md · 제출 규격 2쪽 내외 충족 목표 · 이 레포 루트에 위치*
+*파일: PRD.md · 이 레포 루트에 위치*
