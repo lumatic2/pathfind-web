@@ -159,25 +159,22 @@
 }
 .trust__title b { color: var(--primary); font-weight: 900; }
 
-.trust__subtitle {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
+/* 채널 목록 — 제목이 아니라 그 아래 붙는 한 줄이다 */
+.trust__title-sub {
+  display: block;
+  margin-top: var(--space-3);
   font-size: var(--fs-lead);
   font-weight: 600;
+  letter-spacing: normal;
   color: var(--muted-foreground);
-  line-height: var(--lh-quote);
 }
-
-.trust__subtitle-group {
-  display: inline-flex;
-  gap: var(--space-2);
-  padding-inline: var(--space-2);
-  border-inline: var(--hairline) solid var(--border);
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
+/* 묶음 사이의 「·」 는 앞 묶음에 붙는다(NBSP) — 줄 맨 앞에 「·」 가 남지 않게 */
+.trust__title-group + .trust__title-group::before { content: '\00a0· '; }
+/* 한 줄에 안 들어가는 폭에서는 묶음마다 줄을 바꾼다 — 접히는 자리를 브라우저에 맡기면
+   「·」 가 줄 끝이나 줄 머리에 혼자 남는다. 경계값은 실측(1100 부터 여유 있게 한 줄에 든다). */
+@media (max-width: 1099px) {
+  .trust__title-group { display: block; }
+  .trust__title-group + .trust__title-group::before { content: none; }
 }
 
 /* ────────────────────────────────────────────────────────

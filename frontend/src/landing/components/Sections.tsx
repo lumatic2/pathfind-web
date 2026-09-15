@@ -100,11 +100,10 @@ export function Trust() {
       </div>
 
       <h2 className="trust__title">
-        {T.title.before}<b>{T.title.number}</b>{T.title.after}<br />
-        <span className="trust__subtitle">
-          {T.title.line2.map((g, i) => (
-            <span key={i} className="trust__subtitle-group">{g}</span>
-          ))}
+        {T.title.before}<b>{T.title.number}</b>{T.title.after}
+        {/* 채널 목록은 제목 크기로 두면 가운데서 접힌다 — 작은 부제로 내리고, 접히는 자리는 묶음 경계로 못 박는다 */}
+        <span className="trust__title-sub">
+          {T.title.line2.map((g) => <span key={g} className="trust__title-group">{g}</span>)}
         </span>
       </h2>
     </div>
