@@ -1,4 +1,9 @@
 import { sendError, logCall } from './_lib/http.js';
+import { readPlanningInput } from './_lib/pathfind-input.js';
+import { planFromResearch } from './_lib/pathfind-plan.js';
+import { callPlanningModel } from './_lib/pathfind-model.js';
+import { searchPlanningSources } from './_lib/pathfind-search.js';
+import { normalizePlanningDesign } from './_lib/pathfind-design.js';
 
 // 긴 프롬프트는 별도 상수로 분리 (가독성)
 // pathfind 원본 스킬 이식: SKILL.md §단계 분해 (서비스화 수정 포함, 2026-09-12)
@@ -149,35 +154,53 @@ export async function POST(request) {
   }
 
   if (!process.env.SOLAR_API_KEY) {
-    return sendError(500, 'Solar API key not configured');
+    return sendError(503, 'Solar API key not configured');
   }
 
+  const controller = new AbortController();
+  const clock = { now: () => Date.now() };
+
   try {
-    const body = await request.json().catch(() => ({}));
-    const { summary, initialQuestion } = body || {};
-    if (!summary && !initialQuestion) {
-      return sendError(400, 'summary 또는 initialQuestion 필요');
-    }
+    const summary = await readPlanningInput(request);
 
-    // 1단계: 큰 그림 생성 (Solar)
-    const bigPictureMessages = [
-      { role: 'system', content: BIG_PICTURE_SYSTEM },
-      {
-        role: 'user',
-        content: `사용자는 다음 아이디어를 구현하려고 합니다.\n\n[정렬 인터뷰 요약]\n${summary || initialQuestion}\n\n위 아이디어를 바탕으로 큰 그림(stages)과 각 단계의 할 일, 선택지(골격)를 설계해 주세요. bigPicture.stages[]에는 verdict·findings를 넣지 말고, 각 단계는 no·title·desc·icon·tasks·choices만 담으세요. JSON만 출력하세요.`,
-      },
-    ];
+    const { bigPicture: bp, planning } = await planFromResearch(
+      summary,
+      clock,
+      callPlanningModel,
+      searchPlanningSources,
+      normalizePlanningDesign,
+      controller.signal,
+    );
 
-    const bpContent = await callSolar(bigPictureMessages, 0.6);
-    const bpData = parseSolarJsonOrText(bpContent, true);
-    const bigPicture = validateBigPicture(bpData);
+    const bigPicture = {
+      ...bp,
+      planning,
+      prototypeLoop: bp.prototypeLoop || 'prototype → playtest → 수정 루프로 아이디어를 다듬습니다.',
+    };
 
-    return new Response(JSON.stringify({
-      bigPicture,
-    }), {
+    return new Response(JSON.stringify({ bigPicture, handoffMarkdown: '' }), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
+    const status = err.status || err.statusCode || 500;
+    if (status === 400 || status === 413) {
+      return sendError(status, err.message);
+    }
+    if (status === 422 || err.message?.includes('검증에 통과하지 못했습니다') || err.message?.includes('예상한 형식이 아닙니다')) {
+      return sendError(422, '설계 응답 검증에 통과하지 못했습니다');
+    }
+    if (status === 429) {
+      return sendError(429, '요청 제한');
+    }
+    if (status === 502) {
+      return sendError(502, '상류 연결 오류');
+    }
+    if (status === 503) {
+      return sendError(503, '설정 누락');
+    }
+    if (status === 504 || err.message?.includes('시간 초과')) {
+      return sendError(504, '시간 초과');
+    }
     logCall('pathfind.POST', 0, 500, request.headers);
     return sendError(500, '서버 오류');
   }
