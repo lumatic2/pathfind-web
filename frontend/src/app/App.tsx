@@ -911,6 +911,14 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
   const timer = useRef<number | null>(null)
   const openedBy = useRef<'hover' | 'focus' | 'key' | null>(null)
 
+  const constraint = useMemo(
+    () => ({
+      width: Math.min(26 * 16, window.innerWidth - 16),
+      height: Math.min(24 * 16, window.innerHeight - 24),
+    }),
+    [],
+  )
+
   const clear = () => {
     if (timer.current !== null) window.clearTimeout(timer.current)
     timer.current = null
@@ -1008,9 +1016,9 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
           if (openedBy.current === 'hover') scheduleClose()
         }}
         className="flex w-auto flex-col overflow-hidden rounded-lg border-0 bg-popover p-0 text-foreground shadow-md"
-        style={{ width: 420, height: 420 }}
+        style={{ width: constraint.width, height: constraint.height }}
       >
-        <div id="citation-popover-head" data-citation-popover-head className="shrink-0 truncate px-4 py-3 text-sm font-medium" style={{ height: 49 }}>
+        <div id="citation-popover-head" data-citation-popover-head className="shrink-0 px-4 py-3 text-sm font-medium">
           {citation.title}
         </div>
         <div data-citation-popover-body tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-4 text-base leading-6 outline-none [&>p]:mb-2">
@@ -1018,9 +1026,7 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
             <>
               <p className="text-sm text-muted-foreground">{doc.subtitle ?? '자료'}</p>
               <p className="mt-1 text-sm leading-relaxed">
-                <span className="line-clamp-4 block overflow-hidden text-foreground">
-                  {doc.evidence ?? doc.markdown}
-                </span>
+                {doc.evidence ?? doc.markdown}
               </p>
             </>
           ) : (
