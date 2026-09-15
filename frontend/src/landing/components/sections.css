@@ -408,8 +408,6 @@
   width: 100%;
   height: 100%;
   fill: none;
-  /* viewBox 를 패널 비율에 맞춰 늘인다 — 비율을 지키면 파선이 패널 한쪽에 몰린다 */
-  preserve-aspect-ratio: none;
   stroke: var(--askewly-lavender);
   stroke-width: 2;
   stroke-dasharray: 6 8;
@@ -423,7 +421,8 @@
   position: absolute;
   display: grid;
   justify-items: center;
-  gap: var(--space-2);
+  /* 아이콘과 이름은 한 덩어리로 읽혀야 한다 — 8px 는 떨어져 보였다(2026-09-15) */
+  gap: var(--space-1);
   /* ⚠ 폭을 타일과 같게 두면 라벨이 옆 타일 위로 흘러 서로 겹친다.
      라벨이 들어갈 폭을 따로 준다 — 타일은 그 안에서 가운데 선다. */
   width: var(--tile-slot);
@@ -440,18 +439,40 @@
 .band__spoke::before {
   content: '';
   width: var(--tile);
-  height: var(--tile);
-  border-radius: var(--radius-xl);
-  background-color: var(--card);
-  box-shadow: 0 0 0 var(--hairline) var(--border);
+  /* ⚠ 상자를 정사각(`--tile`)으로 두고 **폭** 기준으로 그리면, 납작한 그림일수록
+     위아래에 빈 띠가 남아 이름표가 멀어 보인다(tile-0 은 56 상자에 25 만 그려져 15px 씩 떴다).
+     상자 높이를 그림 높이로 잡고 **높이** 기준으로 그린다 — 빈 띠 0, 그림 크기도 고르게 맞는다. */
+  height: calc(var(--tile) * 0.62);
   /* 그림은 `content.compare` 의 `icon` — 타일마다 `--img` 로 받는다 */
   background-image: var(--img);
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 62% auto;
+  background-size: auto 100%;
+  /* 파선이 그림 뒤를 지난다 — 얇은 흰 테로 선을 끊는다(2026-09-15 사용자 지적).
+     PNG 라 테두리를 그릴 수 없어 같은 그림자를 두 번 겹친다. */
+  filter: drop-shadow(0 0 2px var(--card)) drop-shadow(0 0 2px var(--card));
 }
 
 /* 타일·스포크 자리는 `content.compare` 가 인라인 left/top 으로 준다 — 흩어짐과 네 방위는 데이터다 */
+
+/* 이름표도 같은 파선 위에 앉는다 — 세 번 겹쳐야 획 사이가 메워진다 */
+.band__tile-label {
+  text-shadow:
+    0 0 3px var(--card),
+    0 0 3px var(--card),
+    0 0 3px var(--card);
+}
+
+/* 스포크는 궤도 **위에 아이콘이** 앉아야 한다. 라벨을 흐름에 두면 슬롯 한가운데가 원에 걸려
+   아이콘이 그만큼 위로 뜬다(좌·우 스포크에서 특히 보인다) — 라벨을 흐름에서 뺀다. */
+/* 라벨이 흐름 밖이라 스포크 상자의 높이 = 그림 높이 → 상자 한가운데가 곧 그림 한가운데다 */
+.band__spoke .band__tile-label {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: var(--space-1);
+}
 
 
 .band__hub {
