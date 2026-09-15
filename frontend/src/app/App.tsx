@@ -13,6 +13,8 @@ import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestor
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { downloadText, sourceCard } from '../lib/api'
 import { saveRoadmap, newRoadmapId } from '../state/roadmaps'
+import { listRoadmaps } from '../state/roadmaps'
+import type { SavedRoadmap } from '../state/roadmaps'
 import type { GroundedSource } from '../components/grounded-source-panel'
 import { GroundedSourcePanel } from '../components/grounded-source-panel'
 import {
@@ -23,6 +25,13 @@ import {
 import type { MindmapNode } from '../components/mindmap-spine-tree'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 
 type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 
@@ -64,7 +73,13 @@ export default function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [footerAlert, setFooterAlert] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [archiveItems, setArchiveItems] = useState<SavedRoadmap[]>([])
   const pendingArchiveIdRef = useRef<string | null>(null)
+
+  const loadArchive = useCallback(() => {
+    setArchiveItems(listRoadmaps())
+  }, [])
 
   const topTitle = titleForSession(session)
 
@@ -192,20 +207,34 @@ export default function App() {
             title={topTitle}
             onTitleChange={handleTitleChange}
             actions={[
-              {
-                id: 'path',
-                label: session.exportState.busy ? '만드는 중' : 'PATH.md',
-                onClick: handleRoadmapDownload,
-                disabled:
-                  session.phase !== 'ready' ||
-                  session.stages.filter((s) => s.status === 'done').length === 0 ||
-                  session.busy,
-              },
-            ]}
+                          {
+                            id: 'path',
+                            label: session.exportState.busy ? '만드는 중' : 'PATH.md',
+                            onClick: handleRoadmapDownload,
+                            disabled:
+                              session.phase !== 'ready' ||
+                              session.stages.filter((s) => s.status === 'done').length === 0 ||
+                              session.busy,
+                          },
+                          {
+                            id: 'library',
+                            label: '목록',
+                            onClick: () => {
+                              loadArchive()
+                              setDialogOpen(true)
+                            },
+                          },
+                        ]}
             statusSlot={topStatusSlot}
           />
         }
         footer={footerAlert}
+      />
+      <ArchiveDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        items={archiveItems}
+        currentSessionId={session.id ?? null}
       />
     </div>
   )
@@ -864,5 +893,49 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
         )}
       </PopoverContent>
     </Popover>
+  )
+}
+
+function ArchiveDialog({ open, onOpenChange, items, currentSessionId }: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  items: SavedRoadmap[]
+  currentSessionId: string | null
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>내 패스 목록</DialogTitle>
+          <DialogDescription>
+            완주한 패스는 이 브라우저에 자동으로 보관됩니다. 골라서 열면 그 자리로 돌아갑니다.
+            남은 횟수는 줄지 않아요. 제목을 누르면 고칠 수 있습니다.
+          </DialogDescription>
+        </DialogHeader>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            보관된 패스가 아직 없습니다. 조사가 완주되면 여기에 쌓입니다.
+          </p>
+        ) : (
+          <ul className="space-y-4">
+            {items.map((item) => (
+              <li key={item.id} className="border-t border-border pt-4 first:pt-0">
+                <div className="font-medium text-foreground">{item.title}</div>
+                <div className="text-sm text-muted-foreground mt-0.5">
+                  {item.savedAt}
+                  {' · '}
+                  단계 {item.stageCount}개
+                  {' · '}
+                  자료 {item.findingCount}개
+                  {item.session === currentSessionId ? (
+                    <span className="ml-2 text-muted-foreground">지금 보는 중</span>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
