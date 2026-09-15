@@ -201,10 +201,10 @@ export const content: {
     title: ['새 일을 시작하는 분께', '맞습니다'],
     /** 2×2 — `lead` 가 강조색 */
     items: [
-      { icon: '/svc-0.png', lead: '처음 해 보는 일', rest: '어디서부터 손대야 할지 막막할 때, 단계로 나눠 드립니다.' },
-      { icon: '/svc-1.png', lead: '동네 가게 준비', rest: '임대차·허가·설비처럼 챙길 것이 많은 일을 정리합니다.' },
-      { icon: '/svc-2.png', lead: '작은 서비스 만들기', rest: '이미 있는 것과 직접 만들 것을 갈라 범위를 잡습니다.' },
-      { icon: '/svc-3.png', lead: 'AI 가 익숙하지 않은 분', rest: '어려운 말 없이, 하려는 일부터 한 문단으로 시작합니다.' },
+      { icon: '/svc-map.png', lead: '처음 해 보는 일', rest: '어디서부터 손대야 할지 막막할 때, 단계로 나눠 드립니다.' },
+      { icon: '/svc-parts.png', lead: '동네 가게 준비', rest: '임대차·허가·설비처럼 챙길 것이 많은 일을 정리합니다.' },
+      { icon: '/svc-shop.png', lead: '작은 서비스 만들기', rest: '이미 있는 것과 직접 만들 것을 갈라 범위를 잡습니다.' },
+      { icon: '/svc-interview.png', lead: 'AI 가 익숙하지 않은 분', rest: '어려운 말 없이, 하려는 일부터 한 문단으로 시작합니다.' },
     ],
   },
 
