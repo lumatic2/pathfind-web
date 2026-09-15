@@ -764,8 +764,8 @@ async function retryMissingCitationNumbers(originalBody, renumberedBody, finding
 문장 내용은 절대 바꾸지 말고, 근거가 되는 곳마다 해당 자료 번호 마크를 붙이세요.
 결과에는 마크가 붙은 문장 하나만 출력하고 다른 설명은 넣지 마세요.
 
-자료:
-${findings.map((f, i) => `[${i + 1}] ${f.name || f.id}`).join('\n')}
+자료 (번호와 이름, 같은 순서):
+${findings.map((f, i) => `${i + 1}. ${f.name || f.id}`).join('\n')}
 
 원문:
 ${originalBody}`;
@@ -792,9 +792,8 @@ ${originalBody}`;
       markNums.push(n);
     }
     if (markNums.length === 0) return renumberedBody;
-    const maxMark = Math.max(...markNums);
-    const markSet = new Set(markNums);
-    for (let i = 1; i <= maxMark; i++) { if (!markSet.has(i)) return renumberedBody; }
+    // 번호가 하나라도 있으면 그 문장을 쓴다. '없는 번호'는 최종 자료 개수(N) 밖의 번호만 뜻한다.
+    // 범위 안의 번호가 일부 빠져 있어도, 모델이 문장 내용에 맞춰 선택적으로 붙인 것으로 본다.
     return returnedText;
   } catch (e) {
     logCall('stage.retryMissingCitationNumbers', 0, 0, { err: String(e) });
