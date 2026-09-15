@@ -48,6 +48,11 @@ export function findingKindLabel(kind: string | undefined): string {
   return kind
 }
 
+const TITLE_BRING = "이미 있는 것, 가져다 쓰거나 손봐서 씁니다"
+const TITLE_DIRECT = "직접 만들 것, 선례가 없어 직접 만듭니다"
+const TITLE_BUSY = "아직 조사하고 있습니다"
+const TITLE_FAILED = "이 단계는 자료를 못 찾았습니다"
+
 export const channelShort: Record<string, string> = {
   web: "웹",
   oss: "GitHub",
@@ -561,10 +566,38 @@ function stageNode(session: Session, slot: StageSlot): MindmapNode {
   const labelRaw = `${no}. ${stage.title}`
   const label = shortLabel(labelRaw, 28)
   const hint = stage.desc
-  const dot =
-    stage.verdict != null
-      ? { verdict: stage.verdict, color: verdictColor(stage.verdict), title: verdictTitle(stage.verdict) }
-      : undefined
+
+  const findings = stage.findings ?? []
+  const tasks = stage.tasks ?? []
+  const todos = stage.todos ?? []
+  const greenCount = findings.length + todos.filter((t) => t.owner === "가져다 씀").length
+  const orangeCount = tasks.length + todos.filter((t) => t.owner === "직접 함").length
+  const totalCount = greenCount + orangeCount
+
+  let dot: MindmapNode["dot"]
+  if (slot.status === "done" && totalCount >= 1) {
+    dot = {
+      verdict: "분할",
+      color: "var(--verdict-bring)",
+      color2: "var(--verdict-direct)",
+      split: greenCount / totalCount,
+      title: `가져다 쓸 것 ${greenCount}개, 직접 만들 것 ${orangeCount}개`,
+    }
+  } else if (slot.status === "pending" || slot.status === "running") {
+    dot = {
+      verdict: "",
+      color: "var(--text-secondary)",
+      hollow: true,
+      title: TITLE_BUSY,
+    }
+  } else {
+    dot = {
+      verdict: "",
+      color: "var(--text-secondary)",
+      hollow: true,
+      title: TITLE_FAILED,
+    }
+  }
 
   const children = buildStageChildren(session, slot, no, stage)
   return {
@@ -722,6 +755,7 @@ function findingLeaf(no: number, idx: number, f: Finding): MindmapNode {
     label,
     hint: full,
     data: { full },
+    dot: { verdict: "가져다 씀", color: "var(--verdict-bring)", title: TITLE_BRING },
   }
 }
 
@@ -732,44 +766,26 @@ function taskLeaf(no: number, idx: number, t: Task): MindmapNode {
     label,
     hint: t.why,
     data: { full: t.why },
+    dot: { verdict: "직접 함", color: "var(--verdict-direct)", title: TITLE_DIRECT },
   }
 }
 
 function todoLeaf(no: number, idx: number, t: Todo): MindmapNode {
   const label = shortLabel(t.task, 18)
+  const isBring = t.owner === "가져다 씀"
   return {
     id: `s${no}-todo-${idx}`,
     label,
     hint: t.note,
     data: { full: t.note },
+    dot: {
+      verdict: isBring ? "가져다 씀" : "직접 함",
+      color: isBring ? "var(--verdict-bring)" : "var(--verdict-direct)",
+      title: isBring ? TITLE_BRING : TITLE_DIRECT,
+    },
   }
 }
 
-function verdictColor(v: Verdict): string {
-  switch (v) {
-    case "가져다 써도 됨":
-      return "var(--verdict-가져다-써도-됨)"
-    case "직접 해야 함":
-      return "var(--verdict-직접-해야-함)"
-    case "섞어야 함":
-      return "var(--verdict-섞어야-함)"
-    case "선례를 못 찾음":
-      return "var(--verdict-선례를-못-찾음)"
-  }
-}
-
-function verdictTitle(v: Verdict): string {
-  switch (v) {
-    case "가져다 써도 됨":
-      return "이미 있음"
-    case "직접 해야 함":
-      return "없음"
-    case "섞어야 함":
-      return "일부만 있음"
-    case "선례를 못 찾음":
-      return "못 찾음"
-  }
-}
 
 /** 트리와 노드 id를 받아 그 노드의 조상 id 목록을 돌려준다(펼침 처리용). */
 export function mindmapAncestors(tree: MindmapNode, id: string): string[] {
@@ -789,4 +805,30 @@ function walkMindmapAncestors(node: MindmapNode, id: string, acc: string[]): boo
     }
   }
   return false
+}
+
+export function mindmapLegend() {
+  return [
+    {
+      verdict: "가져다 씀",
+      label: "이미 있는 것",
+      title: TITLE_BRING,
+      color: "var(--verdict-bring)",
+      hollow: false,
+    },
+    {
+      verdict: "직접 함",
+      label: "직접 만들 것",
+      title: TITLE_DIRECT,
+      color: "var(--verdict-direct)",
+      hollow: false,
+    },
+    {
+      verdict: "",
+      label: "조사 중",
+      title: TITLE_BUSY,
+      color: "var(--text-secondary)",
+      hollow: true,
+    },
+  ]
 }
