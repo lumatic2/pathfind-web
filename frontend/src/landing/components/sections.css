@@ -464,26 +464,29 @@
   color: var(--primary);
 }
 
-.band__action { margin-top: var(--space-14); }
+.band__action { margin-top: var(--space-16); }
 
-/* 아래로 내려가는 힌트 — 보라 버튼 대신 조용한 링크 */
-.band__action-link {
+/* 다음 섹션으로 잇는 힌트 — 상자도 배경도 없다. 화살표만 hover 에서 한 칸 내려간다. */
+.band__next {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  color: var(--foreground);
-  text-decoration: none;
-  font-weight: 600;
-  transition: translate 150ms ease;
-}
-.band__action-link:hover { translate: 0 var(--space-1); }
-.band__action-arrow {
-  font-size: var(--fs-item);
-  line-height: 1;
   color: var(--muted-foreground);
-  transition: translate 150ms ease;
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  text-decoration: none;
 }
-.band__action-link:hover .band__action-arrow { translate: 0 calc(var(--space-1) * -1); }
+.band__next:hover { color: var(--foreground); }
+.band__next-arrow {
+  font-size: 1.6em;
+  line-height: 1;
+  transition: translate 200ms ease;
+}
+.band__next:hover .band__next-arrow { translate: 0 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .band__next-arrow { transition: none; }
+}
 
 /* ────────────────────────────────────────────────────────
    Team — 원본 `gl-service`

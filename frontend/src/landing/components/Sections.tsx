@@ -247,8 +247,9 @@ export function Compare() {
           </div>
 
           <div className="band__action">
-            <a className="band__action-link" href={C.cta.href}>
-              {C.cta.label} <span className="band__action-arrow" aria-hidden="true">↓</span>
+            <a className="band__next" href={C.cta.href}>
+              {C.cta.label}
+              <span className="band__next-arrow" aria-hidden="true">↓</span>
             </a>
           </div>
         </div>
