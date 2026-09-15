@@ -905,6 +905,63 @@ const SERVER_FILLED_VERDICT_REASONS = [
   "Solar 호출 단계에서 오류가 발생해 조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.",
 ] as const
 
+/** 이유 문단에서 판정 줄에 올릴 첫 문장과 남는 이유를 고른다. */
+function pickVerdictSentence(
+  reason: string | undefined,
+): { verdictSentence: string | null; remainingReason: string | null } {
+  if (reason == null) return { verdictSentence: null, remainingReason: null }
+  const trimmed = reason.trim()
+  if (trimmed.length === 0) return { verdictSentence: null, remainingReason: null }
+
+  if (SERVER_FILLED_VERDICT_REASONS.includes(trimmed as (typeof SERVER_FILLED_VERDICT_REASONS)[number])) {
+    return { verdictSentence: null, remainingReason: null }
+  }
+
+  const stripped = trimBoldWrapper(trimmed)
+  const text = stripped !== null ? stripped : trimmed
+
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+  let candidateText: string
+  if (lines.length > 0 && /^[-*]\s/.test(lines[0])) {
+    const allItems = lines.every((l) => /^[-*]\s/.test(l))
+    if (allItems) {
+      candidateText = lines[0].replace(/^[-*]\s+/, '')
+    } else {
+      candidateText = text
+    }
+  } else {
+    candidateText = text
+  }
+
+  const firstSentence = extractFirstSentence(candidateText)
+  if (firstSentence == null) {
+    return { verdictSentence: null, remainingReason: text }
+  }
+  if (firstSentence.length > 120) {
+    return { verdictSentence: null, remainingReason: text }
+  }
+
+  const remaining = candidateText.slice(firstSentence.length).trim()
+  return {
+    verdictSentence: firstSentence,
+    remainingReason: remaining.length > 0 ? remaining : null,
+  }
+}
+
+function trimBoldWrapper(text: string): string | null {
+  const m = text.match(/^\*\*(.+)\*\*$/)
+  if (m) return m[1]
+  return null
+}
+
+function extractFirstSentence(text: string): string | null {
+  const m = text.match(/^[^\n.!?]*[.!?]/)
+  if (m) return m[0]
+  const line = text.split('\n')[0]
+  if (line.trim().length > 0) return line.trim()
+  return null
+}
+
 const CHANNEL_HUMAN: Record<string, string> = {
   web: "웹",
   oss: "GitHub",
@@ -960,9 +1017,16 @@ function channelTallyHuman(tally: { channel: string; count: number }[]): string 
    }
    const out = [first, second]
    if (stage?.verdictReason && stage.verdictReason.trim().length > 0) {
-     const reason = stage.verdictReason.trim()
-     if (!SERVER_FILLED_VERDICT_REASONS.includes(reason as (typeof SERVER_FILLED_VERDICT_REASONS)[number])) {
-       out.push(reason)
+     const { verdictSentence, remainingReason } = pickVerdictSentence(stage.verdictReason)
+     const parts: string[] = []
+     if (verdictSentence) {
+       parts.push(`**${verdictSentence}**`)
+     }
+     if (remainingReason != null && remainingReason.trim().length > 0) {
+       parts.push(remainingReason)
+     }
+     if (parts.length > 0) {
+       out.push(parts.join('\n\n'))
      }
    }
    return out.join('\n\n')
