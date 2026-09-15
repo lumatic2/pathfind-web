@@ -305,7 +305,10 @@ const SYSTEM_PROMPT = `당신은 특정 구현 단계의 리서치 결과를 정
 {
   "claimType": "기술"|"정량/법적"|"맥락",
   "verdict": "가져다 써도 됨"|"직접 해야 함"|"섞어야 함"|"쓸 만한 자료 없음",
-  "verdictReason": "판정 근거 한 줄. 사람에게 설명하는 자리이므로 합니다·입니다로 끝맺습니다.",
+  "verdictReason": "판정 근거의 첫 한두 문장. 사람에게 설명하는 자리이므로 합니다·입니다로 끝맺습니다.",
+  "reasonPoints": [
+    { "label": "무엇에 대한 이야기인지 서너 낱말", "text": "그 한 줄 설명" }
+  ] — 항목은 둘에서 넷. label과 text를 적고 빈 text 항목은 넣지 않습니다.
   "findings": [
     {
       "id": "채널-번호 형태의 항목 식별자 (예: naver-web-0)",
@@ -638,6 +641,40 @@ ${(stage.tasks || []).map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n'
   }
 }
 
+// ---------- verdictReason 조립 ----------
+
+function composeReason(leading, points) {
+  const list = Array.isArray(points) ? points : [];
+  const trimmed = list
+    .slice(0, 5)
+    .filter((p) => typeof p === 'object' && p && typeof p.text === 'string' && p.text.trim() !== '');
+  if (trimmed.length === 0) return leading || '';
+
+  const lines = [];
+  if (leading != null && leading !== '') {
+    const kept = leading
+      .split('\n')
+      .filter((line) => {
+        const s = line.trim();
+        return !(s.startsWith('-') || s.startsWith('*') || s.startsWith('·'));
+      })
+      .join('\n');
+    if (kept !== '') lines.push(kept);
+  }
+
+  lines.push('');
+  for (const p of trimmed) {
+    const label = (p.label && typeof p.label === 'string' && p.label.trim()) || '';
+    const text = (p.text || '').trim();
+    if (label !== '') {
+      lines.push(`- **${label}**: ${text}`);
+    } else {
+      lines.push(`- ${text}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 // ---------- verdictReason / findings 조립 ----------
 
 function assembleFindings(modelOutput, catalog) {
@@ -679,7 +716,10 @@ function extractHost(url) {
 function buildResponse(stage, modelOutput, findings, queries, plannedChannels, calledChannels, calls, source) {
   const findingsCount = findings.length;
   const verdict = normalizeVerdict(modelOutput?.verdict, findingsCount);
-  const verdictReason = modelOutput?.verdictReason || (findingsCount ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
+  const verdictReason = composeReason(
+    modelOutput?.verdictReason,
+    modelOutput?.reasonPoints,
+  ) || (findingsCount ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
 
   let options = modelOutput?.options || stage.choices || [];
   let todos = (modelOutput?.todos || []).map((t) => ({
@@ -963,7 +1003,10 @@ export async function POST(request) {
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findings.length);
-    const verdictReason = parsed?.verdictReason || (findings.length ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
+    const verdictReason = composeReason(
+      parsed?.verdictReason,
+      parsed?.reasonPoints,
+    ) || (findings.length ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
 
     let options = parsed?.options || stage.choices || [];
     let todos = (parsed?.todos || []).map((t) => ({
@@ -1059,3 +1102,5 @@ async function runLegacyFallback(request, source) {
     return sendError(500, '서버 오류');
   }
 }
+
+export { composeReason };
