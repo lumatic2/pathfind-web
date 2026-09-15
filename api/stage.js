@@ -17,6 +17,7 @@ const SOLAR_API_URL = process.env.SOLAR_API_URL || 'https://api.upstage.ai/v1/ch
 const MAX_TOKENS_ANALYSIS = 3000;
 const MAX_TOKENS_QUERY = 400;
 const CALL_TIMEOUT_MS = 90_000;
+const MODEL_REVIEW_TIMEOUT_MS = 15_000;
 const MAX_CALLS_PER_STAGE = 8; // 프리서치 포함
 const MAX_RESULTS_PER_CHANNEL = 3;
 const MAX_FINDINGS = 6;
@@ -459,12 +460,12 @@ function buildToolDefs() {
 
 // ---------- Solar 호출 ----------
 
-async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTokens = MAX_TOKENS_ANALYSIS } = {}) {
+async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTokens = MAX_TOKENS_ANALYSIS, timeoutMs = CALL_TIMEOUT_MS } = {}) {
   const key = process.env.SOLAR_API_KEY;
   if (!key) throw new Error('Solar API key not configured');
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(SOLAR_API_URL, {
       method: 'POST',
@@ -495,6 +496,58 @@ async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTok
     };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// ---------- 스텝34: 규칙 통과 자료 모델 재확인 ----------
+
+const MODEL_REVIEW_PROMPT = `당신은 통계·공공데이터 결과 중 이 단계에 실제로 참고가 되는 것만 고르는 어시스턴트입니다.
+
+아래 결과를 보고, 이 단계의 제목과 설명에 비추어 참고할 만한 결과의 id만 번호 배열로 답하세요.
+- 참고 번호가 없으면 빈 배열 [] 로 답합니다.
+- 마크다운 없이 JSON 배열만 출력합니다.
+
+[단계 제목] ${stage.title}
+[단계 설명] ${stage.desc}
+
+[통계·공공데이터 결과]
+${reviewedSection}
+
+답변: `;
+
+function reviewedSection(items) {
+  if (!items || items.length === 0) return '';
+  return items
+    .map(
+      (r, i) =>
+        `${i + 1}. id: ${r.id}\n   제목: ${r.title || '제목 없음'}\n   URL: ${r.url || '없음'}\n   요약: ${(r.snippet || '').slice(0, 250)}`,
+    )
+    .join('\n\n');
+}
+
+async function modelReviewPass(stage, reviewed) {
+  if (!stage || !reviewed || reviewed.length === 0) return [];
+  const messages = [
+    { role: 'system', content: '당신은 JSON 배열만 출력하며, id 번호만 고릅니다.' },
+    { role: 'user', content: MODEL_REVIEW_PROMPT },
+  ];
+
+  try {
+    const res = await callSolar(messages, {
+      tools: false,
+      tool_choice: 'auto',
+      maxTokens: 400,
+      timeoutMs: MODEL_REVIEW_TIMEOUT_MS,
+    });
+    if (!res.content) return [];
+    const parsed = JSON.parse(res.content.trim());
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((id) => typeof id === 'string' && id.length > 0)
+      .map((id) => id.trim());
+  } catch (e) {
+    logCall('stage.modelReview', 0, 0, { err: String(e) });
+    return [];
   }
 }
 
@@ -955,6 +1008,22 @@ export async function POST(request) {
 
     const webReviewUsed = preResults.some((r) => r.channel === 'web_review');
 
+    // ---------- 스텝34: 규칙 통과 자료 모델 재확인 (통계·공공데이터만) ----------
+    const modelReviewedIds = new Set();
+    const hasStatsOrPublicData = plannedFinal.some((n) => n === 'stats' || n === 'public_data');
+    if (hasStatsOrPublicData) {
+      const reviewed = preResults.filter((r) => r.channel === 'stats' || r.channel === 'public_data');
+      if (reviewed.length > 0) {
+        const reviewIds = await modelReviewPass(stage, reviewed);
+        if (Array.isArray(reviewIds)) {
+          for (const id of reviewIds) {
+            if (typeof id === 'string' && id) modelReviewedIds.add(id);
+          }
+        }
+        // 모델 호출이 비어 있거나 실패해도 단계는 계속 간다 — 아래 조립부에서 반영
+      }
+    }
+
     // 4) 분석 호출 (tool_choice auto)
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -1083,8 +1152,13 @@ export async function POST(request) {
     // 모델 findings 조립 (카탈로그 없는 id 버림)
     const parsed = parseSolarJson(toolResult.content || '');
     const findings = assembleFindings(parsed, catalog);
+    // 스텝34: 규칙 통과 후 모델 재확인에서 고른 id만 남긴다(통계·공공데이터)
+    const reviewedFindings = findings.filter(
+      (f) => !modelReviewedIds.size || modelReviewedIds.has(f.id),
+    );
+    const findingsAfterReview = reviewedFindings.length ? reviewedFindings : findings;
     const calledChannels = new Set();
-    for (const f of findings) calledChannels.add(f.channel);
+    for (const f of findingsAfterReview) calledChannels.add(f.channel);
 
     // scope
     const scope = {
