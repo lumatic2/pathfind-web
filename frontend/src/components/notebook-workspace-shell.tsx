@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { ChartNoAxesCombined, Copy, Grip, Maximize2, MoreVertical, Network, PanelRightClose, PanelRightOpen, Plus, Settings, Share2, Shrink } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { AppDialogContent } from "@/app/AppDialogContent"
 import { EditableText } from "@/components/editable-text"
 import { cn } from "@/lib/utils"
 import { CitationBadge, type Citation } from "@/components/citation-ladder"
@@ -813,13 +814,13 @@ export function MindmapPanel({ root, layout = "roadmap", mapTitle, onMapTitleCha
                 종전은 `inset-4 … h-auto` 뿐이라 얕은 트리에서 화면 가운데 띠로 열렸다. 치수를 유틸 클래스에 맡기면
                 `inset-*` 과 `top-*`/`left-*` 가 같은 충돌군이라 병합 순서에 따라 bottom·right 가 조용히 사라진다 —
                 그래서 **인라인 style 로 못박는다**. shadcn 표준 프리미티브(`ui/dialog`)는 손대지 않는다. */}
-            <DialogContent
+            <AppDialogContent
               showCloseButton={false}
               data-mindmap-panel-viewer
-              className="flex max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden p-0 text-foreground data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 sm:max-w-none"
+              className="flex max-w-none flex-col gap-0 overflow-hidden p-0 text-foreground data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 sm:max-w-none"
               style={{ inset: VIEWER_INSET_PX }}
             >
-              <div className="min-h-0 flex-1 max-h-none overflow-hidden rounded-2xl border-0 bg-card p-0 shadow-xl">
+              <div className="min-h-0 flex-1 flex flex-col overflow-hidden rounded-2xl border-0 bg-card p-0 shadow-xl">
                 {mapTitle == null && <DialogTitle className="sr-only">{L.title}</DialogTitle>}
                 <DialogDescription className="sr-only">{sourcesLabel ?? L.title}</DialogDescription>
                 {titleBlock(true)}
@@ -827,7 +828,7 @@ export function MindmapPanel({ root, layout = "roadmap", mapTitle, onMapTitleCha
                   {fullscreen ? map : null}
                 </div>
               </div>
-            </DialogContent>
+            </AppDialogContent>
           </Dialog>
         </>
       ) : (
