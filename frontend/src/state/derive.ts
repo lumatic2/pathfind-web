@@ -1,3 +1,4 @@
+import type { MindmapNode } from "../components/mindmap-spine-tree"
 import type { Verdict, StageRunStatus, Stage } from "./types"
 import { VERDICTS } from "./types"
 import type { Session, SourceDoc, StageSlot, Finding, Task, Todo, OutlineTopic } from "./types"
@@ -516,4 +517,276 @@ export function findDoc(tree: SourceDoc[], id: string): SourceDoc | null {
     }
   }
   return null
+}
+
+function trimmedNonEmpty(s: string | null | undefined): string | null {
+  if (s == null) return null
+  const t = s.trim()
+  return t.length > 0 ? t : null
+}
+
+function shortLabel(text: string, maxLen: number): string {
+  const t = text.trim()
+  return t.length > maxLen ? t.slice(0, maxLen) + "…" : t
+}
+
+export function mindmapTree(session: Session): MindmapNode {
+  const rootLabel =
+    trimmedNonEmpty(session.mapTitle) ??
+    trimmedNonEmpty(session.bigPicture?.title) ??
+    "제목 없는 로드맵"
+
+  const root: MindmapNode = {
+    id: "root",
+    label: rootLabel,
+    hint: rootLabel,
+    data: { full: rootLabel },
+    children: session.bigPicture != null ? session.stages.map((slot) => stageNode(session, slot)) : [],
+  }
+  return root
+}
+
+function stageNode(session: Session, slot: StageSlot): MindmapNode {
+  const stage = slot.stage
+  const no = stage.no
+  const status: MindmapNode["status"] =
+    slot.status === "running"
+      ? "busy"
+      : slot.status === "done"
+        ? "done"
+        : slot.status === "failed"
+          ? "failed"
+          : undefined
+
+  const labelRaw = `${no}. ${stage.title}`
+  const label = shortLabel(labelRaw, 28)
+  const hint = stage.desc
+  const dot =
+    stage.verdict != null
+      ? { verdict: stage.verdict, color: verdictColor(stage.verdict), title: verdictTitle(stage.verdict) }
+      : undefined
+
+  const children = buildStageChildren(session, slot, no, stage)
+  return {
+    id: `s${no}`,
+    label,
+    status,
+    hint,
+    data: { full: hint },
+    dot,
+    children: children.length > 0 ? children : undefined,
+  }
+}
+
+function buildStageChildren(session: Session, slot: StageSlot, no: number, stage: Stage): MindmapNode[] {
+  const outline = slot.outline
+  const topicNodes: MindmapNode[] = []
+  const placed = new Set<string>()
+
+  if (outline) {
+    for (let i = 0; i < outline.length; i++) {
+      const topicNode = buildTopicNode(session, slot, no, stage, outline[i], i, outline, placed)
+      if (topicNode != null) topicNodes.push(topicNode)
+    }
+  }
+
+  // 소주제에 안 붙은 잎 — 왼쪽 패널 orphan 배치 순서와 동일하게
+  const orphan = orphanLeaves(session, slot, no, placed)
+  return [...topicNodes, ...orphan]
+}
+
+function buildTopicNode(
+  session: Session,
+  slot: StageSlot,
+  no: number,
+  stage: Stage,
+  topic: OutlineTopic,
+  topicIndex: number,
+  outline: OutlineTopic[],
+  placed: Set<string>,
+): MindmapNode | null {
+  if (topic.items.length === 0) return null
+
+  const id = `s${no}-t${topicIndex}`
+  const label = shortLabel(topic.title, 18)
+  const hint = topic.title
+
+  const depth = countDepth(topic)
+  let children: MindmapNode[] = []
+
+  if (depth === 0) {
+    // 평평한 소주제 — items를 그대로 잎으로
+    children = topicItemsToMindmap(session, slot, no, stage, topic.items, placed)
+  } else {
+    // 중첩 소주제
+    if (topic.topics) {
+      for (let j = 0; j < topic.topics.length; j++) {
+        const sub = topic.topics[j]
+        if (sub.items.length === 0) continue
+        const subId = `${id}-${j}`
+        const subLabel = shortLabel(sub.title, 18)
+        const subChildren = topicItemsToMindmap(session, slot, no, stage, sub.items, placed)
+        if (subChildren.length > 0) {
+          children.push({
+            id: subId,
+            label: subLabel,
+            hint: sub.title,
+            data: { full: sub.title },
+            children: subChildren,
+          })
+        }
+      }
+    }
+  }
+
+  if (children.length === 0) return null
+
+  return {
+    id,
+    label,
+    hint,
+    data: { full: hint },
+    children: children.length > 0 ? children : undefined,
+  }
+}
+
+function topicItemsToMindmap(
+  session: Session,
+  slot: StageSlot,
+  no: number,
+  stage: Stage,
+  refs: string[],
+  placed: Set<string>,
+): MindmapNode[] {
+  const out: MindmapNode[] = []
+  const findings = stage.findings ?? []
+  const tasks = stage.tasks ?? []
+  const todos = stage.todos ?? []
+
+  // 소주제 안 항목은 출처 그대로 — 왼쪽 패널과 같은 번호 체계를 쓴다
+  for (const ref of refs) {
+    const [kind, idxStr] = ref.split("-")
+    const idx = parseInt(idxStr, 10)
+    if (!kind || isNaN(idx)) continue
+    placed.add(ref)
+
+    if (kind === "finding" && idx >= 0 && idx < findings.length) {
+      const f = findings[idx]
+      out.push(findingLeaf(no, idx, f))
+    } else if (kind === "task" && idx >= 0 && idx < tasks.length) {
+      const t = tasks[idx]
+      out.push(taskLeaf(no, idx, t))
+    } else if (kind === "todo" && idx >= 0 && idx < todos.length) {
+      const t = todos[idx]
+      out.push(todoLeaf(no, idx, t))
+    }
+  }
+  return out
+}
+
+function orphanLeaves(session: Session, slot: StageSlot, no: number, placed: Set<string>): MindmapNode[] {
+  const stage = slot.stage
+  const findings = stage.findings ?? []
+  const tasks = stage.tasks ?? []
+  const todos = stage.todos ?? []
+  const out: MindmapNode[] = []
+
+  // 1) 자료 중 소주제에 안 붙은 것
+  for (let i = 0; i < findings.length; i++) {
+    const key = `finding-${i}`
+    if (!placed.has(key)) out.push(findingLeaf(no, i, findings[i]))
+  }
+  // 2) 가져다 쓰는 역할 나눔
+  for (let i = 0; i < todos.length; i++) {
+    const key = `todo-${i}`
+    if (!placed.has(key) && todos[i].owner === "가져다 씀") out.push(todoLeaf(no, i, todos[i]))
+  }
+  // 3) 할 일
+  for (let i = 0; i < tasks.length; i++) {
+    const key = `task-${i}`
+    if (!placed.has(key)) out.push(taskLeaf(no, i, tasks[i]))
+  }
+  // 4) 직접 하는 역할 나눔
+  for (let i = 0; i < todos.length; i++) {
+    const key = `todo-${i}`
+    if (!placed.has(key) && todos[i].owner === "직접 함") out.push(todoLeaf(no, i, todos[i]))
+  }
+  return out
+}
+
+function findingLeaf(no: number, idx: number, f: Finding): MindmapNode {
+  const label = shortLabel(f.name, 18)
+  const full = [f.name, f.evidence, f.url].filter(Boolean).join("\n")
+  return {
+    id: `s${no}-finding-${idx}`,
+    label,
+    hint: full,
+    data: { full },
+  }
+}
+
+function taskLeaf(no: number, idx: number, t: Task): MindmapNode {
+  const label = shortLabel(t.task, 18)
+  return {
+    id: `s${no}-task-${idx}`,
+    label,
+    hint: t.why,
+    data: { full: t.why },
+  }
+}
+
+function todoLeaf(no: number, idx: number, t: Todo): MindmapNode {
+  const label = shortLabel(t.task, 18)
+  return {
+    id: `s${no}-todo-${idx}`,
+    label,
+    hint: t.note,
+    data: { full: t.note },
+  }
+}
+
+function verdictColor(v: Verdict): string {
+  switch (v) {
+    case "가져다 써도 됨":
+      return "var(--verdict-가져다-써도-됨)"
+    case "직접 해야 함":
+      return "var(--verdict-직접-해야-함)"
+    case "섞어야 함":
+      return "var(--verdict-섞어야-함)"
+    case "선례를 못 찾음":
+      return "var(--verdict-선례를-못-찾음)"
+  }
+}
+
+function verdictTitle(v: Verdict): string {
+  switch (v) {
+    case "가져다 써도 됨":
+      return "이미 있음"
+    case "직접 해야 함":
+      return "없음"
+    case "섞어야 함":
+      return "일부만 있음"
+    case "선례를 못 찾음":
+      return "못 찾음"
+  }
+}
+
+/** 트리와 노드 id를 받아 그 노드의 조상 id 목록을 돌려준다(펼침 처리용). */
+export function mindmapAncestors(tree: MindmapNode, id: string): string[] {
+  const result: string[] = []
+  walkMindmapAncestors(tree, id, result)
+  return result
+}
+
+function walkMindmapAncestors(node: MindmapNode, id: string, acc: string[]): boolean {
+  if (node.id === id) return true
+  const kids = node.children
+  if (kids) {
+    for (const c of kids) {
+      acc.push(node.id)
+      if (walkMindmapAncestors(c, id, acc)) return true
+      acc.pop()
+    }
+  }
+  return false
 }
