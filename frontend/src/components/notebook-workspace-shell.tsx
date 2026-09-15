@@ -295,7 +295,9 @@ function TopbarButton({ children, icon, primary, ...rest }: { children: ReactNod
       type="button"
       className={cn(
         "inline-flex h-8 items-center gap-1.5 rounded-full text-sm outline-none ring-ring ring-offset-2 ring-offset-background motion-safe:transition-[background-color,transform] active:scale-[0.98] focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40 [&>svg]:size-4",
-        primary ? "bg-foreground pl-3 pr-4 font-normal text-background hover:bg-foreground/90" : "border border-border pl-2 pr-3 font-medium text-foreground hover:bg-foreground/8",
+        // 채운 버튼은 **브랜드 보라**다(2026-09-15). 먹(`bg-foreground`)이던 동안 앱에서 유일한
+        // 검정 채움이라 랜딩 보라 CTA 에서 넘어오면 여기서 색이 끊겼다.
+        primary ? "bg-primary pl-3 pr-4 font-normal text-primary-foreground hover:bg-primary/90" : "border border-border pl-2 pr-3 font-medium text-foreground hover:bg-foreground/8",
         icon ? "" : primary ? "px-4" : "px-3",
       )}
       {...rest}
