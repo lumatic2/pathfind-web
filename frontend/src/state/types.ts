@@ -61,23 +61,29 @@ export type BigPicture = {
   prototypeLoop: string
 }
 
-// 그릴 인터뷰 한 턴의 질문 구성.
+// 그릴 선택지 하나. 서버가 새 저장본에 주는 형태(label + why + recommended)와 옛 저장본의 문자열 둘 다 받을 수 있게 한다.
+export type GrillChoice = {
+  label: string
+  why: string
+  recommended: boolean
+}
 export type GrillTurn = {
   questionTitle: string
   questionBody: string
   suggestion: string
-  exampleButtons: string[]
+  exampleButtons: string[] | GrillChoice[]
   answer: string
 }
 
-// 그릴 한 턴 응답. done=true 이면 summary 가 들어온다.
+// 그릴 한 턴 응답. done=true 이면 summary 가 들어온다. done 이면 opening 이 함께 올 수 있다.
 export type GrillResponse = {
   questionTitle: string
   questionBody: string
   suggestion: string
-  exampleButtons: string[]
+  exampleButtons: string[] | GrillChoice[]
   done: boolean
   summary?: string
+  opening?: string
   turnCount: number
 }
 
