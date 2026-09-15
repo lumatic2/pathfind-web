@@ -2,9 +2,6 @@ import { useEffect, useId, useState } from 'react';
 import { Logo } from './Logo';
 import { content } from '../content';
 import { Linkedin } from 'lucide-react';
-/* 업스테이지 공식 워드마크 — 출처 `upstage.ai` 브랜드 리소스 센터의 `Logo_Black`(2026-09-15 취득),
-   여백만 잘라 냈다. 색면 위에서는 흰색 단색으로 뒤집어 쓴다(그쪽도 흰 심벌을 함께 배포한다). */
-import upstageWordmark from '../../assets/upstage-wordmark.png';
 import './footer.css';
 
 /**
@@ -85,7 +82,7 @@ export function Footer() {
             rel="noopener noreferrer"
           >
             {content.footer.powered.label}
-            <img src={upstageWordmark} alt={content.footer.powered.alt} />
+            <img src={new URL('../../assets/upstage-wordmark.png', import.meta.url).href} alt={content.footer.powered.alt} />
           </a>
           <nav className="tmfn" aria-label="Footer">
             {COLUMNS.map(c => <FooterCol key={c.title} col={c} />)}

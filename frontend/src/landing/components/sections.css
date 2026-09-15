@@ -85,12 +85,12 @@
   width: var(--size);
   height: var(--size);
   border-radius: 50%;
-  background-color: var(--node-bg, var(--askewly-lavender));
+  background-color: var(--node-bg, var(--path-lavender));
   background-size: 500% 200%;
   box-shadow: 0 0 0 var(--hairline) var(--card) inset;
 }
-.trust__node:nth-child(3n)   { --node-bg: var(--askewly-orchid); }
-.trust__node:nth-child(3n+1) { --node-bg: var(--askewly-sky); }
+.trust__node:nth-child(3n)   { --node-bg: var(--path-orchid); }
+.trust__node:nth-child(3n+1) { --node-bg: var(--path-sky); }
 
 /* 말풍선 — 원본 `.gl-radar-figure-item-popup`: 아바타의 오른쪽 위(left 90% / bottom 90%)에 붙고,
    점 3개가 깜빡이다가(`gl-load`) 글자가 한 자씩 들어오며 폭이 늘어난다. */
@@ -109,7 +109,7 @@
   transform-origin: left bottom;
   white-space: nowrap;
 }
-.trust__bubble.-a { background: var(--askewly-orchid); }
+.trust__bubble.-a { background: var(--path-orchid); }
 .trust__bubble::after {
   /* 꼬리 */
   content: '';
@@ -237,7 +237,7 @@
   width: var(--avatar);
   height: var(--avatar);
   border-radius: 50%;
-  background-color: var(--askewly-orchid);
+  background-color: var(--path-orchid);
   --ax: 4; --ay: 1;
   box-shadow: 0 0 0 var(--space-2) var(--background);
 }
@@ -340,9 +340,9 @@
   height: var(--mood);
   border-radius: 50%;
   border: var(--hairline-2) solid var(--foreground);
-  background: var(--askewly-lavender);
+  background: var(--path-lavender);
 }
-.band__mood.-high { background: var(--askewly-lavender); }
+.band__mood.-high { background: var(--path-lavender); }
 .band__mood.-low  { background: var(--muted); }
 .band__mood::before {
   content: '';
@@ -408,7 +408,7 @@
   width: 100%;
   height: 100%;
   fill: none;
-  stroke: var(--askewly-lavender);
+  stroke: var(--path-lavender);
   stroke-width: 2;
   stroke-dasharray: 6 8;
   stroke-linecap: round;
@@ -596,8 +596,8 @@
 /* ⚠ 밝은 원을 **카피가 앉는 쪽에 두지 않는다.**
    흰 글씨가 라벤더 위로 올라가 22px 본문이 대비 3.3 으로 떨어졌다(2026-09-12 적발).
    밝은 면은 인물이 서는 오른쪽으로 보낸다 — 인물은 먹선이라 밝은 바탕에서 더 또렷하다. */
-.cta__circle.-c1 { width: 114%; left: -24%; top: -160%; background: var(--askewly-orchid); }
-.cta__circle.-c2 { width: 78%;  left: 94%;  top: -38%;  background: var(--askewly-lavender); }
+.cta__circle.-c1 { width: 114%; left: -24%; top: -160%; background: var(--path-orchid); }
+.cta__circle.-c2 { width: 78%;  left: 94%;  top: -38%;  background: var(--path-lavender); }
 .cta__circle.-c3 { width: 108%; left: -43%; top: 22%;   background: var(--primary); }
 
 .cta__figure {
