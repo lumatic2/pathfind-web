@@ -12,7 +12,7 @@ import { renderMarkdown } from '../components/chat-conversation-panel'
 import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestors } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { downloadText, sourceCard } from '../lib/api'
-import { saveRoadmap, newRoadmapId } from '../state/roadmaps'
+import { saveRoadmap, newRoadmapId, getRoadmap, toCurrentSession } from '../state/roadmaps'
 import { listRoadmaps } from '../state/roadmaps'
 import type { SavedRoadmap } from '../state/roadmaps'
 import type { GroundedSource } from '../components/grounded-source-panel'
@@ -66,7 +66,7 @@ function titleForSession(session: ReturnType<typeof useSession>['session']): str
 }
 
 export default function App() {
-  const { session, patch } = useSession()
+  const { session, patch, replace } = useSession()
   const sessionRef = useRef(session)
   sessionRef.current = session
   const quota = useQuota()
@@ -158,6 +158,19 @@ export default function App() {
     }
   }, [patch])
 
+  const handleItemOpen = useCallback(
+    (id: string) => {
+      archiveCurrent()
+      const item = getRoadmap(id)
+      if (item == null) return
+      const next = toCurrentSession(item)
+      replace(next)
+      pendingArchiveIdRef.current = id
+      setDialogOpen(false)
+    },
+    [archiveCurrent, replace],
+  )
+
   useEffect(() => {
     if (session.phase === 'ready') {
       archiveCurrent()
@@ -235,6 +248,7 @@ export default function App() {
         onOpenChange={setDialogOpen}
         items={archiveItems}
         currentSessionId={session.id ?? null}
+        onItemOpen={handleItemOpen}
       />
     </div>
   )
@@ -896,11 +910,12 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
   )
 }
 
-function ArchiveDialog({ open, onOpenChange, items, currentSessionId }: {
+function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   items: SavedRoadmap[]
   currentSessionId: string | null
+  onItemOpen: (id: string) => void
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -920,16 +935,39 @@ function ArchiveDialog({ open, onOpenChange, items, currentSessionId }: {
           <ul className="space-y-4">
             {items.map((item) => (
               <li key={item.id} className="border-t border-border pt-4 first:pt-0">
-                <div className="font-medium text-foreground">{item.title}</div>
-                <div className="text-sm text-muted-foreground mt-0.5">
-                  {item.savedAt}
-                  {' · '}
-                  단계 {item.stageCount}개
-                  {' · '}
-                  자료 {item.findingCount}개
-                  {item.session === currentSessionId ? (
-                    <span className="ml-2 text-muted-foreground">지금 보는 중</span>
-                  ) : null}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-foreground">{item.title}</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">
+                      {item.savedAt}
+                      {' · '}
+                      단계 {item.stageCount}개
+                      {' · '}
+                      자료 {item.findingCount}개
+                      {item.session === currentSessionId ? (
+                        <span className="ml-2 text-muted-foreground">지금 보는 중</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    {item.session === currentSessionId ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenChange(false)}
+                        className="text-sm text-foreground underline underline-offset-2 hover:text-muted-foreground"
+                      >
+                        닫기
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onItemOpen(item.id)}
+                        className="text-sm text-foreground underline underline-offset-2 hover:text-muted-foreground"
+                      >
+                        열기
+                      </button>
+                    )}
+                  </div>
                 </div>
               </li>
             ))}
