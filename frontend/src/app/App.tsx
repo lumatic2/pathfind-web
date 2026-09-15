@@ -971,13 +971,32 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
   const timer = useRef<number | null>(null)
   const openedBy = useRef<'hover' | 'focus' | 'key' | null>(null)
 
+  const [popoverSide, setPopoverSide] = useState<'bottom' | 'top'>('bottom')
+
   const constraint = useMemo(
     () => ({
-      width: Math.min(26 * 16, window.innerWidth - 16),
-      height: Math.min(24 * 16, window.innerHeight - 24),
+      width: Math.min(28 * 16, window.innerWidth - 16),
+      height: Math.max(22 * 16, Math.min(32 * 16, window.innerHeight - 24)),
     }),
     [],
   )
+
+  useEffect(() => {
+    if (!open) {
+      setPopoverSide('bottom')
+      return
+    }
+    if (triggerRef.current == null) return
+    const recompute = () => {
+      if (triggerRef.current == null) return
+      const rect = triggerRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom - 8
+      setPopoverSide(spaceBelow < constraint.height ? 'top' : 'bottom')
+    }
+    recompute()
+    window.addEventListener('resize', recompute)
+    return () => window.removeEventListener('resize', recompute)
+  }, [open, constraint.height])
 
   const clear = () => {
     if (timer.current !== null) window.clearTimeout(timer.current)
@@ -997,7 +1016,7 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
     timer.current = window.setTimeout(() => {
       openedBy.current = null
       onOpenChange(null)
-    }, 160)
+    }, 220)
   }
 
   const onPointerEnter = (e: React.PointerEvent) => {
@@ -1010,6 +1029,11 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
     if (openedBy.current === 'key') return
     if (!open) clear()
     else scheduleClose()
+  }
+
+  const onTriggerPointerEnter = () => {
+    if (!open || openedBy.current === 'key') return
+    clear()
   }
 
   const onFocus = () => {
@@ -1061,6 +1085,7 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
           onPointerLeave={onPointerLeave}
           onFocus={onFocus}
           onBlur={onBlur}
+          onMouseEnter={onTriggerPointerEnter}
           onClick={onClick}
         >
           {citation.n}
@@ -1069,7 +1094,9 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
       <PopoverContent
         ref={contentRef}
         align="start"
+        side={popoverSide}
         sideOffset={8}
+        collisionPadding={0}
         aria-labelledby="citation-popover-head"
         onPointerEnter={clear}
         onPointerLeave={() => {
@@ -1078,10 +1105,22 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
         className="flex w-auto flex-col overflow-hidden rounded-lg border-0 bg-popover p-0 text-foreground shadow-md"
         style={{ width: constraint.width, height: constraint.height }}
       >
-        <div id="citation-popover-head" data-citation-popover-head className="shrink-0 px-4 py-3 text-sm font-medium">
+        <div
+          id="citation-popover-head"
+          data-citation-popover-head
+          className="shrink-0 px-4 py-3 text-sm font-medium"
+          onPointerEnter={clear}
+          onPointerLeave={scheduleClose}
+        >
           {citation.title}
         </div>
-        <div data-citation-popover-body tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-4 text-base leading-6 outline-none [&>p]:mb-2">
+        <div
+          data-citation-popover-body
+          tabIndex={0}
+          className="min-h-0 flex-1 overflow-y-auto px-4 text-base leading-6 outline-none [&>p]:mb-2"
+          onPointerEnter={clear}
+          onPointerLeave={scheduleClose}
+        >
           {doc ? (
             <>
               <p className="text-sm text-muted-foreground">{doc.subtitle ?? '자료'}</p>
@@ -1100,6 +1139,8 @@ function CitationBadge({ citation, doc, open, onOpenChange, onOpen }: { citation
               data-citation-show-source
               onClick={() => onOpen(doc.id)}
               className="text-sm text-foreground underline underline-offset-4 outline-none ring-ring ring-offset-2 ring-offset-popover hover:text-muted-foreground focus-visible:ring-2"
+              onPointerEnter={clear}
+              onPointerLeave={scheduleClose}
             >
               소스 보기
             </button>
