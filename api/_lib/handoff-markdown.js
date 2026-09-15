@@ -2,6 +2,8 @@
 // 조사 결과를 PATH.md 형식 마크다운으로 조립한다.
 // 모델·외부 API 호출 없음.
 
+import { buildPlanningMarkdown } from './planning-markdown.js';
+
 const VERDICT_LINES = {
   '가져다 써도 됨': '이미 나와 있는 것을 가져다 쓰면 됩니다',
   '직접 해야 함': '직접 만들어야 하는 부분입니다',
@@ -91,6 +93,13 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
   // 소개
   if (intro) {
     lines.push(intro);
+    lines.push('');
+  }
+
+  // 선행 조사 절 (planning-markdown.js — planning이 없으면 빈 문자열)
+  const planningMd = buildPlanningMarkdown(bigPicture);
+  if (planningMd) {
+    lines.push(planningMd);
     lines.push('');
   }
 
