@@ -143,7 +143,7 @@ body {
      1024 에서 1건 — 자리값이 패널 대비 % 라 패널이 줄면 슬롯만 안 줄어든다).
      패널 폭에 묶어 같이 줄인다. */
   --tile-slot: clamp(72px, 27%, 104px);
-  --icon-lg: 56px;           /* 2×2 아이콘 */
+  --icon-lg: 72px;           /* 2×2 아이콘 — 두 덩어리짜리 그림(퍼즐·인터뷰)이 56 에서는 조각마다 너무 작았다(2026-09-15) */
   --cta-base: var(--primary-hover);
   --cta-h: 486px;            /* 원본 CTA 카드 높이 */
   --cta-copy-w: 46%;
@@ -191,7 +191,6 @@ body {
 @media (min-width: 768px)  { :root { --gutter: 30px;              --section-y: var(--space-16); } }
 @media (min-width: 1024px) { :root { --gutter: var(--space-14);   --section-y: var(--space-18); } }
 @media (min-width: 1200px) { :root { --gutter: 100px; --measure: 1200px; --section-y: 144px; } }
-@media (min-width: 1600px) { :root { --gutter: var(--space-20); --measure: 1600px; --section-y: 168px; --start-card: 302px; } }
 
 /* 원본 사다리 — 1440 실측값을 그대로 박는다. 여기가 이 파일에서 유일하게
    스케일 밖 숫자를 쓰는 자리이고, 그래서 출처를 줄마다 적는다. */
@@ -204,11 +203,11 @@ body {
     --pad-trust-t: 520px;   /* gl-radar  520 / 90 — 위 520 이 궤도가 사는 띠다 */
     --pad-trust-b:  90px;
     --pad-quote-t:   0px;   /* gl-feedback 0 / 0 — 카드가 자기 패딩을 쓴다 */
-    --pad-quote-b:   0px;
+    --pad-quote-b:   80px;   /* 원본은 0 이지만 그러면 후기 카드가 다음 보라 색면과 맞닿는다(2026-09-15) */
     --pad-band-t:  260px;   /* gl-package 260 / 0 */
     --pad-band-b:    0px;
-    --pad-team-t:  354px;   /* gl-service 354 / 0 — 앞 카드의 돌출을 이 띠가 받는다 */
-    --pad-team-b:    0px;
+    --pad-team-t:  200px;
+    --pad-team-b:  160px;
     --pad-cta-t:     0px;   /* gl-cta      0 / 0 */
     --pad-cta-b:     0px;
     --pad-start-t: 180px;   /* gl-start  180 / 180 */
