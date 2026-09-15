@@ -22,7 +22,7 @@ MABC 2026 결선 산출물 레포. 예선 당선 스킬 `pathfind` 를 누구나
 - **진입**: `index.html`(랜딩), `app.html`(앱). 둘 다 `vite.config.ts`의 빌드 입력.
 - **서버**: `api/*.js` 함수 하나가 엔드포인트 하나. 기존 `grill`·`pathfind`·`stage`·`handoff` 넷은 요청·응답 모양을 바꾸지 않는다. 신설은 `explain`·`chat`·`outline`·`source-card`. 계약은 `docs/api-contract.md`.
 - **서버 공용**: `api/_lib/`. 여러 엔드포인트가 공유하는 헬퍼·상수·푸터.
-- **조사 채널**: `api/channels/`. 웹·뉴스 등 외부 조사 채널 구현.
+- **조사 채널**: `api/_channels/`. 웹·뉴스 등 외부 조사 채널 구현.
 - **앱**: `frontend/src/app/`(진입·셸), `frontend/src/state/`(타입·저장·흐름·파생), `frontend/src/lib/api.ts`(서버 호출), `frontend/src/landing/`(랜딩 진입). 상태 모양은 `docs/app-state.md`.
 - **디자인 자산**: `frontend/src/components/`는 `https://ui.askewly.com` 레지스트리 설치본이다. 손으로 고치지 않는다. 필요한 슬롯이 없으면 그 사실을 말하고 멈춘다. 재설치는 `npx shadcn@latest add https://ui.askewly.com/r/<이름>.json --overwrite`. 토큰은 `frontend/tokens.css`.
 - **랜딩은 예외**: `frontend/src/landing/`은 레지스트리 블록이 아니라 디자인 시스템 레포 `examples/glide-landing`의 복사본이다. 자기 `tokens.css`·`base.css`를 쓰고 앱 토큰을 쓰지 않는다. 문안·링크는 `content.ts`만 고치고 컴포넌트·CSS는 손대지 않는다. 그림은 `public/`.

@@ -73,7 +73,7 @@ api/                  Vercel 서버리스 함수 — 파일 하나 = 엔드포�
   outline.js          개요
   source-card.js      출처 카드
   _lib/               서버 공용 코드 (예: solar.js)
-  channels/           조사 채널 — 외부 검색·데이터 공급자를 추상화
+  _channels/           조사 채널 — 외부 검색·데이터 공급자를 추상화 (모듈이라 밑줄: 주소로 부르는 곳이 아니라 stage가 불러 쓰는 모듈)
     naver.js          네이버 검색
     github.js         GitHub
     public-data.js    공공데이터포털
@@ -115,11 +115,11 @@ docs/api-contract.md  서버 API 계약
 
 규정상 비-LLM 공개 외부 API는 허용된다. 사용 시 출처를 표기한다.
 
-1. **네이버 검색** — `api/channels/naver.js`
-2. **GitHub** — `api/channels/github.js`
-3. **공공데이터포털** — `api/channels/public-data.js`
-4. **KOSIS** — `api/channels/kosis.js`
-5. **국가법령정보센터** — `api/channels/law.js`
+1. **네이버 검색** — `api/_channels/naver.js`
+2. **GitHub** — `api/_channels/github.js`
+3. **공공데이터포털** — `api/_channels/public-data.js`
+4. **KOSIS** — `api/_channels/kosis.js`
+5. **국가법령정보센터** — `api/_channels/law.js`
 
 ---
 
