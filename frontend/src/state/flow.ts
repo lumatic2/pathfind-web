@@ -160,7 +160,7 @@ export function useFlow() {
     // 8) 결과 줄 (kind progress) — 미리 깔아둔 stage-result-${index} 자리를 덮는다
     const top = findings.slice(0, 3)
     const citationTitles = top.map((f) => (typeof f === 'object' && f != null ? (f as { name?: string }).name ?? '' : ''))
-    const citationIds = top.map((_f, i) => `stage-${index}-finding-${i}`)
+    const citationIds = top.map((_f, i) => `stage-${currentStage.no}-finding-${i}`)
     const markerSuffix =
       top.length > 0 ? ` [${top.map((_f, i) => i + 1).join(', ')}]` : ''
     const tally = channelTally(findings)
