@@ -1,14 +1,18 @@
 @import "tailwindcss";
 @import "../../tokens.css";
 
+/* 랜딩(`index.html`)에서 넘어올 때 두 화면을 겹쳐 넘긴다 — 랜딩 `base.css` 에도 같은 줄이 있다.
+   한쪽만 켜면 성립하지 않는다. 지원 안 하는 브라우저는 지금처럼 즉시 바뀐다. */
+@view-transition { navigation: auto; }
+/* 상단 바 로고 — 랜딩 내비 로고(`.nav__logo`)와 같은 이름이라 그 사이를 이어서 움직인다 */
+[data-app-logo] { view-transition-name: pathfinder-logo; }
+
 /* ── 프로젝트 토큰: ui-dictionary 본인 디자인 시스템이 룩을 소유 ── */
 /*    Askewly 토큰 주입 아님. 값은 DESIGN.md 표 + 본인 토큰 파일에서 파생. */
 /*    실질 정의는 frontend/tokens.css (레지스트리 requiredCssVars 이름도 거기 병기). */
 
 /* ── Tailwind dark variant: .dark 클래스에만 묶음 (우리는 그 클래스를 붙이지 않음) ── */
-@variant dark {
-  .dark & { }
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* ── Tailwind 테마 확장: 커스텀 색상·반경을 유틸리티로 노출 ── */
 @theme {
@@ -24,6 +28,12 @@
   --color-ring:               var(--ring);
   --color-popover:            var(--popover);
   --color-destructive:        var(--destructive);
+  --color-card-foreground:    var(--card-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary:          var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent-foreground:  var(--accent-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent:             var(--accent);
   --color-info-foreground:    var(--info-foreground);
   --color-info-link:          var(--info-link);
@@ -68,8 +78,20 @@ body {
   to   { opacity: 1; transform: none; }
 }
 
+@keyframes chat-block-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.chat-block-in {
+  animation: chat-block-in 0.32s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  --block-delay: 0ms;
+  animation-delay: var(--block-delay);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chat-message-in,
+  .chat-block-in,
   * {
     animation: none !important;
   }
