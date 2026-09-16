@@ -10,9 +10,9 @@
 function stripStepNumber(title) {
   const t = title.trim();
   let out = t
-    .replace(/^단계\s+\d{1,2}[.)]\s*/, '')
+    .replace(/^단계\s+\d{1,2}[.)]\s+/, '')
     .replace(/^단계\s+\d{1,2}:\s+/, '')
-    .replace(/^\d{1,2}[.)]\s*/, '')
+    .replace(/^\d{1,2}[.)]\s+/, '')
     .replace(/^\d{1,2}:\s+/, '');
   return out || t;
 }
