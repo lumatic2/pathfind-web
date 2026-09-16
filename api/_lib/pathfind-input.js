@@ -50,35 +50,35 @@ function readBodyText(body) {
   let bytesRead = 0;
   let settled = false;
 
-  const pump = () => {
-    reader.read().then(({ done, value }) => {
-      if (settled) return;
-      if (done) {
-        settled = true;
-        const text = chunks.length ? concatChunks(chunks) : '';
-        resolve(text);
-        return;
-      }
-
-      const byteCount = byteLength(value);
-      bytesRead += byteCount;
-      if (bytesRead > MAX_BODY_BYTES) {
-        settled = true;
-        reader.cancel && reader.cancel();
-        reject(makeError(413, '요청 본문이 너무 큽니다.'));
-        return;
-      }
-
-      chunks.push(value);
-      pump();
-    }).catch(err => {
-      if (settled) return;
-      settled = true;
-      reject(err && err.status === 413 ? err : makeError(400, '요청 본문을 읽는 중 오류가 발생했습니다.'));
-    });
-  };
-
   return new Promise((resolve, reject) => {
+    const pump = () => {
+      reader.read().then(({ done, value }) => {
+        if (settled) return;
+        if (done) {
+          settled = true;
+          const text = chunks.length ? concatChunks(chunks) : '';
+          resolve(text);
+          return;
+        }
+
+        const byteCount = byteLength(value);
+        bytesRead += byteCount;
+        if (bytesRead > MAX_BODY_BYTES) {
+          settled = true;
+          reader.cancel && reader.cancel();
+          reject(makeError(413, '요청 본문이 너무 큽니다.'));
+          return;
+        }
+
+        chunks.push(value);
+        pump();
+      }).catch(err => {
+        if (settled) return;
+        settled = true;
+        reject(err && err.status === 413 ? err : makeError(400, '요청 본문을 읽는 중 오류가 발생했습니다.'));
+      });
+    };
+
     pump();
   });
 }
