@@ -65,15 +65,17 @@ export function buildPlanningMarkdown(bigPicture) {
       lines.push('');
       const reason = sb.reason || '';
       if (reason) {
-        lines.push(`- 제안 이유: ${escapeMd(reason)}`);
+        lines.push(`- **목표에 맞춘 제안:** ${escapeMd(reason)}`);
         lines.push('');
       }
       const support = sb.support || [];
       const sourceIds = sb.sourceIds || [];
-      const combined = [...support, ...sourceIds];
-      if (combined.length > 0) {
+      const strIds = sourceIds.filter(id => typeof id === 'string');
+      const objSupps = support.filter(s => s && typeof s === 'object' && s.sourceId && typeof s.excerpt === 'string');
+      const allIds = [...strIds, ...objSupps.map(s => s.sourceId)];
+      if (allIds.length > 0 || objSupps.length > 0) {
         lines.push('- 이 단계가 참고한 자료:');
-        for (const id of combined) {
+        for (const id of strIds) {
           const src = sourceById.get(id);
           if (src) {
             const t = src.title || '자료';
@@ -84,6 +86,17 @@ export function buildPlanningMarkdown(bigPicture) {
           } else {
             lines.push(`  - (자료 ${id})`);
           }
+        }
+        for (const obj of objSupps) {
+          const src = sourceById.get(obj.sourceId);
+          if (!src) continue;
+          const excEsc = escapeMd(obj.excerpt);
+          const sT = src.title || '자료';
+          const sU = src.url && src.url.trim() ? src.url.trim() : null;
+          const sTEsc = escapeMd(sT);
+          if (sU) lines.push(`  - [${sTEsc}](${sU}) (자료 ${obj.sourceId})`);
+          else lines.push(`  - ${sTEsc} (자료 ${obj.sourceId})`);
+          if (excEsc) lines.push(`    > ${excEsc}`);
         }
         lines.push('');
       }
@@ -115,21 +128,14 @@ export function buildPlanningMarkdown(bigPicture) {
     for (const note of researchNotes) {
       if (!note || !note.sourceId || !note.excerpt) continue;
       const src = sourceById.get(note.sourceId);
-      const excerptEsc = escapeMd(note.excerpt);
-      if (src) {
-        const sTitle = src.title || '자료';
-        const sUrl = src.url && src.url.trim() ? src.url.trim() : null;
-        const sTitleEsc = escapeMd(sTitle);
-        lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
-        if (sUrl) {
-          lines.push(`  출처: [${sTitleEsc}](${sUrl}) (자료 ${note.sourceId})`);
-        } else {
-          lines.push(`  출처: ${sTitleEsc} (자료 ${note.sourceId})`);
-        }
-      } else {
-        lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
-        lines.push(`  출처: (자료 ${note.sourceId})`);
-      }
+      if (!src) continue;
+      const excEsc = escapeMd(note.excerpt);
+      const sTitle = src.title || '자료';
+      const sUrl = src.url && src.url.trim() ? src.url.trim() : null;
+      const sTitleEsc = escapeMd(sTitle);
+      if (sUrl) lines.push(`- [${sTitleEsc}](${sUrl}) (자료 ${note.sourceId})`);
+      else lines.push(`- ${sTitleEsc} (자료 ${note.sourceId})`);
+      lines.push(`  > ${excEsc}`);
       lines.push('');
     }
   }
