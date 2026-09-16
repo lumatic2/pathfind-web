@@ -285,7 +285,7 @@ export function useFlow() {
     const failedCount = completed.stages.filter((s) => s.status === 'failed').length
     return failedCount === 0
       ? `🧰 조사를 마쳤습니다! 오른쪽 마인드맵에서 궁금한 것을 누르면 설명해 드려요.`
-      : `🧰 조사를 마쳤습니다! 전체 슬롯 수에서 실패 수를 뺀 개수만큼 단계가 채워졌고 실패 수만큼은 자료를 못 찾았습니다(둘 다 굵게). 오른쪽 마인드맵에서 노드를 누르면 설명해 드려요.`
+      : `조사를 마쳤습니다! ${completed.stages.length - failedCount}개 단계를 채웠고 ${failedCount}개 단계는 자료를 못 찾았습니다. 오른쪽 마인드맵에서 노드를 누르면 설명해 드려요.`
   }
 
   const startResearch = useCallback(() => {
@@ -884,6 +884,7 @@ export function useFlow() {
                 text: res.explanation,
                 kind: 'node-explain',
                 citationTitles: res.citationTitles,
+                citationIds: res.citationIds,
                 suggestions: res.followups,
               },
             ],
