@@ -336,10 +336,18 @@ export function useFlow() {
     if (current.pending == null) return
     if (readQuota().remaining === 0) return
 
-    consumeQuota()
+    const existingAttempt = current.planningAttempt
+    if (existingAttempt == null || !existingAttempt.approved || existingAttempt.summary !== current.summary) {
+      consumeQuota()
+    }
     patch({
       phase: "skeleton",
       pending: null,
+      planningAttempt: {
+        approved: true,
+        summary: current.summary,
+        status: "pending",
+      },
     })
     startResearch()
   }, [patch])
@@ -417,6 +425,26 @@ export function useFlow() {
     // 2) 큰 그림 + 단계 골격 요청
     pathfind({ summary: current.summary })
       .then((res) => {
+        // 응답 검사: 큰 그림과 단계 목록이 있어야 골격을 만든다
+        if (res.bigPicture == null || !Array.isArray(res.bigPicture.stages) || res.bigPicture.stages.length === 0) {
+          patch({
+            planningAttempt: current.planningAttempt != null
+              ? { ...current.planningAttempt, status: "failed" }
+              : { approved: true, summary: current.summary, status: "failed" },
+            busy: false,
+            phase: "confirm",
+            error: "조사 큰 그림을 가져오지 못했습니다.",
+          })
+          return
+        }
+
+        // 같은 승인으로 다시 조사한 것이면 횟수를 또 빼지 않도록 승인 기록을 성공으로 남긴다
+        patch({
+          planningAttempt: current.planningAttempt != null
+            ? { ...current.planningAttempt, status: "succeeded" }
+            : { approved: true, summary: current.summary, status: "succeeded" },
+        })
+
         // 골격을 만드는 부분은 상태를 다시 읽지 않고 응답에서 바로 만든다
         const stages: StageSlot[] = res.bigPicture.stages.map((stage) => ({
           status: 'pending',
@@ -498,12 +526,15 @@ export function useFlow() {
       .catch((err) => {
         // pathfind 실패 → 승인 카드로 되돌림 (횟수는 되돌리지 않음)
         patch({
+          planningAttempt: current.planningAttempt != null
+            ? { ...current.planningAttempt, status: "failed" }
+            : { approved: true, summary: current.summary, status: "failed" },
           busy: false,
-          phase: 'confirm',
+          phase: "confirm",
           error:
             err instanceof Error
               ? err.message
-              : '조사 큰 그림을 가져오지 못했습니다.',
+              : "조사 큰 그림을 가져오지 못했습니다.",
         })
       })
   }, [patch])
