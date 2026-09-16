@@ -2,179 +2,63 @@
 // 내려받는 문서 — 조사 기록과 단계별 제안 절을 조립한다.
 // 모델·외부 API 호출 없음.
 
-/** 마크다운 특수 문자를 이스케이프한다(text에서만). */
-function escapeMd(s) {
-  if (typeof s !== 'string') return '';
-  return s
-    .replace(/[\\`*_{}\\[\\]#>|]/g, '\\$&');
-}
-
 /** bigPicture의 planning을 받아 내려받는 문서 한 절을 조립한다.
- * planning이 없으면 빈 문자열(옛 입력 보존), 자료가 없으면 초안 표시. */
+ * planning이 없으면 빈 문자열(옛 입력 보존), 자료가 없으면 초안 표시.
+ * 출력 순서와 문구는 기준코드 server/handoff.mjs의 planningMarkdown을 그대로 따른다. */
 export function buildPlanningMarkdown(bigPicture) {
-  const planning = (bigPicture && bigPicture.planning) ? bigPicture.planning : null;
-  if (!planning) return '';
+  const p = (bigPicture && bigPicture.planning) || null;
+  if (!p) return '';
 
-  const sources = planning.sources || [];
-  const researchNotes = planning.researchNotes || [];
-  const stageBasis = planning.stageBasis || [];
-  const trace = planning.trace || [];
-  const warnings = planning.warnings || [];
-  const basisSummary = planning.basisSummary || '';
-  const stages = (bigPicture && bigPicture.stages) || [];
-  const requiresDraft = sources.length === 0 || researchNotes.length === 0;
+  const t = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const safe = v => t(v).replace(/[\\`*_{}\\[\\]<>#|]/g, '\\$&');
+  const link = s => /^https?:\/\//.test(s.url) ? `[${safe(s.title)}](${s.url.replace(/[()<>\s]/g, c => encodeURIComponent(c).replace(/\(/g, '%28').replace(/\)/g, '%29'))})` : safe(s.title);
 
-  const stageMap = new Map();
-  for (const s of stages) {
-    if (s && typeof s === 'object' && s.no != null) stageMap.set(s.no, s);
-  }
-  const sourceById = new Map();
-  for (const src of sources) {
-    if (src && src.id) sourceById.set(src.id, src);
-  }
+  // stageBasis가 Record(객체)이면 stageNo를 가진 배열로 읽는다
+  const stageBasisArr = Array.isArray(p.stageBasis)
+    ? p.stageBasis
+    : typeof p.stageBasis === 'object' && p.stageBasis !== null
+      ? Object.entries(p.stageBasis).map(([no, b]) => ({ stageNo: Number(no), ...b }))
+      : [];
 
-  const lines = [];
+  const out = ['## 단계를 정한 이유와 자료', '', safe(p.basisSummary), '',
+    `선행 조사 자료 ${p.sources.length}건 · 조회 ${safe(p.researchedAt)}`, '', p.sources.length ? '검색 결과의 제목과 발췌를 읽었습니다. 링크의 본문 전체를 읽은 기록은 아닙니다.' : '검색을 시도했지만 참고할 제목·발췌를 얻지 못했습니다.', ''];
 
-  // 단계를 정한 이유와 자료 — 2수준 제목 하나로
-  lines.push('## 단계를 정한 이유와 자료');
-  lines.push('');
-  if (basisSummary && basisSummary.trim()) {
-    lines.push(basisSummary.trim());
-    lines.push('');
-  }
-  lines.push(`- 자료 수: ${sources.length}건`);
-  if (planning.researchedAt) {
-    lines.push(`- 조회 시각: ${planning.researchedAt}`);
-  }
-  lines.push('');
-  lines.push('검색 결과의 제목과 발췌를 읽었고, 링크 본문 전체를 읽은 기록은 아닙니다.');
-  lines.push('');
-
-  // 단계별 제안 이유 — 3수준 제목으로 시작
-  if (stageBasis.length > 0) {
-    for (const sb of stageBasis) {
-      if (!sb || sb.stageNo == null) continue;
-      const stage = stageMap.get(sb.stageNo);
-      const stageTitle = (stage && stage.title) ? stage.title : `단계 ${sb.stageNo}`;
-      lines.push(`### ${sb.stageNo}. ${escapeMd(stageTitle)}`);
-      lines.push('');
-      const reason = sb.reason || '';
-      if (reason) {
-        lines.push(`- **목표에 맞춘 제안:** ${escapeMd(reason)}`);
-        lines.push('');
-      }
-      const support = sb.support || [];
-      const sourceIds = sb.sourceIds || [];
-      const strIds = sourceIds.filter(id => typeof id === 'string');
-      const strSuppIds = support.filter(s => typeof s === 'string');
-      const objSupps = support.filter(s => s && typeof s === 'object' && s.sourceId && typeof s.excerpt === 'string');
-      const shownIds = new Set();
-      for (const id of strIds) shownIds.add(id);
-      for (const id of strSuppIds) shownIds.add(id);
-      if (shownIds.size > 0 || objSupps.length > 0) {
-        lines.push('- 이 단계가 참고한 자료:');
-        for (const id of shownIds) {
-          const src = sourceById.get(id);
-          if (!src) continue;
-          const t = src.title || '자료';
-          const u = src.url && src.url.trim() ? src.url.trim() : null;
-          const tEsc = escapeMd(t);
-          if (u) lines.push(`  - [${tEsc}](${u})`);
-          else lines.push(`  - ${tEsc}`);
-        }
-        for (const obj of objSupps) {
-          if (shownIds.has(obj.sourceId)) continue;
-          const src = sourceById.get(obj.sourceId);
-          if (!src) continue;
-          const excEsc = escapeMd(obj.excerpt);
-          const sT = src.title || '자료';
-          const sU = src.url && src.url.trim() ? src.url.trim() : null;
-          const sTEsc = escapeMd(sT);
-          if (sU) lines.push(`  - [${sTEsc}](${sU}) (자료 ${obj.sourceId})`);
-          else lines.push(`  - ${sTEsc} (자료 ${obj.sourceId})`);
-          if (excEsc) lines.push(`    > ${excEsc}`);
-        }
-        lines.push('');
-      }
+  if (p.mode === 'research-informed') {
+    out.push(
+      '단계와 순서는 사용자 목표에 맞춘 제안이며 출처가 직접 증명한 순서는 아닙니다.',
+      '',
+      '### 참고한 조사 내용',
+      ''
+    );
+    for (const note of p.researchNotes ?? []) {
+      const source = p.sources.find((s) => s.id === note.sourceId);
+      if (source) out.push(`- ${link(source)}`, `  > ${safe(note.excerpt)}`, '');
     }
   }
 
-  // 선행 조사 출처 — sources 목록을 단계별 제안 뒤에 보여 줌
-  if (sources.length > 0) {
-    lines.push('### 선행 조사 출처');
-    lines.push('');
-    for (const src of sources) {
-      if (!src || !src.id) continue;
-      const title = src.title || '자료';
-      const url = src.url && src.url.trim() ? src.url.trim() : null;
-      const titleEsc = escapeMd(title);
-      if (url) {
-        lines.push(`- [${titleEsc}](${url})`);
-      } else {
-        lines.push(`- ${titleEsc}`);
-      }
-      if (src.accessedAt) lines.push(`  접근: ${src.accessedAt}`);
-      if (src.snippet) lines.push(`  발췌: ${escapeMd(src.snippet)}`);
-      if (src.queries && src.queries.length > 0) {
-        lines.push(`  검색어: ${src.queries.map(escapeMd).join(', ')}`);
-      }
-      if (src.channel) lines.push(`  채널: ${src.channel}`);
-      lines.push('');
+  for (const b of stageBasisArr) {
+    if (!b || b.stageNo == null) continue;
+    out.push(`### ${b.stageNo}. ${safe(bigPicture.stages?.find(s => s.no === b.stageNo)?.title || '단계')}`, '',
+      `**${p.mode === 'research-informed' ? '목표에 맞춘 제안' : b.basis === 'source' ? '자료에 근거한 단계' : '상황에 맞춰 추가한 단계'}** · ${safe(b.reason)}`, '');
+    for (const support of b.support) {
+      const source = p.sources.find(s => s.id === support.sourceId);
+      if (source) out.push(`- ${link(source)}`, `  > ${safe(support.excerpt)}`, '');
     }
   }
 
-  // 참고한 조사 내용 — research-informed일 때만 3수준 제목으로
-  if (planning.mode === 'research-informed' && researchNotes.length > 0) {
-    lines.push('### 참고한 조사 내용');
-    lines.push('');
-    for (const note of researchNotes) {
-      if (!note || !note.sourceId || !note.excerpt) continue;
-      const src = sourceById.get(note.sourceId);
-      if (!src) continue;
-      const excEsc = escapeMd(note.excerpt);
-      const sTitle = src.title || '자료';
-      const sUrl = src.url && src.url.trim() ? src.url.trim() : null;
-      const sTitleEsc = escapeMd(sTitle);
-      if (sUrl) lines.push(`- [${sTitleEsc}](${sUrl}) (자료 ${note.sourceId})`);
-      else lines.push(`- ${sTitleEsc} (자료 ${note.sourceId})`);
-      lines.push(`  > ${excEsc}`);
-      lines.push('');
-    }
+  out.push('### 선행 조사 출처', '');
+  for (const s of p.sources) {
+    out.push(
+      `- ${link(s)} · 조회 ${safe(s.accessedAt)}`,
+      `  ${safe(s.snippet)}`,
+      `  검색어: ${s.queries.map(safe).join(' · ')}`,
+      ''
+    );
   }
 
-  // 초안 안내 — sources나 researchNotes 중 하나라도 없으면
-  if (requiresDraft) {
-    lines.push('### 초안 안내');
-    lines.push('');
-    lines.push('아직 조사 자료가 충분하지 않습니다. 인터뷰 기반으로 작성된 초안입니다.');
-    lines.push('');
+  for (const warning of p.warnings) {
+    out.push(safe(warning), '');
   }
 
-  // 추가 조회 기록 — 3수준 제목으로 마지막
-  if (trace.length > 0) {
-    lines.push('### 추가 조회 기록');
-    lines.push('');
-    for (const t of trace) {
-      if (!t) continue;
-      const q = t.query || '';
-      const ch = t.channel || '';
-      const st = t.status || '';
-      const cnt = t.count != null ? String(t.count) : '';
-      const el = t.elapsedMs != null ? `${t.elapsedMs}ms` : '';
-      lines.push(`- ${escapeMd(q)} (${escapeMd(ch)}) — 상태: ${st}, 결과: ${cnt}, 소요: ${el}`);
-    }
-    lines.push('');
-  }
-
-  // 한계 — 3수준 제목으로 마지막
-  if (warnings.length > 0) {
-    lines.push('### 한계');
-    lines.push('');
-    for (const w of warnings) {
-      if (w) lines.push(`- ${escapeMd(w)}`);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  return out.join('\n');
 }
