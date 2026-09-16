@@ -826,6 +826,38 @@ function walkMindmapAncestors(node: MindmapNode, id: string, acc: string[]): boo
   return false
 }
 
+export function itemSplit(s: Stage): { existing: number; need: number } {
+  const todos = s.todos ?? []
+  const bring = todos.filter((t) => asText(t.owner) === BRING_OWNER).length
+  return { existing: (s.findings?.length ?? 0) + bring, need: (s.tasks?.length ?? 0) + (todos.length - bring) }
+}
+/** 단계 부제·툴팁 문구 — 「가져다 쓸 것 n · 직접 만들 것 m」 */
+export function splitLabel(s: Stage): string {
+  const { existing, need } = itemSplit(s)
+  return `가져다 쓸 것 ${existing} · 직접 만들 것 ${need}`
+}
+
+/** 마인드맵 범례(4차 보강 2 step-17 → 보강 3 step-22: 3줄). 문구·색은 아래 `ITEM_DOT` 을 **그대로 참조**한다 — 범례가 따로 문장을
+ * 갖지 않아 툴팁과 어긋날 수 없다. `verdict` 는 지도 위 점의 `data-verdict` 와 같다.
+ */
+export type LegendItem = { verdict: string; label: string; title: string; color: string; hollow?: boolean }
+
+/** 단계 점 = 항목 비율의 두 색 분할 점(`split` = 초록 비율). 항목이 없거나 아직 조사 중·실패면 빈 점.
+ * 색은 항목 점과 같은 두 토큰이라 새 색이 없다.
+ */
+export function verdictDot(slot: StageSlot): MindmapNode["dot"] {
+  if (slot.status === "failed") {
+    return { verdict: "failed", color: "var(--verdict-none)", title: "이 단계는 자료를 못 찾았습니다.", hollow: true }
+  }
+  if (slot.status !== "done") {
+    return { verdict: "pending", color: "var(--verdict-none)", title: "아직 조사하고 있습니다.", hollow: true }
+  }
+  const { existing, need } = itemSplit(slot.stage)
+  const total = existing + need
+  if (!total) return { verdict: "empty", color: "var(--verdict-none)", title: "이 단계에는 항목이 없습니다.", hollow: true }
+  return { verdict: "split", color: ITEM_DOT.existing.color, color2: ITEM_DOT.need.color, split: existing / total, title: splitLabel(slot.stage) }
+}
+
 export function mindmapLegend() {
   const items: LegendItem[] = (["existing", "need"] as const).map((k) => ({ label: ITEM_DOT[k].title.split(" — ")[0], ...ITEM_DOT[k] }))
   items.push({ verdict: "pending", label: "조사 중", title: "아직 조사하고 있습니다.", color: "var(--verdict-none)", hollow: true })
