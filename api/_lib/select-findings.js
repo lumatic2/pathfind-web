@@ -54,7 +54,7 @@ function gradeFor(host, channel, form) {
 }
 
 /** 후보 하나를 finding 형태로 만든다. */
-function normalizeCandidate(c) {
+export function normalizeCandidate(c) {
   const channel = c.channel || 'web';
   const host =
     c.host ||
