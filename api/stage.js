@@ -651,7 +651,7 @@ function trimQuery(channel, q) {
 }
 
 /** 규칙에 걸린 채널의 검색어를 모델에게 한 번에 받는다. */
-async function planQueries(stage, summary, planned) {
+async function planQueries(key, stage, summary, planned) {
   let parsed = null;
   try {
     const r = await callSolar([
@@ -661,12 +661,12 @@ async function planQueries(stage, summary, planned) {
     parsed = parseSolarJson(r.content);
   } catch { /* 아래 폴백 */ }
   const out = Object.fromEntries(planned.map((k) => [k, trimQuery(k, parsed?.[k]) || trimQuery(k, stage.title)]));
-  if (planned.includes('oss') && HANGUL.test(out.oss)) out.oss = await toEnglishQuery(out.oss || stage.title);
+  if (planned.includes('oss') && HANGUL.test(out.oss)) out.oss = await toEnglishQuery(key, out.oss || stage.title);
   return out;
 }
 
 /** 한국어 검색어 → GitHub 용 영문 키워드 2~4개. 실패하면 빈 문자열. */
-async function toEnglishQuery(text) {
+async function toEnglishQuery(key, text) {
   try {
     const r = await callSolar([
       { role: 'system', content: 'GitHub 저장소를 찾기 위한 영문 키워드 2~4개만 출력합니다. 소문자 영문과 공백만 씁니다. 다른 텍스트는 쓰지 않습니다.' },
