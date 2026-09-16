@@ -49,6 +49,7 @@ export function useFlow() {
   sessionEpochRef.current = sessionEpoch
   const generationRef = useRef(0)
   const retryingRef = useRef(false)
+  const planningLock = useRef(false)
 
   function isCurrentRequest(gen: number, epoch: number): boolean {
     return generationRef.current === gen && sessionEpochRef.current === epoch
@@ -219,22 +220,6 @@ export function useFlow() {
   const approve = useCallback(() => {
     const current = sessionRef.current
     if (current.phase !== "confirm") return
-    if (readQuota().remaining === 0) return
-
-    const existingAttempt = current.planningAttempt
-    if (existingAttempt == null || !existingAttempt.approved || existingAttempt.summary !== current.summary) {
-      consumeQuota()
-    }
-    generationRef.current++
-    patch({
-      phase: "skeleton",
-      pending: null,
-      planningAttempt: {
-        approved: true,
-        summary: current.summary,
-        status: "pending",
-      },
-    })
     startResearch()
   }, [patch])
 
@@ -299,39 +284,86 @@ export function useFlow() {
   const startResearch = useCallback(() => {
     const current = sessionRef.current
 
-    // 캡처한 세대가 여전히 현재인지 확인. 새 요청이 시작돼 세대가 바뀌었으면 이 요청은 무효다.
+    // 다른 요청이 이미 선도 중이면 여기서 시작하지 않는다
+    if (planningLock.current) return
+    // 요약이 없으면 조사 요청의 출발점이 없다
+    if (current.summary == null) return
+    // confirm 단계에서만 조사 요청이 출발한다
+    if (current.phase !== "confirm") return
+    // 이미 조사 중이면 또 시작하지 않는다
+    if (current.busy) return
+
+    // 새로 승인한 패스일 때만 잔여 횟수를 확인하고 한 번 차감한다
+    // 같은 승인 요약을 재시도할 때는 추가로 빼지 않는다
+    if (current.planningAttempt == null ||
+        !current.planningAttempt.approved ||
+        current.planningAttempt.summary !== current.summary) {
+      if (readQuota().remaining === 0) return
+      consumeQuota()
+    }
+
+    // 잠금을 얻고 현재 요청을 시작한다
+    planningLock.current = true
     const gen = ++generationRef.current
     const epoch = sessionEpochRef.current
+
+    // 골격 전환 (새 승인일 때만 승인 말풍선을 넣고, 재시분이면 덧붙이지 않는다)
+    const isNewApproval =
+      current.planningAttempt == null ||
+      !current.planningAttempt.approved ||
+      current.planningAttempt.summary !== current.summary
+
     patch({
       messages: [
         ...current.messages,
-        {
-          id: msgId(),
-          role: 'user',
-          text: "맞아요, 이대로 조사해 주세요",
-          kind: 'chat',
-          suggestions: [],
-        },
-        {
-          id: msgId(),
-          role: 'assistant',
-          text: current.opening ?? '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
-          kind: 'progress',
-          suggestions: [],
-        },
+        ...(isNewApproval
+          ? [
+              {
+                id: msgId(),
+                role: 'user',
+                text: "맞아요, 이대로 조사해 주세요",
+                kind: 'chat',
+                suggestions: [],
+              },
+              {
+                id: msgId(),
+                role: 'assistant',
+                text: current.opening ?? '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
+                kind: 'progress',
+                suggestions: [],
+              },
+            ]
+          : []),
+        ...(isNewApproval
+          ? []
+          : [
+              {
+                id: msgId(),
+                role: 'assistant',
+                text: '같은 요약을 다시 조사합니다. 앞에서 세운 큰 그림을 다시 확인합니다.',
+                kind: 'progress',
+                suggestions: [],
+              },
+            ]),
       ],
       busy: true,
       phase: 'skeleton',
       error: null,
+      planningAttempt: {
+        approved: true,
+        summary: current.summary,
+        status: "pending",
+      },
     })
 
-    // 2) 큰 그림 + 단계 골격 요청
+    // 큰 그림 + 단계 골격 요청
     pathfind({ summary: current.summary })
       .then((res) => {
         // 마지막 시작 세대가 아니면 이 응답을 처리하지 않는다
         if (!isCurrentRequest(gen, epoch)) return
         // 응답 검사: 큰 그림과 단계 목록이 있어야 골격을 만든다
         if (res.bigPicture == null || !Array.isArray(res.bigPicture.stages) || res.bigPicture.stages.length === 0) {
+          planningLock.current = false
           patch({
             planningAttempt: current.planningAttempt != null
               ? { ...current.planningAttempt, status: "failed" }
@@ -432,6 +464,7 @@ export function useFlow() {
         }).then(() => {
           // startResearch가 출발시킨 세대가 아니면 완료 단계를 건너뛰고 정리만 한다
           if (generationRef.current !== gen || sessionEpochRef.current !== epoch) {
+            planningLock.current = false
             retryingRef.current = false
             return
           }
@@ -451,9 +484,11 @@ export function useFlow() {
             phase: 'ready',
             selectedId: null,
           })
+          planningLock.current = false
         })
       })
       .catch((err) => {
+        planningLock.current = false
         retryingRef.current = false
         // pathfind 실패 → 승인 카드로 되돌림 (횟수는 되돌리지 않음)
         if (!isCurrentRequest(gen, epoch)) return
