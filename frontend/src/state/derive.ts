@@ -127,6 +127,24 @@ export function channelTally(findings: Finding[]): { channel: string; count: num
     .sort((a, b) => b.count - a.count)
 }
 
+export function asText(v: unknown): string {
+  if (typeof v === "string") return v
+  if (v == null) return ""
+  if (typeof v === "number" || typeof v === "boolean") return String(v)
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>
+    for (const k of ["label", "title", "name", "task", "text", "option", "choice"]) {
+      if (typeof o[k] === "string") return o[k] as string
+    }
+    try {
+      return JSON.stringify(v)
+    } catch {
+      return ""
+    }
+  }
+  return String(v)
+}
+
 function stageSubtitle(stage: StageSlot["stage"], status: StageRunStatus): string | undefined {
   if (status === "pending") return undefined
   if (status === "running") return "조사 중"
@@ -165,7 +183,8 @@ function summaryDoc(stageNo: number, stage: StageSlot["stage"], status: StageRun
     id: `${STAGEPREFIX}${stageNo}-summary`,
     kind: "summary",
     stageNo,
-    title: stageTitle(stage, status),
+    title: "단계 요약",
+    subtitle: `${stage.no}. ${asText(stage.title)}`,
     markdown,
     status,
     findingCount: stage.findings?.length ?? 0,
@@ -181,45 +200,34 @@ function stageTitle(stage: StageSlot["stage"], status: StageRunStatus): string {
 }
 
 function summaryMarkdown(stage: StageSlot["stage"], status: StageRunStatus): string {
+  if (status !== "done") {
+    const title = `${stage.no}. ${asText(stage.title)}`
+    const label = status === "failed" ? "자료를 못 찾았습니다." : "조사 중…"
+    return [`# ${title}`, "", stage.desc ? `${asText(stage.desc)}\n` : "", label].join("\n")
+  }
   const lines: string[] = []
-  lines.push(`# ${stageTitle(stage, status)}`)
-  lines.push("")
-  lines.push(stage.desc)
-  lines.push("")
-
-  if (status === "running") {
-    lines.push("아직 조사하고 있습니다.")
-    lines.push("")
-  } else if (status === "failed") {
-    lines.push("이 단계는 자료를 못 찾았습니다.")
-    lines.push("")
-    return lines.join("\n")
-  }
-
-  if (stage.verdict != null) {
-    lines.push(`**판정** — ${verdictLabel(stage.verdict)}`)
-    if (stage.verdictReason != null && stage.verdictReason.trim().length > 0) {
-      lines.push(stage.verdictReason)
-    }
-  }
+  lines.push(`# ${stage.no}. ${asText(stage.title)}`, "")
+  if (stage.desc) lines.push(asText(stage.desc), "")
+  lines.push(`**판정** — ${verdictLabel(normalizeVerdict(stage.verdict))}`)
+  if (stage.verdictReason) lines.push("", asText(stage.verdictReason))
   if (stage.scope != null) {
-    const channels = (stage.scope.channels ?? []).map((c) => channelLabel[c] ?? c)
-    const planned = (stage.scope.planned ?? []).map((c) => channelLabel[c] ?? c)
-    lines.push("", `**조사 범위** — ${stage.scope.claimType || "확인 불가"} · 채널 ${channels.length ? channels.join(" · ") : "없음"} · 호출 ${stage.scope.calls ?? 0}회${planned.length ? ` · 규칙으로 미리 돌린 채널 ${planned.join(" · ")}` : ""}`)
+    const channels = (stage.scope.channels ?? []).map((c) => channelLabel[asText(c)] ?? asText(c))
+    const planned = (stage.scope.planned ?? []).map((c) => channelLabel[asText(c)] ?? asText(c))
+    lines.push("", `**조사 범위** — ${asText(stage.scope.claimType) || "확인 불가"} · 채널 ${channels.length ? channels.join(" · ") : "없음"} · 호출 ${stage.scope.calls ?? 0}회${planned.length ? ` · 규칙으로 미리 돌린 채널 ${planned.join(" · ")}` : ""}`)
   }
   const findings = stage.findings ?? []
   const todos = stage.todos ?? []
   if (findings.length) {
     lines.push("", "## 찾은 자료", "")
     for (const f of findings) {
-      lines.push(`- **${f.name}** (${f.kind})`)
-      if (f.evidence) lines.push(`  - ${f.evidence}`)
-      if (f.url) lines.push(`  - ${f.url}`)
+      lines.push(`- **${asText(f.name)}** (${asText(f.kind)})`)
+      if (f.evidence) lines.push(`  - ${asText(f.evidence)}`)
+      if (f.url) lines.push(`  - ${asText(f.url)}`)
     }
   }
   if (todos.length) {
     lines.push("", "## 이미 있는 것 / 직접 해야 하는 것", "")
-    for (const t of todos) lines.push(`- [${t.owner}] ${t.task}${t.note ? ` — ${t.note}` : ""}`)
+    for (const t of todos) lines.push(`- [${asText(t.owner)}] ${asText(t.task)}${t.note ? ` — ${asText(t.note)}` : ""}`)
   }
   return lines.join("\n")
 }
