@@ -29,12 +29,11 @@ function dateKorean() {
 }
 
 function verdictLine(stage) {
+  if (stage.verdictLine && stage.verdictLine.trim()) return stage.verdictLine.trim();
   const v = stage.verdict;
   if (!v) return null;
   const text = VERDICT_LINES[v] ?? null;
   if (!text) return null;
-  const reason = (stage.verdictReason && stage.verdictReason.trim()) ? stage.verdictReason.trim() : null;
-  if (reason) return `${text} — ${reason}`;
   return text;
 }
 
@@ -72,95 +71,83 @@ function findingLine(f) {
  * 모델·외부 API 호출 없음. 계약 값의 날것 판정 문자열은 화면에 내지 않는다.
  */
 export function buildPathMarkdown(bigPicture, stages, summary) {
-  const title = (bigPicture && bigPicture.title) ? bigPicture.title : '로드맵';
+  const title = (bigPicture && bigPicture.title) ? bigPicture.title : '패스';
   const intro = (bigPicture && bigPicture.intro) ? bigPicture.intro : '';
-  const date = dateKorean();
+  const usedSummary = !intro && summary && summary.trim();
+  const introText = usedSummary ? summary.trim() : intro;
+
+  const d = new Date();
+  const isoDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const stageList = (stages || []).filter(s => s && typeof s === 'object');
   const totalStages = stageList.length;
-
   let totalFindings = 0;
   for (const s of stageList) {
     totalFindings += (s.findings || []).length;
   }
 
   const lines = [];
-
-  // 제목
   lines.push(`# ${title}`);
   lines.push('');
-
-  // 소개
-  if (intro) {
-    lines.push(intro);
+  if (introText) {
+    lines.push(introText);
     lines.push('');
   }
+  lines.push(`> 작성일: ${isoDate} · 단계: ${totalStages}개 · 자료: ${totalFindings}건`);
+  lines.push('');
 
-  // 선행 조사 절 (planning-markdown.js — planning이 없으면 빈 문자열)
   const planningMd = buildPlanningMarkdown(bigPicture);
   if (planningMd) {
     lines.push(planningMd);
     lines.push('');
   }
 
-  // 날짜와 통계
-  lines.push(`**작성일:** ${date}`);
-  lines.push(`**단계:** ${totalStages}개`);
-  lines.push(`**자료:** ${totalFindings}건`);
-  lines.push('');
-
-  // 요약
-  if (summary && summary.trim()) {
+  if (summary && summary.trim() && !usedSummary) {
     lines.push('## 요약');
     lines.push('');
     lines.push(summary.trim());
     lines.push('');
   }
 
-  // 단계별
   if (stageList.length === 0) {
     lines.push('아직 조사 단계가 없습니다.');
     lines.push('');
   } else {
-    lines.push('## 단계별 조사 결과');
-    lines.push('');
     for (const s of stageList) {
-      lines.push(`### ${s.no}. ${s.title}`);
+      lines.push(`## ${s.no}. ${s.title}`);
       lines.push('');
-      lines.push(`- 설명: ${s.desc || '확인 불가'}`);
+      const desc = s.desc || '확인 불가';
+      lines.push(desc);
       lines.push('');
 
-      // 판정 문장 (verdictLine 먼저)
       const vLine = verdictLine(s);
       if (vLine) {
-        lines.push(vLine);
+        lines.push(`**${vLine}**`);
         lines.push('');
+        const reason = s.verdictReason && s.verdictReason.trim();
+        if (reason) {
+          lines.push(reason);
+          lines.push('');
+        }
       } else {
         lines.push(stageVerdictParagraph(s));
         lines.push('');
       }
 
-      // 찾은 자료
       const findings = s.findings || [];
       if (findings.length > 0) {
         lines.push('**찾은 자료:**');
-        for (const f of findings) {
-          lines.push(findingLine(f));
-        }
+        for (const f of findings) lines.push(findingLine(f));
         lines.push('');
       }
 
-      // 선택지
       const choices = s.choices || [];
       if (choices.length > 0) {
         lines.push('**선택지:**');
-        choices.forEach((c, i) => {
-          if (c) lines.push(`${i + 1}. ${c}`);
-        });
+        choices.forEach((c, i) => { if (c) lines.push(`${i + 1}. ${c}`); });
         lines.push('');
       }
 
-      // 할 일 (todo + task)
       const todos = s.todos || [];
       const tasks = s.tasks || [];
       if (todos.length > 0 || tasks.length > 0) {
@@ -173,14 +160,31 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
           }
         }
         for (const t of tasks) {
-          if (t) {
-            lines.push(`- [할 일] ${t.task}`);
-          }
+          if (t) lines.push(`- [할 일] ${t.task}`);
         }
         lines.push('');
       }
     }
   }
 
+  const loop = bigPicture && bigPicture.prototypeLoop;
+  if (loop && typeof loop === 'object') {
+    lines.push('## 다음 회차');
+    lines.push('');
+    if (typeof loop === 'string' && loop.trim()) {
+      lines.push(loop.trim());
+    } else if (loop.message && typeof loop.message === 'string') {
+      lines.push(loop.message.trim());
+      if (loop.items && Array.isArray(loop.items)) {
+        lines.push('');
+        loop.items.forEach(item => lines.push(`- ${item}`));
+      }
+    } else {
+      lines.push(JSON.stringify(loop, null, 2));
+    }
+    lines.push('');
+  }
+
+  lines.push('');
   return lines.join('\n');
 }
