@@ -45,6 +45,8 @@ export function useFlow() {
   const { session, patch } = useSession()
   const sessionRef = useRef(session)
   sessionRef.current = session
+  const generationRef = useRef(0)
+  const retryingRef = useRef(false)
 
   /** 상한이 1로 내려갈 때 한 번만 불린다. degraded를 남기고 강등 말풍선을 붙인다. */
   const onDegrade = useCallback((_newConcurrency: number) => {
@@ -64,7 +66,8 @@ export function useFlow() {
   }, [patch])
 
   /** 단계 1개 조사. 요약·슬롯을 갱신하고 결과 줄을 진행한다. */
-  async function runStage(index: number, summary: string, currentStage: Stage): Promise<void> {
+  async function runStage(index: number, summary: string, currentStage: Stage, gen: number): Promise<void> {
+    if (generationRef.current !== gen) return
     const latest = sessionRef.current
     const slot = latest.stages[index]
     if (slot == null) return
@@ -374,17 +377,29 @@ export function useFlow() {
       ],
       phase: "interview",
       pending: null,
+      planningAttempt: undefined,
     })
   }, [patch])
 
   const retry = useCallback(() => {
     const current = sessionRef.current
+    if (current.phase === 'skeleton') {
+      patch({ error: '새 패스가 만들어지는 중입니다. 잠시 기다려 주세요.' })
+      return
+    }
+    if (current.phase === 'confirm' && current.planningAttempt?.status === 'failed') {
+      if (retryingRef.current) return
+      retryingRef.current = true
+      startResearch()
+      return
+    }
     const failedOrPending = current.stages.find((s) => s.status === 'failed' || s.status === 'pending')
     if (failedOrPending == null) return
     patch({ error: null })
     const idx = current.stages.indexOf(failedOrPending)
     if (idx < 0) return
-    runStage(idx, current.summary, failedOrPending.stage)
+    const gen = generationRef.current
+    runStage(idx, current.summary, failedOrPending.stage, gen)
   }, [patch])
 
   /** 완주 말풍선 텍스트. startResearch 완료 핸들러와 resumeResearch 완료 핸들러가 공유한다. */
@@ -398,7 +413,8 @@ export function useFlow() {
   const startResearch = useCallback(() => {
     const current = sessionRef.current
 
-    // 1) 사용자 확인 말풍선 + 진행 말풍선 + 상태
+    // 캡처한 세대가 여전히 현재인지 확인. 새 요청이 시작돼 세대가 바뀌었으면 이 요청은 무효다.
+    const gen = ++generationRef.current
     patch({
       messages: [
         ...current.messages,
@@ -425,6 +441,8 @@ export function useFlow() {
     // 2) 큰 그림 + 단계 골격 요청
     pathfind({ summary: current.summary })
       .then((res) => {
+        // 마지막 시작 세대가 아니면 이 응답을 처리하지 않는다
+        if (generationRef.current !== gen) return
         // 응답 검사: 큰 그림과 단계 목록이 있어야 골격을 만든다
         if (res.bigPicture == null || !Array.isArray(res.bigPicture.stages) || res.bigPicture.stages.length === 0) {
           patch({
@@ -502,9 +520,14 @@ export function useFlow() {
           items,
           concurrency: CONCURRENCY,
           worker: (item) =>
-            runStage(item.payload, current.summary, stages[item.payload].stage),
+            runStage(item.payload, current.summary, stages[item.payload].stage, gen),
           onDegrade,
         }).then(() => {
+          // startResearch가 출발시킨 세대가 아니면 완료 단계를 건너뛰고 정리만 한다
+          if (generationRef.current !== gen) {
+            retryingRef.current = false
+            return
+          }
           const completed = sessionRef.current
           patch({
             messages: [
@@ -524,6 +547,7 @@ export function useFlow() {
         })
       })
       .catch((err) => {
+        retryingRef.current = false
         // pathfind 실패 → 승인 카드로 되돌림 (횟수는 되돌리지 않음)
         patch({
           planningAttempt: current.planningAttempt != null
@@ -542,6 +566,7 @@ export function useFlow() {
   /** 새로고침으로 끊긴 조사를 이어 받는다. 복원 규칙이 phase를 researching으로 만든 뒤에만 유효하다. */
   const resumeResearch = useCallback(() => {
     const current = sessionRef.current
+    const gen = generationRef.current
 
     // busy이거나 phase가 researching이 아니면 아무것도 하지 않는다
     if (current.busy || current.phase !== 'researching') return
@@ -581,9 +606,11 @@ export function useFlow() {
       items,
       concurrency: CONCURRENCY,
       worker: (item) =>
-        runStage(item.payload, current.summary, current.stages[item.payload].stage),
+        runStage(item.payload, current.summary, current.stages[item.payload].stage, gen),
       onDegrade,
     }).then(() => {
+      // resumeResearch가 불을 붙인 세대가 아니면 완료 핸들러를 건너뛴다
+      if (generationRef.current !== gen) return
       const completed = sessionRef.current
       patch({
         messages: [
