@@ -6,6 +6,15 @@
 // 받아 실제 자료 목록과 대조해 검증하고, 정상이면 bigPicture.stages + planning.stageBasis로
 // 바꿔 넣는다. 가짜 식별자·필수 설명 누락은 422 구분.
 
+// 제목 앞의 단계 번호 접두("N. " / "N) " / "N: " / "단계 N" 등) 제거
+function stripStepNumber(title) {
+  const t = title.trim();
+  let out = t
+    .replace(/^단계\s+\d{1,2}[.\):]?\s*/, '')
+    .replace(/^\d{1,2}[.\):]\s*/, '');
+  return out || t;
+}
+
 /**
  * @param {object} modelDesign - 모델 설계 입력
  *   { title, intro, basisSummary, steps, referenceIds, limitations, researchNotes? }
@@ -116,7 +125,7 @@ export function normalizePlanningDesign(modelDesign, sources) {
   // stages: steps를 순서대로 번호 붙여 변환, tasks·choices는 빈 배열
   const stages = steps.map((s, idx) => ({
     no: idx + 1,
-    title: s.title.trim(),
+    title: stripStepNumber(s.title),
     desc: s.desc.trim(),
     icon: s.icon || 'compass',
     tasks: [],
