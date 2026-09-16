@@ -104,11 +104,15 @@ type ChatConversationPanelProps = {
    * 여기로 들어온다. 안 주면 기본 문구. `renderAssistantMark` 가 없으면 종전 점 3개 스피너 그대로다.
    */
   waitingLabel?: string
-  /** M117 grounded — 답변 아래 액션 바(「메모에 저장」 pill + 복사·👍·👎). 하나라도 주면 바를 그린다 */
+  /** M117 — 답변 아래 액션 바(「메모에 저장」 pill + 복사·👍·👎). 하나라도 주면 바를 그린다 */
   onSaveNote?: (message: ChatMessage) => void
   onCopy?: (message: ChatMessage) => void
   onFeedback?: (message: ChatMessage, v: "up" | "down") => void
   saveNoteLabel?: string
+  /** 조사 실패 안내 한 줄. 주면 오류 행에 쓰고, 없으면 영어 기본값을 쓴다. */
+  errorMessage?: string
+  /** 오류 행 다시 시도 버튼 라벨. 주면 쓰고, 없으면 `Retry`를 쓴다. */
+  retryLabel?: string
   className?: string
   /**
    * 어시스턴트 마크를 구간의 어디에 둘지 정한다(M122 — 실소비자 승격, 계약 옵션).
@@ -709,6 +713,8 @@ export function ChatConversationPanel({
   suggestionNotes,
   suggestionReasons,
   recommendedSuggestion,
+  errorMessage,
+  retryLabel,
   className,
   assistantMarkPlacement = "trailing",
 }: ChatConversationPanelProps) {
@@ -747,8 +753,9 @@ export function ChatConversationPanel({
     setDraft("")
   }
 
-  const hasActions = Boolean(onSaveNote || onCopy || onFeedback)
   const zeroState = grounded && emptyTitle != null && messages.length === 0 && status === "idle"
+  const errorText = errorMessage ?? "The assistant could not respond. Your message was not lost."
+  const retryText = retryLabel ?? "Retry"
   const showTrailingSuggestions = Boolean(suggestions?.length) && status !== "waiting" && !zeroState
 
   return (
@@ -824,23 +831,26 @@ export function ChatConversationPanel({
                     {mark}
                   </div>
                 ) : null}
-                {hasActions ? (
-                  // 원본 §3 액션 바 — 「메모에 저장」 outlined pill 32h + 복사·👍·👎 아이콘 버튼
-                  <div data-chat-actions className="mt-1 flex flex-wrap items-center gap-1">
-                    <button type="button" onClick={() => onSaveNote?.(message)} className={cn("inline-flex items-center gap-1.5 rounded-full border border-border pl-2.5 pr-3 text-sm font-medium outline-none ring-ring ring-offset-2 ring-offset-card focus-visible:ring-2", STATE_LAYER)} style={{ height: ACTION_PX }}>
-                      <PinIcon aria-hidden className="size-4" />
-                      {saveNoteLabel}
-                    </button>
-                    <GroundedIconButton label="복사" size={ACTION_PX} onClick={() => onCopy?.(message)}>
-                      <CopyIcon size={16} aria-hidden />
-                    </GroundedIconButton>
-                    <GroundedIconButton label="만족스러운 답변" size={ACTION_PX} onClick={() => onFeedback?.(message, "up")}>
+                {onSaveNote ? (
+                  <button type="button" onClick={() => onSaveNote(message)} className={cn("inline-flex items-center gap-1.5 rounded-full border border-border pl-2.5 pr-3 text-sm font-medium outline-none ring-ring ring-offset-2 ring-offset-card focus-visible:ring-2", STATE_LAYER)} style={{ height: ACTION_PX }}>
+                    <PinIcon aria-hidden className="size-4" />
+                    {saveNoteLabel}
+                  </button>
+                ) : null}
+                {onCopy ? (
+                  <GroundedIconButton label="복사" size={ACTION_PX} onClick={() => onCopy(message)}>
+                    <CopyIcon size={16} aria-hidden />
+                  </GroundedIconButton>
+                ) : null}
+                {onFeedback ? (
+                  <>
+                    <GroundedIconButton label="만족스러운 답변" size={ACTION_PX} onClick={() => onFeedback(message, "up")}>
                       <ThumbsUpIcon size={16} aria-hidden />
                     </GroundedIconButton>
-                    <GroundedIconButton label="불만족스러운 답변" size={ACTION_PX} onClick={() => onFeedback?.(message, "down")}>
+                    <GroundedIconButton label="불만족스러운 답변" size={ACTION_PX} onClick={() => onFeedback(message, "down")}>
                       <ThumbsDownIcon size={16} aria-hidden />
                     </GroundedIconButton>
-                  </div>
+                  </>
                 ) : null}
               </div>
             )
@@ -911,9 +921,9 @@ export function ChatConversationPanel({
           <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2" role="alert">
             <AlertCircleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-destructive" />
             <div className="min-w-0 flex-1">
-              <p className="break-keep text-sm text-foreground">The assistant could not respond. Your message was not lost.</p>
+              <p className="break-keep text-sm text-foreground">{errorText}</p>
               <Button className="mt-1 h-auto p-0" size="sm" type="button" variant="link" onClick={onRetry}>
-                Retry
+                {retryText}
               </Button>
             </div>
           </div>
