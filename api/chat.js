@@ -28,115 +28,93 @@ const NO_EVIDENCE_ANSWER = '이번 조사에는 없습니다.';
 const NO_EVIDENCE_HELPFUL = '이 로드맵의 단계나 찾은 자료에 대해 물어보시면 그 문서를 근거로 답합니다.';
 const FALLBACK_INTRO = '지금 답을 만들 수 없어 조사 문서를 그대로 정리합니다.';
 
-const SYSTEM_PROMPT = `당신은 조사된 로드맵을 바탕으로 사용자 질문에 답하는 어시스턴트입니다.
-아래 정보를 바탕으로 마지막 질문에 답하세요.
-반드시 JSON 객체로만 답변하세요. 코드 펜스나 다른 텍스트는 넣지 마세요.
-출력은 아래 다섯 키를 가진 JSON 객체 하나입니다.`;
+const SYSTEM_PROMPT = `당신은 방금 끝난 조사 결과(패스)를 두고 사용자와 이야기하는 안내자입니다.
+아래에 주어지는 조사 문서(요약·단계·판정·자료·할 일)만으로 답합니다.
+답의 근거가 된 단계 번호를 evidenceStageNos에 적습니다. 근거로 쓴 자료는 citationNumbers와 citationNames에 번호와 이름을 함께 적습니다 — 이름은 자료 목록의 이름을 그대로 옮깁니다. 문서에 근거가 없는 질문이면 둘 다 빈 배열로 둡니다.
 
-// ---------- 자료 번호 매기기 ----------
+answer는 한국어 마크다운으로 씁니다 — 문단·- 목록·**굵게**·### 소제목까지만(표·이미지·링크는 화면이 그리지 않습니다).
+자료를 근거로 쓴 문장 끝에는 그 자료 번호를 [n]으로 붙입니다(예: "... 공식 API가 있습니다 [3]").
+followUpQuestions는 2~3개입니다.
 
-function buildMaterialList(stages) {
-  const materials = [];
-  for (const stage of stages) {
-    const findings = stage.findings || [];
-    for (let i = 0; i < findings.length; i++) {
-      materials.push({
-        number: materials.length + 1,
-        stageNo: stage.no,
+출력 형식 (JSON만, 다른 텍스트 없이):
+{
+  "answer": "마크다운 답",
+  "evidenceStageNos": [단계 번호],
+  "citationNumbers": [자료 번호],
+  "citationNames": [{"n": 자료 번호, "name": "자료 목록에 적힌 그 자료의 이름"}],
+  "furtherResearch": "근거가 없을 때만 — 무엇을 더 조사하면 되는지 한 줄",
+  "followUpQuestions": ["후속 질문", "..."]
+}`;
+
+// ---------- 자료 번호 매기기: 전역 n(1부터) ↔ 문서 id ----------
+
+function buildDocs(stages) {
+  const docs = [];
+  for (const s of stages) {
+    (Array.isArray(s.findings) ? s.findings : []).forEach((f, i) => {
+      const name = String(f?.name ?? '');
+      docs.push({
+        n: docs.length + 1,
+        number: docs.length + 1,
+        id: `stage-${s.no}-finding-${i}`,
+        stageNo: s.no,
         findingIndex: i,
-        name: findings[i].name || '자료',
-        evidence: findings[i].evidence || '',
-        url: findings[i].url || '',
-        kind: findings[i].kind || '',
+        name,
+        kind: String(f?.kind ?? ''),
+        evidence: String(f?.evidence ?? ''),
+        url: String(f?.url ?? ''),
       });
-    }
+    });
   }
-  return materials;
+  return docs;
 }
 
-// ---------- 프롬프트 ----------
+// ---------- 프롬프트: 조사 문서 직렬화에 단계·판정·자료·할 일·최근 대화 ----------
+
+function buildContext({ summary, bigPicture, stages, docs }) {
+  const lines = [`[프로젝트 요약]\n${summary || '(없음)'}`];
+  if (bigPicture?.title) lines.push(`[패스 제목]\n${bigPicture.title}${bigPicture.intro ? `\n${bigPicture.intro}` : ''}`);
+
+  const verdictLabel = (v) =>
+    ({ '가져다 써도 됨': '이미 있음', '직접 해야 함': '없음', '섞어야 함': '일부만 있음', '선례를 못 찾음': '못 찾음' }[v] ?? v ?? '확인 불가');
+
+  for (const s of stages) {
+    const items = [
+      `[단계 ${s.no}] ${s.title}`,
+      s.desc ? `설명: ${s.desc}` : '',
+      `이 단계 판정: ${s.verdict ? verdictLabel(s.verdict) : '미정'}${s.verdictReason ? ` — ${s.verdictReason}` : ''}`,
+    ];
+    const mine = docs.filter((d) => d.stageNo === s.no);
+    items.push(
+      mine.length
+        ? `자료:\n${mine.map((d) => `  [${d.n}] ${d.name} (${d.kind}) ${d.url}\n      ${d.evidence}`).join('\n')}`
+        : '자료: (없음)',
+    );
+    const tasks = Array.isArray(s.tasks) ? s.tasks : [];
+    if (tasks.length) items.push(`할 일:\n${tasks.map((t) => `  - ${t.task}${t.why ? ` (${t.why})` : ''}`).join('\n')}`);
+    const todos = Array.isArray(s.todos) ? s.todos : [];
+    if (todos.length) items.push(`이미 있는 것 / 직접 해야 하는 것:\n${todos.map((t) => `  - [${t.owner}] ${t.task}`).join('\n')}`);
+    lines.push(items.filter(Boolean).join('\n'));
+  }
+  return lines.join('\n\n');
+}
+
+function historyMessages(history) {
+  return (Array.isArray(history) ? history : [])
+    .filter((h) => h && (h.role === 'user' || h.role === 'assistant') && typeof h.text === 'string')
+    .slice(-6)
+    .map((h) => ({ role: h.role, content: h.text }));
+}
 
 function buildPrompt({ summary, bigPicture, stages, history }) {
-  const materials = buildMaterialList(stages);
-  const lines = [];
+  const docs = buildDocs(stages);
+  const context = buildContext({ summary, bigPicture, stages, docs });
+  const messages = historyMessages(history);
 
-  lines.push('## 요약');
-  lines.push(summary || '없음');
-  lines.push('');
+  const parts = [`[조사 문서]\n${context}`];
+  if (messages.length) parts.push('');
 
-  if (bigPicture) {
-    lines.push('## 큰 그림');
-    lines.push(`제목: ${bigPicture.title || '없음'}`);
-    lines.push(`소개: ${bigPicture.intro || '없음'}`);
-    lines.push('');
-  }
-
-  for (const stage of stages) {
-    const label = VERDICT_LABELS[stage.verdict] || stage.verdict || '확인 불가';
-    lines.push(`### 단계 ${stage.no}. ${stage.title}`);
-    lines.push(`판정: ${label}`);
-    if (stage.desc) lines.push(`설명: ${stage.desc}`);
-    lines.push('');
-
-    const tasks = stage.tasks || [];
-    if (tasks.length > 0) {
-      lines.push('할 일:');
-      for (const t of tasks) {
-        lines.push(`- ${t.order}. ${t.task} (${t.why || ''})`);
-      }
-      lines.push('');
-    }
-
-    if (materials.some(m => m.stageNo === stage.no)) {
-      lines.push('자료:');
-      for (const m of materials) {
-        if (m.stageNo === stage.no) {
-          lines.push(`${m.number}. ${m.name} — ${m.evidence || '근거 없음'}`);
-        }
-      }
-      lines.push('');
-    }
-
-    const todos = stage.todos || [];
-    if (todos.length > 0) {
-      lines.push('역할 나눔:');
-      for (const t of todos) {
-        lines.push(`- [${t.owner}] ${t.task}${t.note ? ` (${t.note})` : ''}`);
-      }
-      lines.push('');
-    }
-  }
-
-  // 마지막 사용자 질문을 추출
-  const lastUserMessage = history
-    .filter(h => h.role === 'user' && h.text)
-    .pop();
-
-  if (lastUserMessage) {
-    lines.push('## 질문');
-    lines.push(lastUserMessage.text);
-    lines.push('');
-  }
-
-  lines.push('출력 형식 (JSON 객체 하나만):');
-  lines.push('{');
-  lines.push('  "answer": "답변",');
-  lines.push('  "evidenceStageNos": [1, 2],');
-  lines.push('  "citationNumbers": [1, 3],');
-  lines.push('  "citationNames": [{"n": 1, "name": "자료 이름"}, {"n": 3, "name": "자료 이름"}],');
-  lines.push('  "furtherResearch": "더 조사할 내용이 있으면 한 줄로, 없으면 빈 문자열",');
-  lines.push('  "followUpQuestions": ["후속 질문 1", "후속 질문 2", "후속 질문 3"]');
-  lines.push('}');
-  lines.push('');
-  lines.push('규칙:');
-  lines.push('- answer는 자료에 근거한 내용으로 작성하세요.');
-  lines.push('- evidenceStageNos는 근거로 사용한 단계 번호 목록입니다.');
-  lines.push('- citationNumbers는 위 자료 번호를 인용한 목록입니다. 역호환을 위해 항상 함께 내세요.');
-  lines.push('- citationNames는 인용한 각 자료의 번호(n)와 자료 이름(name)을 담은 객체 배열입니다. name은 요청에 주어진 자료 목록의 이름과 정확히 일치해야 하며, 공백 포함 차이까지 대비해 양쪽을 trim한 값이 같아야 합니다. 이름이 일치하지 않으면 서버가 그 인용을 버립니다.');
-  lines.push('- followUpQuestions는 2~3개입니다.');
-  lines.push('- 한국어만 사용하세요.');
-
-  return lines.join('\n');
+  return { context, prompts: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: parts.join('\n') }, ...messages] };
 }
 
 // ---------- 모델 응답 파싱 ----------
@@ -188,9 +166,9 @@ function validateAndRenumber(answer, evidenceStageNos, citationNumbers, citation
   // 자료 번호 → 정보 매핑 / 자료 이름 → 정보 매핑
   const materialMap = new Map();
   const nameToInfo = new Map();
-  const materials = buildMaterialList(stages);
+  const materials = buildDocs(stages);
   for (const m of materials) {
-    materialMap.set(m.number, m);
+    materialMap.set(m.n, m);
     const t = (m.name || '').trim();
     if (t && !nameToInfo.has(t)) nameToInfo.set(t, m);
   }
@@ -207,9 +185,9 @@ function validateAndRenumber(answer, evidenceStageNos, citationNumbers, citation
       const nameTrim = rawName.trim();
       const info = nameToInfo.get(nameTrim);
       if (!info) { dropped++; continue; }
-      if (seen.has(info.number)) continue;
-      seen.add(info.number);
-      orderedNumbers.push(info.number);
+      if (seen.has(info.n)) continue;
+      seen.add(info.n);
+      orderedNumbers.push(info.n);
     }
   } else {
     // 옛 모양: citationNumbers만으로 검증 (버리지 않음)
@@ -258,7 +236,7 @@ function validateAndRenumber(answer, evidenceStageNos, citationNumbers, citation
     const info = materialMap.get(num);
     if (info) {
       citationTitles.push(info.name);
-      citationIds.push(`stage-${info.stageNo}-finding-${info.findingIndex}`);
+      citationIds.push(info.id);
     }
   }
 
@@ -342,10 +320,7 @@ export async function POST(request) {
 
   try {
     const content = await callSolar(
-      [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: prompt },
-      ],
+      prompt.prompts,
       {
         maxTokens: CHAT_MAX_TOKENS,
         forceParse: force === 'parse',
