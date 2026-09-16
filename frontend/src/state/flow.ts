@@ -711,6 +711,7 @@ export function useFlow() {
     outline({ stage: item.slot.stage, summary: current.summary })
       .then((res) => {
         if (!isCurrentRequest(gen, epoch)) return
+        if (sessionRef.current.stages[item.index]?.stage !== item.slot.stage) return
         if (res.topics.length > 0) {
           patch({
             stages: sessionRef.current.stages.map((s, i) =>
