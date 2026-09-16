@@ -28,9 +28,7 @@ export async function researchHermesStage(
 ): Promise<Stage | null> {
   const resume = opts?.resume
   const signal = opts?.signal
-
   if (signal?.aborted) return null
-
   let planned: { tool: string; queryHint: string; why?: string }[] = []
   if (!resume) {
     try {
@@ -54,23 +52,37 @@ export async function researchHermesStage(
       const started = await hermes.startRun(prompt)
       runId = started.runId
       cursor = 0
-    } catch {
+    } catch (e) {
+      if (e instanceof hermes.GatewayBusy) throw new RateLimited()
       return null
     }
   }
 
+  if (signal?.aborted) {
+    hermes.stopRun(runId).catch(() => {})
+    return null
+  }
+
   opts?.onRun?.(runId, cursor)
+
+  const onEvent = (event: hermes.HermesEvent, cursor: number) => {
+    if (signal?.aborted) return
+    opts?.onEvent?.(event, cursor)
+  }
+  const onQuiet = () => {
+    if (signal?.aborted) return
+    opts?.onQuiet?.()
+  }
 
   try {
     const state = await collectRunResult(runId, {
       cursor,
       signal,
-      onEvent: opts?.onEvent,
-      onQuiet: opts?.onQuiet,
+      onEvent,
+      onQuiet,
     })
-
+    if (signal?.aborted) return null
     if (state.status !== "completed") return null
-
     const parsed = parseStageJson(state.output)
     if (!parsed) return null
 
