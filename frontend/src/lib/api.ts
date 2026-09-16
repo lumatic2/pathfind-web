@@ -126,6 +126,15 @@ export async function grill(
   return r;
 }
 
+// channelPlan
+export type ChannelPlanItem = { channel: string; tool: string; why: string; queryHint: string }
+
+export async function channelPlan(
+  input: { stage: Stage },
+): Promise<{ planned: ChannelPlanItem[] }> {
+  return post<{ planned: ChannelPlanItem[] }>('/api/channel-plan', input, 15000);
+}
+
 // 2. pathfind
 export interface PathfindRequest {
   summary?: string;
