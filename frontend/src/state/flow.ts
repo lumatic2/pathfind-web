@@ -325,7 +325,10 @@ export function useFlow() {
                 },
               ],
               history: requestHistory,
-              summary: res.summary ?? "",
+              summary: (res.summary ?? "").trim(),
+              opening: res.opening?.trim() ?? undefined,
+              turnCount: res.turnCount,
+              pending: null,
               phase: "confirm",
               busy: false,
             })
@@ -344,7 +347,6 @@ export function useFlow() {
   const approve = useCallback(() => {
     const current = sessionRef.current
     if (current.phase !== "confirm") return
-    if (current.pending == null) return
     if (readQuota().remaining === 0) return
 
     const existingAttempt = current.planningAttempt
@@ -441,7 +443,7 @@ export function useFlow() {
         {
           id: msgId(),
           role: 'assistant',
-          text: current.pending?.opening ?? '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
+          text: current.opening ?? '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
           kind: 'progress',
           suggestions: [],
         },
