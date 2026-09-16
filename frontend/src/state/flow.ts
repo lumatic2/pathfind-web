@@ -1,5 +1,9 @@
 import { useCallback, useRef } from 'react'
 
+import * as hermes from '../lib/hermes'
+import { researchHermesStage } from '../lib/hermes-stage-run'
+import { needsReinforce, isBetterStage } from './hermes-quality'
+import { activityLine } from './hermes-findings'
 import { useSession } from './store'
 import {
   chat,
@@ -49,6 +53,8 @@ export function useFlow() {
   const generationRef = useRef(0)
   const retryingRef = useRef(false)
   const planningLock = useRef(false)
+  const reinforceControllerRef = useRef<AbortController | null>(null)
+  const reinforceAttemptRef = useRef<string | null>(null)
   if (sessionEpoch !== sessionEpochRef.current) {
     generationRef.current++
     planningLock.current = false
@@ -79,45 +85,59 @@ export function useFlow() {
   }, [patch])
 
   /** 단계 1개 조사. 요약·슬롯을 갱신하고 결과 줄을 진행한다. */
-  async function runStage(index: number, summary: string, currentStage: Stage, gen: number, epoch: number): Promise<void> {
+  async function runStage(
+    index: number,
+    summary: string,
+    currentStage: Stage,
+    gen: number,
+    epoch: number,
+    providedStage?: Stage,
+  ): Promise<void> {
     if (generationRef.current !== gen || sessionEpochRef.current !== epoch) return
-    const latest = sessionRef.current
-    const slot = latest.stages[index]
+    const slot = sessionRef.current.stages[index]
     if (slot == null) return
 
-    // 1) status → running + 마지막 활동 줄
-    patch({
-      stages: latest.stages.map((s, i) => (i === index ? { ...s, status: 'running' as const } : s)),
-      runActivity: `${index + 1}. ${currentStage.title} 자료를 찾는 중…`,
-    })
-
-    // 2) 서버 호출 (6분 타임아웃은 api.stage의 기본값과 같다)
-    let res: Awaited<ReturnType<typeof stage>>
-    try {
-      res = await stage({ stageIndex: index, stage: currentStage, summary })
-    } catch (err) {
-      if (err instanceof RateLimited) throw err
-      const message =
-        err instanceof Error
-          ? err.message
-          : '이 단계는 자료를 못 찾았습니다. 나머지는 계속합니다.'
-      if (!isCurrentRequest(gen, epoch)) return
+    // 1) status → running + 마지막 활동 줄 (providedStage가 있으면 건너뛴다)
+    if (providedStage == null) {
       patch({
-        stages: latest.stages.map((s, i) =>
-          i === index ? { ...s, status: 'failed' as const, error: message } : s,
+        stages: sessionRef.current.stages.map((s, i) =>
+          i === index ? { ...s, status: 'running' as const } : s,
         ),
-        messages: [
-          ...latest.messages,
-          {
-            id: msgId(),
-            role: 'assistant',
-            text: message,
-            kind: 'progress',
-            suggestions: [],
-          },
-        ],
+        runActivity: `${index + 1}. ${currentStage.title} 자료를 찾는 중…`,
       })
-      return
+    }
+
+    // 2) 서버 호출 (providedStage가 있으면 받은 결과를 그대로 쓴다)
+    let res: Awaited<ReturnType<typeof stage>>
+    if (providedStage != null) {
+      res = { stage: providedStage }
+    } else {
+      try {
+        res = await stage({ stageIndex: index, stage: currentStage, summary })
+      } catch (err) {
+        if (err instanceof RateLimited) throw err
+        const message =
+          err instanceof Error
+            ? err.message
+            : '이 단계는 자료를 못 찾았습니다. 나머지는 계속합니다.'
+        if (!isCurrentRequest(gen, epoch)) return
+        patch({
+          stages: sessionRef.current.stages.map((s, i) =>
+            i === index ? { ...s, status: 'failed' as const, error: message } : s,
+          ),
+          messages: [
+            ...sessionRef.current.messages,
+            {
+              id: msgId(),
+              role: 'assistant',
+              text: message,
+              kind: 'progress',
+              suggestions: [],
+            },
+          ],
+        })
+        return
+      }
     }
 
     // 3) 판정 정규화
@@ -148,7 +168,7 @@ export function useFlow() {
 
     // 6) 슬롯 상태 done, stage 교체
     if (!isCurrentRequest(gen, epoch)) return
-    const nextStages = latest.stages.map((s, i) =>
+    const nextStages = sessionRef.current.stages.map((s, i) =>
       i === index ? { ...s, status: 'done' as const, stage: merged } : s,
     )
     patch({ stages: nextStages })
@@ -157,6 +177,7 @@ export function useFlow() {
     outline({ stage: merged, summary })
       .then((res) => {
         if (!isCurrentRequest(gen, epoch)) return
+        if (sessionRef.current.stages[index]?.stage !== merged) return
         if (res.topics.length > 0) {
           patch({
             stages: sessionRef.current.stages.map((s, i) =>
