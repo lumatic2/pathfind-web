@@ -16,7 +16,7 @@ import { lawAvailable, searchLaw, NAME as LAW_NAME, isRelevantHit } from './_cha
 import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './_channels/public-data.js';
 import { available as kosisAvailable, searchKosis, name as KOSIS_NAME } from './_channels/kosis.js';
 import { reviewFindings } from './_lib/review-findings.js';
-import { selectFindings, normalizeCandidate } from './_lib/select-findings.js';
+import { selectFindings, normalizeCandidate, pickSupplementCandidates } from './_lib/select-findings.js';
 import { renumberBody, countCitationMarks, stripCitationMarks, attachNumbersByMaterialName } from './_lib/citation-marks.js';
 import { topicWords } from './_lib/topic-query.js';
 
@@ -991,8 +991,9 @@ export async function POST(request) {
     const tools = buildToolDefs();
 
     // 2) 쿼리 생성 호출 (작은 호출)
-    const plannedQueries = planQueries(/* key= */ null, stage, summary, plannedFinal);
+    const plannedQueries = await planQueries(/* key= */ null, stage, summary, plannedFinal);
     const queryMap = new Map(Object.entries(plannedQueries));
+    const queries = [];
 
     // 3) 프리서치: 규칙 채널을 한 단계 안에서 직렬로 돈다 (외부 API 429 회피).
     const preResults = [];
@@ -1021,6 +1022,7 @@ export async function POST(request) {
       const stageWords = stageContextWords(stage);
       const opts = channelOpts(ch, stage);
       const { results: chResults, calls: chSearchCalls, error: channelFailed } = await runChannelSearch(ch, q, stage, opts);
+      queries.push({ channel: ch, query: q });
       if (channelFailed) logCall('stage.preSearch.failed', 0, 502, { 'x-channel': ch });
       chCalls = chSearchCalls;
       const stats = ensureStats(ch);
@@ -1057,6 +1059,7 @@ export async function POST(request) {
               reason: 'callLimit',
             });
           } else {
+            queries.push({ channel: ch, query: topicQuery });
             const { results: tResults, calls: tCalls, error: channelFailed } = await runChannelSearch(
               ch,
               topicQuery,
@@ -1136,7 +1139,7 @@ export async function POST(request) {
         const args = JSON.parse(tc.function.arguments || '{}');
         const q = args.query || '';
         if (!q) break;
-
+        queries.push({ channel: chname, query: q });
         const opts = channelOpts(chname, stage);
         const { results, error: channelFailed } = await runChannelSearch(chname, q, stage, opts);
         if (channelFailed) logCall('stage.toolRun.failed', 0, 502, { 'x-channel': chname });
