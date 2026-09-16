@@ -121,6 +121,10 @@ export function streamEvents(
     onClose?: (reason: "done" | "aborted" | "error") => void
   },
 ): StreamHandle {
+  if (import.meta.env.PROD) {
+    return pollEvents(runId, opts)
+  }
+
   let cursor = opts.cursor ?? 0
   let closed = false
   let retries = 0
