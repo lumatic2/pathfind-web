@@ -471,21 +471,40 @@ export function useFlow() {
 
         const n = stages.length
 
-        // 3) 진행 말풍선: bigPicture.intro + 단계 n개 + 단계 목록
+        // 3) 진행 말풍선: intro + 조사 참고 요약·제안 이유·한계 + 단계 n개 + 단계 목록
         const afterPathfind = sessionRef.current
         const stageListLines = stages.map((s, i) => {
           const desc = s.stage.desc ?? ''
           return `- ${i + 1}. ${s.stage.title}${desc ? ` · ${desc}` : ''}`
         }).join('\n')
+        const planning = res.bigPicture.planning
+        const hasMaterials = planning != null &&
+          (planning.sources.length > 0 || planning.researchNotes.length > 0)
+        const msgParts: string[] = [
+          res.bigPicture.intro,
+          '',
+          `단계를 ${n}개로 나눴습니다. 이제 단계마다 자료를 찾습니다.`,
+        ]
+        if (planning?.basisSummary?.trim()) {
+          msgParts.push(planning.basisSummary.trim().slice(0, 400))
+        }
+        if (hasMaterials) {
+          if (planning?.warnings?.length) {
+            msgParts.push(planning.warnings[0].trim().slice(0, 180))
+          }
+        } else {
+          msgParts.push(
+            '참고한 자료나 조사 메모가 없어 인터뷰 기반 초안입니다. 자세한 내용은 왼쪽 문서를 열어 확인하세요.',
+          )
+        }
+        msgParts.push('', stageListLines)
         patch({
           messages: [
             ...afterPathfind.messages,
             {
               id: msgId(),
               role: 'assistant',
-              text: [res.bigPicture.intro, '', `단계를 ${n}개로 나눴습니다. 이제 단계마다 자료를 찾습니다.`, '', stageListLines].join(
-                '\n',
-              ),
+              text: msgParts.join('\n'),
               kind: 'progress',
               suggestions: [],
             },
