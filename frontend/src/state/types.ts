@@ -33,8 +33,37 @@ export type StageScope = {
   vetTimeout?: number
 }
 
+// 단계 설계 정보. 서버가 주는 planning 블록의 형태를 그대로 받는다.
+export type Planning = {
+  version: 1
+  mode: string
+  researchedAt: string
+  requestId: string
+  basisSummary: string
+  sources: PlanningSource[]
+  researchNotes: { sourceId: string; excerpt: string }[]
+  stageBasis: Record<number, { basis: string; reason: string; sourceIds: string[]; support: string[] }>
+  trace: { query: string; channel: string; status: string; count: number; elapsedMs: number }[]
+  warnings: string[]
+  events: { name: string; elapsedMs: number }[]
+  groundingChecks: never[]
+  offTopic?: number // 선행 검색 결과 중 주제와 맞지 않아 제외한 건수. 옛 데이터에 없을 수 있음.
+}
+
 // 큰 그림에서 한 단계가 책임질 개별 할 일.
 export type Task = { order: number; task: string; why: string }
+
+// 단계 설계 정보에 들어가는 자료 출처 하나.
+export type PlanningSource = {
+  id: string
+  title: string
+  url: string
+  snippet: string
+  queries: string[]
+  channel: string
+  accessedAt: string
+  readScope: "search-snippet"
+}
 
 // 단계 안에서 이미 있는 것과 직접 할 것을 owner 표기로 나눈 항목.
 export type Todo = { task: string; owner: "가져다 씀" | "직접 함"; note: string }
@@ -63,6 +92,7 @@ export type BigPicture = {
   intro: string
   stages: Stage[]
   prototypeLoop: string
+  planning?: Planning
 }
 
 // 그릴 선택지 하나. 서버가 새 저장본에 주는 형태(label + why + recommended)와 옛 저장본의 문자열 둘 다 받을 수 있게 한다.
@@ -129,7 +159,7 @@ export type ChatEntry = {
 // 왼쪽 패널에 쌓이는 문서·폴더 노드. children 이 있으면 폴더, 없으면 잎.
 export type SourceDoc = {
   id: string
-  kind: "stage" | "folder" | "finding" | "item" | "summary"
+  kind: "stage" | "folder" | "finding" | "item" | "summary" | "planning"
   stageNo: number
   title: string
   markdown: string
@@ -196,6 +226,7 @@ export type Session = {
   runCursor: number
   runActivity: string | null
   researchPath: "hermes" | "local" | null
+  planningAttempt?: { approved: boolean; summary: string; status: "pending" | "failed" | "succeeded" }
   degraded: boolean
   error: string | null
   busy: boolean
