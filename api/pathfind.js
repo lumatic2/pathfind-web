@@ -175,7 +175,7 @@ export async function POST(request) {
     const bigPicture = {
       ...bp,
       planning,
-      prototypeLoop: bp.prototypeLoop || 'prototype → playtest → 수정 루프로 아이디어를 다듬습니다.',
+      prototypeLoop: bp.prototypeLoop || '',
     };
 
     return new Response(JSON.stringify({ bigPicture, handoffMarkdown: '' }), {

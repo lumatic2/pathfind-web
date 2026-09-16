@@ -10,8 +10,10 @@
 function stripStepNumber(title) {
   const t = title.trim();
   let out = t
-    .replace(/^단계\s+\d{1,2}[.\):]?\s*/, '')
-    .replace(/^\d{1,2}[.\):]\s*/, '');
+    .replace(/^단계\s+\d{1,2}[.)]\s*/, '')
+    .replace(/^단계\s+\d{1,2}:\s+/, '')
+    .replace(/^\d{1,2}[.)]\s*/, '')
+    .replace(/^\d{1,2}:\s+/, '');
   return out || t;
 }
 
@@ -32,20 +34,22 @@ export function normalizePlanningDesign(modelDesign, sources) {
   const title = modelDesign.title;
   if (typeof title !== 'string' || !title.trim()) {
     errors.push('title이 비어 있습니다');
-  } else if (title.length > 24) {
-    errors.push('title이 24자를 초과합니다');
+  } else if (title.length > 200) {
+    errors.push('title이 200자를 초과합니다');
   }
 
   const intro = modelDesign.intro;
   if (typeof intro !== 'string' || !intro.trim()) {
     errors.push('intro가 비어 있습니다');
+  } else if (intro.length > 2000) {
+    errors.push('intro가 2000자를 초과합니다');
   }
 
   const basisSummary = modelDesign.basisSummary;
   if (typeof basisSummary !== 'string' || !basisSummary.trim()) {
     errors.push('basisSummary가 비어 있습니다');
-  } else if (basisSummary.length > 400) {
-    errors.push('basisSummary가 400자를 초과합니다');
+  } else if (basisSummary.length > 2000) {
+    errors.push('basisSummary가 2000자를 초과합니다');
   }
 
   const steps = modelDesign.steps;
@@ -57,25 +61,28 @@ export function normalizePlanningDesign(modelDesign, sources) {
         errors.push(`단계 ${i + 1}이 객체가 아닙니다`);
         return;
       }
-      if (typeof s.no !== 'number' || !Number.isInteger(s.no) || s.no < 1) {
-        errors.push(`단계 ${i + 1}의 no가 유효하지 않습니다`);
-      }
       if (typeof s.title !== 'string' || !s.title.trim()) {
         errors.push(`단계 ${i + 1}의 title이 비어 있습니다`);
-      } else if (s.title.length > 24) {
-        errors.push(`단계 ${i + 1}의 title이 24자를 초과합니다`);
+      } else if (s.title.length > 200) {
+        errors.push(`단계 ${i + 1}의 title이 200자를 초과합니다`);
       }
       if (typeof s.desc !== 'string' || !s.desc.trim()) {
         errors.push(`단계 ${i + 1}의 desc가 비어 있습니다`);
+      } else if (s.desc.length > 2000) {
+        errors.push(`단계 ${i + 1}의 desc가 2000자를 초과합니다`);
       }
       if (typeof s.reason !== 'string' || !s.reason.trim()) {
         errors.push(`단계 ${i + 1}의 제안 이유(reason)가 비어 있습니다`);
+      } else if (s.reason.length > 2000) {
+        errors.push(`단계 ${i + 1}의 제안 이유(reason)가 2000자를 초과합니다`);
       }
     });
   }
 
-  // 참고 식별자: 실제 자료 목록에 있는 것만 허용
+  // 참고 식별자: 실제 자료 목록에 있는 것만 허용, 최대 15개, 중복 제거
   const refIds = modelDesign.referenceIds;
+  const seen = new Set();
+  let uniqueCount = 0;
   if (!Array.isArray(refIds)) {
     errors.push('referenceIds는 문자열 배열이어야 합니다');
   } else {
@@ -83,6 +90,13 @@ export function normalizePlanningDesign(modelDesign, sources) {
       if (typeof id !== 'string' || !id.trim()) {
         errors.push('referenceIds에 빈 식별자가 있습니다');
         continue;
+      }
+      if (seen.has(id)) continue;
+      seen.add(id);
+      uniqueCount++;
+      if (uniqueCount > 15) {
+        errors.push('referenceIds는 최대 15개까지 허용됩니다');
+        break;
       }
       if (!srcById.has(id)) {
         errors.push(`참고 식별자가 자료에 없습니다: ${id}`);
@@ -96,7 +110,7 @@ export function normalizePlanningDesign(modelDesign, sources) {
     if (typeof modelDesign.limitations === 'string') {
       limitations = modelDesign.limitations.trim() ? [modelDesign.limitations.trim()] : [];
     } else if (Array.isArray(modelDesign.limitations)) {
-      limitations = modelDesign.limitations.filter((l) => typeof l === 'string' && l.trim());
+      limitations = modelDesign.limitations.filter((l) => typeof l === 'string' && l.trim()).slice(0, 5);
     } else {
       errors.push('limitations는 문자열 또는 문자열 배열이어야 합니다');
     }
@@ -106,20 +120,19 @@ export function normalizePlanningDesign(modelDesign, sources) {
     return { ok: false, status: 422, error: errors.join('; ') };
   }
 
-  // researchNotes: 선택한 자료의 실제 발췌에서 조립
-  const researchNotes = [];
-  const notesRaw = modelDesign.researchNotes;
-  if (Array.isArray(notesRaw)) {
-    for (const n of notesRaw) {
-      if (!n || typeof n !== 'object') continue;
-      const sid = n.sourceId;
-      if (typeof sid !== 'string' || !sid.trim()) continue;
-      const src = srcById.get(sid);
-      if (!src) continue;
-      const excerpt = (n.excerpt && typeof n.excerpt === 'string') ? n.excerpt.trim() : '';
-      if (!excerpt) continue;
-      researchNotes.push({ sourceId: sid, excerpt: excerpt.slice(0, 800) });
+  // 한계 각 항목 길이 검사
+  for (const l of limitations) {
+    if (l.length > 2000) {
+      return { ok: false, status: 422, error: '한계가 2000자를 초과합니다' };
     }
+  }
+
+  // researchNotes: 실제 자료의 snippet 으로만 구성, 모델 researchNotes·excerpt 배제
+  const researchNotes = [];
+  for (const id of seen) {
+    const src = srcById.get(id);
+    if (!src || typeof src.snippet !== 'string' || !src.snippet.trim()) continue;
+    researchNotes.push({ sourceId: id, excerpt: src.snippet.trim().slice(0, 2000) });
   }
 
   // stages: steps를 순서대로 번호 붙여 변환, tasks·choices는 빈 배열
@@ -149,6 +162,7 @@ export function normalizePlanningDesign(modelDesign, sources) {
       title: title.trim(),
       intro: intro.trim(),
       stages,
+      prototypeLoop: '',
     },
     planning: {
       version: 1,
