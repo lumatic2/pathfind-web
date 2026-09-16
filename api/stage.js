@@ -565,7 +565,7 @@ async function runChannelSearch(channelName, query, stage = null, opts = {}) {
     }
     return { results: [], calls: 0 };
   } catch (e) {
-    logCall('stage.runChannelSearch', 0, 0, { channel: channelName });
+    logCall('stage.runChannelSearch', 0, 0, { 'x-channel': channelName });
     return { results: [], calls: 1, error: true };
   }
 }
@@ -1020,7 +1020,8 @@ export async function POST(request) {
       let chCalls = 0;
       const stageWords = stageContextWords(stage);
       const opts = channelOpts(ch, stage);
-      const { results: chResults, calls: chSearchCalls } = await runChannelSearch(ch, q, stage, opts);
+      const { results: chResults, calls: chSearchCalls, error: channelFailed } = await runChannelSearch(ch, q, stage, opts);
+      if (channelFailed) logCall('stage.preSearch.failed', 0, 502, { 'x-channel': ch });
       chCalls = chSearchCalls;
       const stats = ensureStats(ch);
       stats.calls += chSearchCalls;
@@ -1056,12 +1057,13 @@ export async function POST(request) {
               reason: 'callLimit',
             });
           } else {
-            const { results: tResults, calls: tCalls } = await runChannelSearch(
+            const { results: tResults, calls: tCalls, error: channelFailed } = await runChannelSearch(
               ch,
               topicQuery,
               stage,
               channelOpts(ch, stage),
             );
+            if (channelFailed) logCall('stage.topicSupplement.failed', 0, 502, { 'x-channel': ch });
             const tStats = ensureStats(ch);
             tStats.returned += tResults.length;
             tStats.calls += tCalls; // 실제 부른 횟수를 채널 통계에 더한다
@@ -1136,7 +1138,8 @@ export async function POST(request) {
         if (!q) break;
 
         const opts = channelOpts(chname, stage);
-        const { results } = await runChannelSearch(chname, q, stage, opts);
+        const { results, error: channelFailed } = await runChannelSearch(chname, q, stage, opts);
+        if (channelFailed) logCall('stage.toolRun.failed', 0, 502, { 'x-channel': chname });
         ensureStats(chname).returned += results.length;
 
         // web 결과에서 stats/public_data로 분류된 항목도 관문을 지나게 한다
