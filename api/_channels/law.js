@@ -4,7 +4,7 @@
 // 결과: { id, title, url, snippet, host, form }[]  (form = 'law')
 // 구현 근거: roadmap/목표화면/기준코드/server/channels/law.mjs searchLaw
 
-const NAME = 'law';
+export const NAME = 'law';
 
 const LAW_SEARCH_BASE = 'https://www.law.go.kr/DRF/lawSearch.do';
 const OC_PARAM = 'OC';
