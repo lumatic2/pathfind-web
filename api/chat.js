@@ -3,7 +3,7 @@
 // 새로 만드는 건 이 파일뿐. 공용 Solar 호출은 _lib/solar.js 사용.
 // 최대 실행 시간: Vercel 함수 maxDuration 90초 (vercel.json 확인 완료).
 
-import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
+import { callSolar, SOLAR_MODEL } from './_lib/solar.js';
 import { logCall, sendError } from './_lib/http.js';
 
 const CHAT_MAX_TOKENS = 2048;
