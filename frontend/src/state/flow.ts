@@ -216,131 +216,6 @@ export function useFlow() {
     }
   }
 
-  const sendAnswer = useCallback(
-    (text: string) => {
-      const current = sessionRef.current
-
-      // phase가 ready이면 입력 무시
-      if (current.phase === 'ready') return
-
-      // 1) 사용자 말풍선 먼저 붙이고 busy true, error null
-      patch({
-        messages: [
-          ...current.messages,
-          {
-            id: msgId(),
-            role: 'user',
-            text,
-            kind: 'chat',
-            suggestions: [],
-          },
-        ],
-        busy: true,
-        error: null,
-      })
-
-      // 2) 요청용 이력: pending이 있으면 이번 답변을 붙여 하나를 만들고, 없으면 기존 이력을 그대로 쓴다.
-      const requestHistory: typeof current.history =
-        current.pending
-          ? [...current.history, {
-              questionTitle: current.pending.questionTitle,
-              questionBody: current.pending.questionBody,
-              suggestion: current.pending.suggestion,
-              exampleButtons: current.pending.exampleButtons,
-              answer: text,
-            }]
-          : current.history
-
-      const body: Parameters<typeof grill>[0] = {
-        history: requestHistory,
-        turnCount: current.turnCount,
-      }
-      if (current.turnCount === 0 && current.pending == null) {
-        body.question = text
-        body.history = []
-      } else {
-        body.answer = text
-      }
-
-      grill(body)
-        .then((res: GrillResponse) => {
-          if (!res.done) {
-            const questionText = [
-              res.questionTitle,
-              res.questionBody,
-            ].join('\n\n')
-
-            const latest = sessionRef.current
-            patch({
-              messages: [
-                ...latest.messages,
-                {
-                  id: msgId(),
-                  role: 'assistant',
-                  text: questionText,
-                  kind: 'question',
-                  suggestions: res.exampleButtons ?? [],
-                },
-              ],
-              history: requestHistory,
-              pending: res,
-              turnCount: res.turnCount,
-              busy: false,
-            })
-          } else {
-            const remaining = readQuota().remaining
-            const chipConfirm =
-              remaining > 0
-                ? {
-                    label: "맞아요, 이대로 조사해 주세요",
-                    note: "패스 1회 소진",
-                  }
-                : null
-            const chipEdit = {
-              label: "고칠 게 있어요",
-              note: "요약·큰 그림 수정",
-            }
-
-            const approvalSuggestions: string[] = [
-              ...(chipConfirm ? [chipConfirm.label] : []),
-              chipEdit.label,
-              "직접 입력",
-            ]
-
-            const guidanceLine = `정리했습니다. 이게 맞나요?\n\n${(res.summary ?? "").trim()}`
-
-            const latest = sessionRef.current
-            patch({
-              messages: [
-                ...latest.messages,
-                {
-                  id: msgId(),
-                  role: "assistant",
-                  text: guidanceLine,
-                  kind: "summary-approval",
-                  suggestions: approvalSuggestions,
-                },
-              ],
-              history: requestHistory,
-              summary: (res.summary ?? "").trim(),
-              opening: res.opening?.trim() ?? undefined,
-              turnCount: res.turnCount,
-              pending: null,
-              phase: "confirm",
-              busy: false,
-            })
-          }
-        })
-        .catch(() => {
-          patch({
-            error: '잠시 문제가 있었습니다. 다시 시도해 주세요.',
-            busy: false,
-          })
-        })
-    },
-    [patch],
-  )
-
   const approve = useCallback(() => {
     const current = sessionRef.current
     if (current.phase !== "confirm") return
@@ -784,6 +659,150 @@ export function useFlow() {
         })
     },
     [patch],
+  )
+
+  const sendAnswer = useCallback(
+    (text: string) => {
+      const trimmed = text.trim()
+      if (trimmed.length === 0) {
+        patch({
+          error: '한 글자 이상 적어 주세요.',
+          busy: false,
+        })
+        return
+      }
+
+      const current = sessionRef.current
+
+      if (current.busy) return
+
+      // phase가 ready이면 sendChat으로 넘긴다
+      if (current.phase === 'ready') {
+        sendChat(trimmed)
+        return
+      }
+
+      // 1) 사용자 말풍선 먼저 붙이고 busy true, error null
+      patch({
+        messages: [
+          ...current.messages,
+          {
+            id: msgId(),
+            role: 'user',
+            text: trimmed,
+            kind: 'chat',
+            suggestions: [],
+          },
+        ],
+        busy: true,
+        error: null,
+      })
+
+      // 2) 요청용 이력: pending이 있으면 이번 답변을 붙여 하나를 만들고, 없으면 기존 이력을 그대로 쓴다.
+      const requestHistory: typeof current.history =
+        current.pending
+          ? [...current.history, {
+              questionTitle: current.pending.questionTitle,
+              questionBody: current.pending.questionBody,
+              suggestion: current.pending.suggestion,
+              exampleButtons: current.pending.exampleButtons,
+              answer: trimmed,
+            }]
+          : current.history
+
+      const body: Parameters<typeof grill>[0] = {
+        history: requestHistory,
+        turnCount: current.turnCount,
+      }
+      if (current.turnCount === 0 && current.pending == null) {
+        body.question = trimmed
+        body.history = []
+      } else {
+        body.answer = trimmed
+      }
+
+      const gen = generationRef.current
+      const epoch = sessionEpochRef.current
+
+      grill(body)
+        .then((res: GrillResponse) => {
+          if (!isCurrentRequest(gen, epoch)) return
+          if (!res.done) {
+            const questionText = [
+              res.questionTitle,
+              res.questionBody,
+            ].join('\n\n')
+
+            const latest = sessionRef.current
+            patch({
+              messages: [
+                ...latest.messages,
+                {
+                  id: msgId(),
+                  role: 'assistant',
+                  text: questionText,
+                  kind: 'question',
+                  suggestions: res.exampleButtons ?? [],
+                },
+              ],
+              history: requestHistory,
+              pending: res,
+              turnCount: res.turnCount,
+              busy: false,
+            })
+          } else {
+            const remaining = readQuota().remaining
+            const chipConfirm =
+              remaining > 0
+                ? {
+                    label: "맞아요, 이대로 조사해 주세요",
+                    note: "패스 1회 소진",
+                  }
+                : null
+            const chipEdit = {
+              label: "고칠 게 있어요",
+              note: "요약·큰 그림 수정",
+            }
+
+            const approvalSuggestions: string[] = [
+              ...(chipConfirm ? [chipConfirm.label] : []),
+              chipEdit.label,
+              "직접 입력",
+            ]
+
+            const guidanceLine = `정리했습니다. 이게 맞나요?\n\n${(res.summary ?? "").trim()}`
+
+            const latest = sessionRef.current
+            patch({
+              messages: [
+                ...latest.messages,
+                {
+                  id: msgId(),
+                  role: "assistant",
+                  text: guidanceLine,
+                  kind: "summary-approval",
+                  suggestions: approvalSuggestions,
+                },
+              ],
+              history: requestHistory,
+              summary: (res.summary ?? "").trim(),
+              opening: res.opening?.trim() ?? undefined,
+              turnCount: res.turnCount,
+              pending: null,
+              phase: "confirm",
+              busy: false,
+            })
+          }
+        })
+        .catch(() => {
+          if (!isCurrentRequest(gen, epoch)) return
+          patch({
+            error: '잠시 문제가 있었습니다. 다시 시도해 주세요.',
+            busy: false,
+          })
+        })
+    },
+    [patch, sendChat],
   )
 
   const explainNode = useCallback(
