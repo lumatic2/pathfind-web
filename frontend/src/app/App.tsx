@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react'
 
 import { FileText } from 'lucide-react'
+import toolboxIcon from '../../../../public/app-toolbox.png'
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
@@ -943,19 +944,30 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
       <ChatConversationPanel
         variant="grounded"
         className="h-full max-w-none rounded-none border-0 bg-card"
-        title="패스 만들기"
+        title="대화"
         messages={chatMessages}
         status={status}
         onSend={handleSend}
         onRetry={handleRetry}
-        emptyTitle="무엇을 시작하려 하세요"
+        emptyTitle="무엇을 시작하려 하세요?"
+        emptyIcon={
+          <img
+            src={toolboxIcon}
+            alt=""
+            aria-hidden
+            style={{ height: 64, width: 'auto' }}
+          />
+        }
         emptyHint="그 길을 먼저 걸었던 사람들의 발자취를 살펴보세요. 간단한 인터뷰 후 말씀하신 것을 정리합니다."
         suggestions={suggestions}
         onSuggestion={handleSuggestion}
         directInputLabel={directInputLabel}
         composerPlaceholder="시작하려는 일을 한 문단으로 적어 주세요"
         onCopy={(m) => navigator.clipboard?.writeText(m.text)}
-        onFeedback={() => {}}
+        {...session.planningAttempt?.status === "failed" && session.error != null ? {
+          errorMessage: session.error,
+          retryLabel: "조사 다시 시작",
+        } : {}}
         suggestionNotes={approvalNotes}
         suggestionReasons={suggestionReasons}
         recommendedSuggestion={recommendedSuggestion}
