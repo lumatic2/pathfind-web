@@ -46,10 +46,15 @@ export function useFlow() {
   const sessionRef = useRef(session)
   const sessionEpochRef = useRef(sessionEpoch)
   sessionRef.current = session
-  sessionEpochRef.current = sessionEpoch
   const generationRef = useRef(0)
   const retryingRef = useRef(false)
   const planningLock = useRef(false)
+  if (sessionEpoch !== sessionEpochRef.current) {
+    generationRef.current++
+    planningLock.current = false
+    retryingRef.current = false
+  }
+  sessionEpochRef.current = sessionEpoch
 
   function isCurrentRequest(gen: number, epoch: number): boolean {
     return generationRef.current === gen && sessionEpochRef.current === epoch
@@ -227,6 +232,8 @@ export function useFlow() {
     const current = sessionRef.current
     // 새 패스 및 보관본 전환에서도 이전 요청을 무효화한다
     generationRef.current++
+    planningLock.current = false
+    retryingRef.current = false
     patch({
       messages: [
         ...current.messages,
@@ -258,7 +265,7 @@ export function useFlow() {
       return
     }
     if (current.phase === 'confirm' && current.planningAttempt?.status === 'failed') {
-      if (retryingRef.current) return
+      if (current.busy || planningLock.current || retryingRef.current) return
       retryingRef.current = true
       startResearch()
       return
@@ -323,15 +330,15 @@ export function useFlow() {
                 role: 'user',
                 text: "맞아요, 이대로 조사해 주세요",
                 kind: 'chat',
-                suggestions: [],
-              },
+                suggestions: [] as string[],
+              } as const,
               {
                 id: msgId(),
                 role: 'assistant',
                 text: current.opening ?? '먼저 이 일이 보통 어떤 단계로 이뤄지는지 알아봅니다.',
                 kind: 'progress',
-                suggestions: [],
-              },
+                suggestions: [] as string[],
+              } as const,
             ]
           : []),
         ...(isNewApproval
@@ -342,8 +349,8 @@ export function useFlow() {
                 role: 'assistant',
                 text: '같은 요약을 다시 조사합니다. 앞에서 세운 큰 그림을 다시 확인합니다.',
                 kind: 'progress',
-                suggestions: [],
-              },
+                suggestions: [] as string[],
+              } as const,
             ]),
       ],
       busy: true,
