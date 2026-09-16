@@ -306,7 +306,6 @@ export function pollEvents(
         continue
       }
 
-      retries = 0
       let body:
         | {
             runId?: string
@@ -341,10 +340,18 @@ export function pollEvents(
         continue
       }
 
-      const events = Array.isArray(body.events) ? body.events : []
-      const nextCursor =
-        typeof body.cursor === "number" ? body.cursor : cursor
-      const done = Boolean(body.done)
+      if (!Array.isArray(body.events)) {
+        return void closeWith("error")
+      }
+      if (typeof body.cursor !== "number" || body.cursor < 0 || !Number.isInteger(body.cursor)) {
+        return void closeWith("error")
+      }
+      if (typeof body.done !== "boolean") {
+        return void closeWith("error")
+      }
+      const events = body.events
+      const nextCursor = body.cursor
+      const done = body.done
 
       if (nextCursor < cursor) {
         if (fetchTimeout) {
@@ -363,6 +370,8 @@ export function pollEvents(
         return void closeWith("error")
       }
 
+      retries = 0
+
       for (let i = 0; i < events.length; i += 1) {
         if (closed) break
         try {
@@ -370,7 +379,7 @@ export function pollEvents(
           cursor += 1
           onEvent(event, cursor)
         } catch {
-          // 깨진 프레임 하나는 건너뛴다
+          return void closeWith("error")
         }
       }
 
