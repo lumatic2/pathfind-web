@@ -29,31 +29,45 @@ const VERDICT_NONE = '선례를 못 찾음';
 
 const FOLLOWUP_FIXED = {
   finding: [
-    '이 자료를 어떻게 가져다 쓰나요',
-    '비슷한 다른 자료도 있나요',
+    '이 자료를 어떻게 가져다 쓰나요?',
+    '비슷한 다른 자료도 있나요?',
   ],
   task: [
-    '이 일은 무엇부터 시작하나요',
-    '이 일에 쓸 수 있는 자료가 있나요',
+    '이 일은 무엇부터 시작하나요?',
+    '이 일에 쓸 수 있는 자료가 있나요?',
   ],
   todo: [
-    '직접 하는 부분은 어디까지인가요',
-    '먼저 가져다 쓸 수 있는 건 뭔가요',
+    '직접 하는 부분은 어디까지인가요?',
+    '먼저 가져다 쓸 수 있는 건 뭔가요?',
   ],
   topic: [
-    '이 묶음에서 먼저 볼 것은',
+    '이 묶음에서 먼저 볼 것은?',
     '이 묶음의 자료를 정리해 줘',
   ],
   stage: [
-    '이 단계에서 먼저 할 일은',
+    '이 단계에서 먼저 할 일은?',
     '이 단계의 자료를 정리해 줘',
   ],
 };
-const FOLLOWUP_ROADMAP = 'ROADMAP.md는 내려받아 두셨나요';
+const FOLLOWUP_ROADMAP = 'PATH.md 내려받기';
 
 const MAX_FOLLOWUPS = 3;
 
-// ---------- 노드 종류 판별 ----------
+const KIND_NAME = { finding: '자료', task: '할 일', todo: '역할 나눔', topic: '소주제', stage: '단계', other: '노드' };
+
+// 폴백 후속 칩 — 노드 종류별 고정 2개 + 「PATH.md 내려받기」(문구 정본 §2-13)
+export const DOWNLOAD_FOLLOWUP = 'PATH.md 내려받기';
+export function fallbackFollowups(kind) {
+  const two =
+    kind === 'finding' ? ['이 자료를 어떻게 가져다 쓰나요?', '비슷한 다른 자료도 있나요?']
+    : kind === 'task' ? ['이 일은 무엇부터 시작하나요?', '이 일에 쓸 수 있는 자료가 있나요?']
+    : kind === 'todo' ? ['직접 하는 부분은 어디까지인가요?', '먼저 가져다 쓸 수 있는 건 뭔가요?']
+    : kind === 'topic' ? ['이 묶음에서 먼저 볼 것은?', '이 묶음의 자료를 정리해 줘']
+    : ['이 단계에서 먼저 할 일은?', '이 단계의 자료를 정리해 줘'];
+  return [...two, DOWNLOAD_FOLLOWUP];
+}
+
+// ---------- 노드 종류 판별 (기준코드 explain.mjs nodeKind) ----------
 
 function nodeType(node) {
   if (!node || typeof node.id !== 'string') return null;
@@ -64,6 +78,16 @@ function nodeType(node) {
   if (/^s\d+-task-\d+$/.test(id)) return 'task';
   if (/^s\d+-todo-\d+$/.test(id)) return 'todo';
   return null;
+}
+
+function nodeKind(id) {
+  const s = String(id ?? '');
+  if (/^s\d+-finding-\d+$/.test(s)) return 'finding';
+  if (/^s\d+-task-\d+$/.test(s)) return 'task';
+  if (/^s\d+-todo-\d+$/.test(s)) return 'todo';
+  if (/^s\d+-t\d+(-\d+)*$/.test(s)) return 'topic';
+  if (/^s\d+$/.test(s)) return 'stage';
+  return 'other';
 }
 
 // ---------- 노드 → 왼쪽 패널 문서 id (app-state.md §2와 같음) ----------
@@ -602,27 +626,28 @@ export async function POST(request) {
 
   const findingLabels = nodeType(node) === 'finding' ? findingLabelsForNode(node, stage) : [];
 
-  const systemPrompt = `당신은 마인드맵의 노드 하나를 설명하는 어시스턴트입니다.
-아래 노드 정보와 단계 정보를 받아, 마크다운 문단과 목록으로만 설명을 작성합니다.
-소제목(수준 2 이상)은 넣지 않습니다. 설명 텍스트와 목록만 씁니다.
-이어서 이 노드에서만 물을 만한 후속 질문 2~3개를 짧게요(약 20자 안팎) 씁니다.
-단계 노드일 때만 마지막에 "이 단계는 이미 있음/없음/일부만 있음/못 찾음 중 하나"에 가깝다는 문장을 한 줄 넣을 수 있습니다.
+  const systemPrompt = `당신은 패스 마인드맵의 한 노드를 설명하는 안내자입니다.
+주어진 노드와 그 단계의 리서치 결과, 프로젝트 요약만 근거로 씁니다.
+근거에 없는 사실은 "확인 불가"로 적고 추정하지 않습니다.
 
-출력은 아래 JSON 객체 하나만 반환합니다. 코드펜스 마커나 앞뒤 설명 문장은 넣지 않습니다.
+설명은 **마크다운으로 씁니다** (사용자 지시 2026-09-13 — 화면이 문단·목록·굵게를 그대로 그립니다).
+이 뼈대로 내놓습니다:
+  · 첫 문단 2~3문장 — 이 노드가 무엇이고 왜 이 단계에 있는지. 핵심 어구는 **굵게**.
+  · 그 아래 \`- \` 목록 2~4줄 — 무엇부터 하면 되는지. 각 줄은 **굵은 머리말 뒤에 콜론**을 두고 한 문장.
+문단·목록·굵게 세 가지만 써서 내놓습니다(소제목·표·이미지·링크는 쓰지 않습니다 — 화면이 그리지 않습니다).
+[노드] 안의 내용을 설명의 중심에 둡니다. 단계의 판정은 [이 노드가 속한 단계] 에 적힌 대로만 한 구절로 언급하고, 없으면 언급하지 않습니다.
+
+자료를 근거로 쓴 문장 끝에는 그 자료 번호를 [n] 으로 붙입니다(예: "… 공식 API 가 있습니다 [2]"). 번호는 [이 노드가 속한 단계] 의 자료 목록 번호입니다.
+citations 에는 근거로 쓴 자료를 **번호와 이름을 함께** 적습니다 — 이름은 자료 목록에 적힌 이름을 그대로 옮깁니다.
+
+followups 는 이 노드를 두고 사용자가 이어서 물을 만한 질문 2~3개, 각 20자 안팎 — 노드 이름이 들어가거나 이 노드에만 맞는 질문으로 씁니다.
+
+출력 형식 (JSON만, 다른 텍스트 금지):
 {
-  "explanation": "마크다운 문단+목록 (자료의 인용은 자료 목록 번호를 대괄호로, 예: [1], [2])",
-  "citationTitles": [{"n": 1, "name": "자료1 이름"}, {"n": 2, "name": "자료2 이름"}, ...] — 인용한 각 자료의 자료 목록 번호(n)와 이름(name)을 함께 적은 객체 배열, 본문에서 실제 인용한 것만 인용 순서,
-  "citations": ["문서 id1", "문서 id2", ...] (citationTitles와 같은 순서의 문서 id),
-  "followups": ["후속 질문1", "후속 질문2", ...]
-}
-
-규칙:
-- 자료 목록 번호는 아래 "자료 목록"의 순서(1부터) 그대로입니다. 본문에서는 이 번호를 대괄호로 인용합니다.
-- citationTitles는 인용한 자료의 정보를 담은 객체 배열로 냅니다. 각 객체는 { "n": <자료 목록 번호(1부터)>, "name": "<자료 이름>" } 꼴입니다.
-- 문서 id는 왼쪽 패널 문서 id와 같은 꼴로 적습니다(아래 문서 id 규칙 참조).
-- 자료 목록에 없는 번호나 틀린 번호는 인용하지 마세요.
-- 설명은 한국어입니다.
-- 단계 노드가 아니면 판정 문구를 넣지 않습니다.`;
+  "explanation": "위 뼈대를 따른 한국어 마크다운 설명",
+  "citations": [{"n": 자료 번호, "name": "자료 목록에 적힌 그 자료의 이름"}],
+  "followups": ["후속 질문", "..."]
+}`;
 
   const userPrompt = buildUserPrompt(node, stage, summary, findingLabels);
 
