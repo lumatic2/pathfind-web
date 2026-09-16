@@ -1027,13 +1027,7 @@ export async function POST(request) {
       const stats = ensureStats(ch);
       stats.calls += chSearchCalls;
       stats.returned += chResults.length;
-      if (ch === 'stats' || ch === 'public_data') {
-        const { kept, dropped } = gateResultsIfNeeded(ch, q, stage, chResults, stageWords);
-        results = kept;
-        stats.gated += dropped;
-      } else {
-        results = chResults;
-      }
+      results = chResults;
       const slotsLeft = MAX_CALLS_PER_STAGE - calls;
       const takeCalls = Math.min(chCalls, slotsLeft);
       stats.calls = stats.calls - chSearchCalls + takeCalls;
@@ -1055,28 +1049,32 @@ export async function POST(request) {
         const hasTopic = kwTokens.some((kw) => topicSummary.includes(kw));
         if (!hasTopic) {
           const topicQuery = topicSummary.slice(0, 2).join(' ');
-          let topicResults = [];
-          let topicCalls = 0;
-          const { results: tResults, calls: tCalls } = await runChannelSearch(ch, topicQuery, stage);
-          topicResults = tResults;
-          topicCalls = tCalls;
-          const tStats = ensureStats(ch);
-          tStats.returned += topicResults.length;
-          if (ch === 'stats' || ch === 'public_data') {
-            const { kept, dropped } = gateResultsIfNeeded(ch, topicQuery, stage, topicResults, stageWords);
-            topicResults = kept;
-            tStats.gated += dropped;
+          // 호출 전에 주제 검색 예상 호출 수를 더했을 때 상한을 넘으면 건너뛴다.
+          const predictedTopicCalls = ch === 'web' ? 3 : 1;
+          if (calls + predictedTopicCalls > MAX_CALLS_PER_STAGE) {
+            logCall('stage.topicSupplement.skipped', 0, 0, {
+              channel: ch,
+              query: topicQuery,
+              reason: 'callLimit',
+            });
+          } else {
+            const { results: tResults, calls: tCalls } = await runChannelSearch(
+              ch,
+              topicQuery,
+              stage,
+            );
+            const tStats = ensureStats(ch);
+            tStats.returned += tResults.length;
+            tStats.calls += tCalls; // 실제 부른 횟수를 채널 통계에 더한다
+            const topicSlotsLeft = MAX_CALLS_PER_STAGE - calls;
+            preResults.push(
+              ...tResults
+                .slice(0, Math.min(MAX_RESULTS_PER_CHANNEL, topicSlotsLeft))
+                .map((r) => ({ ...r, query: topicQuery })),
+            );
+            calls += tCalls;
+            logCall('stage.topicSupplement', 0, 0, { channel: ch, query: topicQuery });
           }
-          const topicSlotsLeft = MAX_CALLS_PER_STAGE - calls;
-          const topicTake = Math.min(topicCalls, topicSlotsLeft);
-          tStats.calls = tStats.calls - topicCalls + topicTake;
-          preResults.push(
-            ...topicResults.slice(0, Math.min(MAX_RESULTS_PER_CHANNEL, topicSlotsLeft)).map(
-              (r) => ({ ...r, query: topicQuery }),
-            ),
-          );
-          calls += topicTake;
-          logCall('stage.topicSupplement', 0, 0, { channel: ch, query: topicQuery });
         }
       }
     }
@@ -1241,6 +1239,12 @@ export async function POST(request) {
       reviewResult = { kept: [], dropped: 0, timedOut: false };
     }
 
+    // 리뷰 결과를 호출부가 정리한다: 시간 초과 신호를 확실히 세워
+    // vetTimeout을 "뜻 판정 시간 초과로 못 세운 자료 수"로 쓰게 한다.
+    const reviewTimedOut =
+      reviewResult && reviewResult.timedOut ? true : false;
+    reviewResult = { ...reviewResult, timedOut: reviewTimedOut };
+
     // 통과된 것만 추려 최종 선택 앞단계로 넘긴다
     const reviewedIds = new Set(reviewResult.kept.map((f) => f.id));
     const supplementOriginallySelectedIds = new Set(supplementForReview.map((c) => c.id));
@@ -1277,8 +1281,8 @@ export async function POST(request) {
     }
 
     // ----- 뜻 판정 집계: vetRejected / vetTimeout -----
-    const vetRejected = reviewResult?.dropped ?? 0;
-    const vetTimeout = reviewResult?.timedOut ? 1 : 0;
+    const vetRejected = reviewResult?.timedOut ? 0 : reviewResult?.dropped ?? 0;
+    const vetTimeout = reviewResult?.timedOut ? (reviewResult?.dropped ?? 0) : 0;
 
     // scope 구성
     const scope = {
