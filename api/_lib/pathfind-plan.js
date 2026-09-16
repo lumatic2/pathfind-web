@@ -242,7 +242,7 @@ export async function planFromResearch(
       { name: 'response_ready', elapsedMs: Math.max(0, responseReadyAt - startedAt) },
     ],
     warnings,
-    offTopic,
+    offTopic: offTopic?.total ?? 0,
   };
 
   if (offTopic?.allExcluded && sources.length === 0) {
