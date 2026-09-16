@@ -425,7 +425,7 @@ function buildTopicFolder(
     // 평평한 소주제 폴더
     const children = topicItemsToDocs(stage, topic.items, outlineItems, status)
     return {
-      ...buildFolder(stageNo, `-t${topicIndex}`, children, status),
+      ...buildFolder(stageNo, topic.title, children, status),
       id: folderId,
     }
   }
