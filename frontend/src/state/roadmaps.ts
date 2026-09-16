@@ -1,3 +1,4 @@
+import { sanitizeForRestore } from "./store"
 import { STORAGE_KEYS, Session } from "./types"
 
 export type SavedRoadmap = {
@@ -122,7 +123,7 @@ export function saveRoadmap(
   const all = loadAll()
   const now = new Date().toISOString()
   const entry: Stored = {
-    id: id ?? crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    id: id ?? (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
     title: titleOf(session),
     savedAt: now,
     stageCount: stageCountOf(session),
@@ -198,13 +199,7 @@ export function renameRoadmap(id: string, title: string): boolean {
 export function toCurrentSession(item: SavedRoadmap): Session {
   const parsed = parseStoredSession(item.session)
   if (parsed != null) {
-    parsed.id = item.id
-    parsed.busy = false
-    parsed.error = null
-    if (parsed.mapTitle == null || parsed.mapTitle === "") {
-      parsed.mapTitle = "제목 없는 패스"
-    }
-    return parsed
+    return sanitizeForRestore({ ...parsed, id: item.id })
   }
   return {
     version: 5,
