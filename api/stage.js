@@ -565,8 +565,8 @@ async function runChannelSearch(channelName, query, stage = null, opts = {}) {
     }
     return { results: [], calls: 0 };
   } catch (e) {
-    logCall('stage.runChannelSearch', 0, 0, { channel: channelName, err: String(e).slice(0, 80) });
-    return { results: [], calls: 0, error: String(e).slice(0, 120) };
+    logCall('stage.runChannelSearch', 0, 0, { channel: channelName });
+    return { results: [], calls: 1, error: true };
   }
 }
 
@@ -577,8 +577,7 @@ async function runChannelSearch(channelName, query, stage = null, opts = {}) {
  * display·trace 등 opts를 searchWebBundle에 전달한다.
  */
 async function searchWeb(query, opts = {}) {
-  const results = await searchWebBundle(query, opts);
-  return { web: results.filter((r) => r.channel === 'web'), web_review: results.filter((r) => r.channel === 'web_review') };
+  return searchWebBundle(query, opts);
 }
 
 // ---------- id 카탈로그 (모델이 id로만 가리키게) ----------
