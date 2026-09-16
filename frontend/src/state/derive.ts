@@ -534,9 +534,53 @@ function trimmedNonEmpty(s: string | null | undefined): string | null {
   return t.length > 0 ? t : null
 }
 
-function shortLabel(text: string, maxLen: number): string {
-  const t = text.trim()
-  return t.length > maxLen ? t.slice(0, maxLen) + "…" : t
+/**
+ * 마인드맵 노드 라벨 길이 상한. 부품은 라벨을 `whitespace-nowrap` 으로 재서 폭을 잡으므로
+ * 문장을 그대로 넣으면 레이아웃이 폭발하고 fit 줌이 트리를 점만 하게 줄인다(실측).
+ * 전문은 `data.full` 에 남겨 노드 설명이 쓴다.
+ */
+export const LABEL_MAX = 28
+
+export function shortLabel(text: unknown, max = LABEL_MAX): string {
+  const t = asText(text).replace(/\s+/g, " ").trim()
+  return t.length <= max ? t : `${t.slice(0, max - 1)}…`
+}
+
+/**
+ * 잎 라벨 상한 (M5 확장 4차 step-2, 사용자 피드백 H2 「노드 제목이 이렇게 긴 게 이상하다」 · 확정 「규칙 먼저」).
+ * 18 은 튜닝값 — fan 레이아웃에서 잎이 오른쪽으로 쌓이므로 우 패널 폭(≈600px)에서 한 줄에 서야 한다.
+ * 단계 노드는 종전 `LABEL_MAX`(28, 번호 + 제목) 그대로다.
+ */
+export const LEAF_LABEL_MAX = 18
+
+/** 구두점 앞에서 자르는 자리 — `(` · ` — ` · `: ` · `|`. 부제·괄호 설명·경로 꼬리가 이 뒤에 온다(실측 라벨: 「Strava Clubs V3 API (/clubs/:id/activities)」). */
+const LEAF_CUT = /\(|\b — |\b: |\|/g
+/** 구두점이 이 안(앞 3자)에서 시작하면 그 규칙은 건너뛴다 — 「(가칭) …」처럼 머리 괄호를 자르면 빈 라벨이 된다. */
+const LEAF_CUT_MIN = 3
+
+/**
+ * 잎 라벨 축약 규칙 — 순수 함수. 전문은 호출부가 `hint`(호버)·`data.full`(노드 설명)에 따로 든다.
+ *   1) 첫 구두점(`(`·` — `·`: `·`|`) 앞에서 자른다. 단 그 구두점이 앞 3자 안이면 건너뛴다.
+ *   2) 그래도 `max` 를 넘으면 `max` 이전 마지막 공백에서 자르고 말줄임표를 붙인다(공백이 앞 3자 안이면 글자 단위로).
+ *   결과 길이 ≤ max + 1(말줄임표). 빈 문자열은 내지 않는다 — 규칙이 전부 비우면 원문 앞을 그대로 쓴다.
+ * 규칙으로 어색한 라벨은 finding 큐(LLM 축약) 몫이다 — 여기서 하지 않는다.
+ */
+export function nodeLabel(text: unknown, max = LEAF_LABEL_MAX): string {
+  const full = asText(text).replace(/\s+/g, " ").trim()
+  let t = full
+  LEAF_CUT.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = LEAF_CUT.exec(full))) {
+    if (m.index >= LEAF_CUT_MIN) {
+      t = full.slice(0, m.index).trim()
+      break
+    }
+  }
+  if (!t) t = full
+  if (t.length <= max) return t
+  const space = t.lastIndexOf(" ", max)
+  const head = space >= LEAF_CUT_MIN ? t.slice(0, space) : t.slice(0, max - 1)
+  return `${head.trim()}…`
 }
 
 export function mindmapTree(session: Session): MindmapNode {
