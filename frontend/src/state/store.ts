@@ -1,4 +1,4 @@
-import { useCallback, useReducer } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 
 import type { Session } from "./types"
 import { INITIAL_SESSION, STORAGE_KEYS } from "./types"
@@ -102,17 +102,39 @@ function reducer(state: Session, action: Action): Session {
 
 // --- hook -------------------------------------------------------------------
 
+const listeners = new Set<() => void>()
+
+function emit(): void {
+  for (const l of listeners) l()
+}
+
+let state: Session = sanitizeForRestore(loadSession())
+let epoch = 0
+
+function dispatch(action: Action): void {
+  state = reducer(state, action)
+  emit()
+}
+
+function subscribe(_onStoreChange: () => void): () => void {
+  listeners.add(_onStoreChange)
+  return () => {
+    listeners.delete(_onStoreChange)
+  }
+}
+
+function snapshot(): Session & { sessionEpoch: number } {
+  return { ...state, sessionEpoch: epoch }
+}
+
 export function useSession(): {
   session: Session
   patch: (patch: Partial<Session>) => void
   replace: (session: Session) => void
   reset: () => void
+  sessionEpoch: number
 } {
-  const [session, dispatch] = useReducer(
-    reducer,
-    null,
-    () => sanitizeForRestore(loadSession()),
-  )
+  const value = useSyncExternalStore(subscribe, snapshot, snapshot)
 
   const patch = useCallback((patch: Partial<Session>) => {
     dispatch({ type: "PATCH", payload: patch })
@@ -120,13 +142,15 @@ export function useSession(): {
 
   const replace = useCallback((session: Session) => {
     dispatch({ type: "REPLACE", payload: session })
+    epoch++
   }, [])
 
   const reset = useCallback(() => {
     dispatch({ type: "RESET" })
+    epoch++
   }, [])
 
-  return { session, patch, replace, reset }
+  return { session: value, patch, replace, reset, sessionEpoch: value.sessionEpoch }
 }
 
 // --- clear -----------------------------------------------------------------
