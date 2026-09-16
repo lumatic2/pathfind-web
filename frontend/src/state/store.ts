@@ -18,9 +18,24 @@ function loadSession(): Session {
 }
 
 export function sanitizeForRestore(session: Session): Session {
-  // stages: running → pending
-  const stages = session.stages.map((slot) =>
-    slot.status === "running" ? { ...slot, status: "pending" as const } : slot,
+  // stages: running → pending, runCursor 정규화
+  const stages = session.stages.map((slot) => {
+    const next = slot.status === "running"
+      ? { ...slot, status: "pending" as const }
+      : slot
+    if (
+      next.runCursor == null ||
+      !Number.isInteger(next.runCursor) ||
+      next.runCursor < 0
+    ) {
+      next.runCursor = 0
+    }
+    return next
+  })
+
+  // 보강 실행 복원: runId가 문자열이고 비어 있지 않은 슬롯이 있으면 true
+  const anyReinforcingSlot = stages.some(
+    (slot) => typeof slot.runId === "string" && slot.runId !== "",
   )
 
   // phase 규칙
@@ -30,7 +45,12 @@ export function sanitizeForRestore(session: Session): Session {
   if (phase === "skeleton") {
     phase = "confirm"
   } else if (phase === "ready") {
-    const anyNotDone = stages.some((slot) => slot.status !== "done")
+    // 끝난 단계의 보강만 남았으면 ready 유지, 실제 단계 조사가 미완이면 researching
+    const anyNotDone = stages.some(
+      (slot) =>
+        slot.status !== "done" &&
+        !(typeof slot.runId === "string" && slot.runId !== ""),
+    )
     if (anyNotDone) phase = "researching"
   }
 
@@ -39,10 +59,24 @@ export function sanitizeForRestore(session: Session): Session {
     phase = "confirm"
   }
 
+  // 전역 runId만 있고 슬롯 실행 번호가 없는 예전 저장본은 전역 실행 값을 비움
+  let runId = session.runId
+  let runStatus = session.runStatus
+  let runCursor = session.runCursor
+  if (typeof runId === "string" && runId !== "" && !anyReinforcingSlot) {
+    runId = null
+    runStatus = null
+    runCursor = 0
+  }
+  if (!Number.isInteger(runCursor) || runCursor < 0) {
+    runCursor = 0
+  }
+
   // 재접속용 값 정리
   return {
     ...session,
     phase,
+    reinforcing: anyReinforcingSlot,
     busy: false,
     error: interrupted
       ? "저장 당시 진행 중이던 계획 설계를 이어서 할 수 있습니다. 승인 화면에서 다시 선택하면 계획 설계를 다시 시도합니다."
@@ -53,7 +87,9 @@ export function sanitizeForRestore(session: Session): Session {
         ? { ...session.planningAttempt, status: "failed" as const }
         : session.planningAttempt,
     exportState: { ...session.exportState, busy: false },
-    // runId, runCursor, runStatus는 그대로 둠
+    runId,
+    runStatus,
+    runCursor,
   }
 }
 
