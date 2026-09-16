@@ -165,10 +165,29 @@ export async function planFromResearch(
     trace = result.trace;
     offTopic = result.offTopic ?? null;
   } catch (err) {
-    // 전량 실패해도 빈 자료로 설계 호출까지 진행한다.
-    sources = [];
-    trace = err.trace ?? { calls: [], totalCalls: 0, succeededCalls: 0, failedCalls: 0, totalElapsedMs: 0 };
-    offTopic = null;
+    // 검색 실패: 오류 유형에 따라 설계 모델 호출을 중단한다.
+    // 검색 자체 실패와 자료 없음이 같은 성공 응답이 되면 안 된다.
+    const tr = err?.trace;
+    if (tr && tr.totalCalls > 0 && tr.succeededCalls === 0 && tr.failedCalls === tr.totalCalls) {
+      // 전량 연결 실패 — 설계로 넘어가지 않는다.
+      const errors = tr.calls.map((c) => c.error).filter(Boolean);
+      let status = 502;
+      let message = `선행 검색 전량 실패 (${tr.failedCalls}/${tr.totalCalls}개 채널)`;
+      if (errors.some((e) => typeof e === 'string' && e.includes('시간 초과'))) {
+        status = 504;
+        message = `선행 검색 시간 초과 (${tr.failedCalls}/${tr.totalCalls}개 채널)`;
+      } else if (errors.some((e) => typeof e === 'string' && (e.includes('429') || e.includes('요청 제한') || e.includes('Rate Limit') || e.includes('rate limit')))) {
+        status = 429;
+        message = '선행 검색 요청 제한';
+      }
+      const failedError = new Error(message);
+      failedError.status = status;
+      failedError.trace = tr;
+      failedError.offTopic = err.offTopic ?? null;
+      throw failedError;
+    }
+    // 그 외 검색 오류도 설계로 넘어가지 않는다.
+    throw err;
   }
 
   // 3) 단계 설계 (40초 상한)
