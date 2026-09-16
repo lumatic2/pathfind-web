@@ -13,6 +13,7 @@ import { renderMarkdown } from '../components/chat-conversation-panel'
 import { sourceTree, mindmapTree, mindmapLegend, resolveCitation, sourceAncestors, displayStageResult } from '../state/derive'
 import type { Finding, Stage, SourceDoc } from '../state/types'
 import { downloadText, sourceCard } from '../lib/api'
+import solarMark from '../assets/solar-mark.png'
 import { saveRoadmap, newRoadmapId, getRoadmap, toCurrentSession } from '../state/roadmaps'
 import { listRoadmaps, renameRoadmap, deleteRoadmap } from '../state/roadmaps'
 import type { SavedRoadmap } from '../state/roadmaps'
@@ -925,9 +926,16 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
         })()
       : undefined
 
-  const renderAssistantMark = researchActive && session.runActivity != null
-    ? () => <span className="research-run-mark">{session.runActivity}</span>
-    : undefined
+  const renderAssistantMark = () => (
+    <img
+      src={solarMark}
+      alt=""
+      aria-hidden
+      width={28}
+      height={28}
+      className="solar-mark"
+    />
+  )
 
   useEffect(() => {
     const now = Date.now()
