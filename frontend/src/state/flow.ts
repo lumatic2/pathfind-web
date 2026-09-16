@@ -268,7 +268,6 @@ export function useFlow() {
             const questionText = [
               res.questionTitle,
               res.questionBody,
-              `추천: ${res.suggestion}`,
             ].join('\n\n')
 
             const latest = sessionRef.current
@@ -308,9 +307,7 @@ export function useFlow() {
               "직접 입력",
             ]
 
-            const guidanceLine = remaining > 0
-              ? `이렇게 이해했습니다. 맞나요?\n\n${res.summary}\n\n이러면 조사를 시작할까요?\n\n**남은 ${remaining}회 중 1회를 씁니다.**`
-              : `이렇게 이해했습니다. 맞나요?\n\n${res.summary}\n\n**패스 2회를 모두 쓰셨습니다.**\n만든 패스는 계속 보실 수 있고, 마인드맵과 PATH.md도 그대로 내려받을 수 있어요.`
+            const guidanceLine = `정리했습니다. 이게 맞나요?\n\n${(res.summary ?? "").trim()}`
 
             const latest = sessionRef.current
             patch({
