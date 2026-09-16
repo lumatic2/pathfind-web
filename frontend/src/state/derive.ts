@@ -1195,7 +1195,7 @@ export function attachMarksByName(text: string, cites: Array<{ n: number; name: 
   return src
     .split(/(?<=[.!?])(?=\s)|(?=\n)/)
     .map((part) => {
-      if (/[\[\]\d{1,2}\]/.test(part)) return part
+      if (/\[\d{1,2}\]/.test(part)) return part
       const hit = list.find((c) => !used.has(c.n) && part.includes(c.name))
       if (!hit) return part
       used.add(hit.n)
