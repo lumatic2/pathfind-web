@@ -63,6 +63,15 @@ const CHANNELS = [
 
 const AVAILABLE_CHANNEL_NAMES = CHANNELS.filter((c) => c.available).map((c) => c.name);
 
+// ---------- 채널 계획 전용 도구 이름 (목표화면 assembly 대응) ----------
+const PLAN_TOOL_BY_CHANNEL = {
+  web: 'pathfind_web_search',
+  oss: 'pathfind_oss_search',
+  law: 'pathfind_law_search',
+  stats: 'pathfind_stats_search',
+  public_data: 'pathfind_public_data_search',
+};
+
 // ---------- 키워드 규칙 ----------
 
 function stageText(stage) {
@@ -924,6 +933,19 @@ export async function POST(request) {
 
     if (!stage || !stage.title) {
       return sendError(400, 'stage.title 필요');
+    }
+
+    // ---------- planOnly: 단계 조사 전 채널 계획(검색·모델 호출 없이 계획만 반환) ----------
+    if (body.planOnly === true) {
+      const planned = planChannels(stage, AVAILABLE_CHANNEL_NAMES).map((channel) => ({
+        channel,
+        tool: PLAN_TOOL_BY_CHANNEL[channel] ?? `pathfind_${channel}_search`,
+        why: channel === 'web' ? '어느 주제에나 먼저 본다' : matchedRuleWords(stage, channel).slice(0, 5).join(', '),
+        queryHint: QUERY_HINT[channel] ?? '핵심 명사 2~4개',
+      }));
+      return new Response(JSON.stringify({ planned }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // 1) 채널 선택 (코드 규칙)
