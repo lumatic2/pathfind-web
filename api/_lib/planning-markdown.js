@@ -23,6 +23,7 @@ export function buildPlanningMarkdown(bigPicture) {
   const basisSummary = planning.basisSummary || '';
   const stages = (bigPicture && bigPicture.stages) || [];
   const hasMaterial = sources.length > 0 || researchNotes.length > 0;
+  const requiresDraft = sources.length === 0 || researchNotes.length === 0;
 
   const stageMap = new Map();
   for (const s of stages) {
@@ -34,15 +35,12 @@ export function buildPlanningMarkdown(bigPicture) {
   }
 
   const lines = [];
-  lines.push('# 내려받은 문서 — 조사 기록과 단계별 제안');
-  lines.push('');
-
   if (planning.researchedAt) {
     lines.push(`**조사 일시:** ${planning.researchedAt}`);
     lines.push('');
   }
 
-  // 단계를 정한 이유와 자료 — 2수준 제목 하나로 통합
+  // 단계를 정한 이유와 자료 — 2수준 제목 하나로
   lines.push('## 단계를 정한 이유와 자료');
   lines.push('');
   if (basisSummary && basisSummary.trim()) {
@@ -57,10 +55,45 @@ export function buildPlanningMarkdown(bigPicture) {
   lines.push('검색 결과의 제목과 발췌를 읽었고, 링크 본문 전체를 읽은 기록은 아닙니다.');
   lines.push('');
 
-  // 참고한 조사 내용 — sources와 researchNotes 발췌를 sourceId로 연결
-  lines.push('## 참고한 조사 내용');
-  lines.push('');
+  // 단계별 제안 이유 — 3수준 제목으로 시작
+  if (stageBasis.length > 0) {
+    for (const sb of stageBasis) {
+      if (!sb || sb.stageNo == null) continue;
+      const stage = stageMap.get(sb.stageNo);
+      const stageTitle = (stage && stage.title) ? stage.title : `단계 ${sb.stageNo}`;
+      lines.push(`### ${sb.stageNo}. ${escapeMd(stageTitle)}`);
+      lines.push('');
+      const reason = sb.reason || '';
+      if (reason) {
+        lines.push(`- 제안 이유: ${escapeMd(reason)}`);
+        lines.push('');
+      }
+      const support = sb.support || [];
+      const sourceIds = sb.sourceIds || [];
+      const combined = [...support, ...sourceIds];
+      if (combined.length > 0) {
+        lines.push('- 이 단계가 참고한 자료:');
+        for (const id of combined) {
+          const src = sourceById.get(id);
+          if (src) {
+            const t = src.title || '자료';
+            const u = src.url && src.url.trim() ? src.url.trim() : null;
+            const tEsc = escapeMd(t);
+            if (u) lines.push(`  - [${tEsc}](${u})`);
+            else lines.push(`  - ${tEsc}`);
+          } else {
+            lines.push(`  - (자료 ${id})`);
+          }
+        }
+        lines.push('');
+      }
+    }
+  }
+
+  // 참고한 조사 내용 — research-informed일 때만 3수준 제목으로
   if (hasMaterial) {
+    lines.push('### 참고한 조사 내용');
+    lines.push('');
     for (const src of sources) {
       if (!src || !src.id) continue;
       const title = src.title || '자료';
@@ -80,20 +113,17 @@ export function buildPlanningMarkdown(bigPicture) {
       lines.push('');
     }
     for (const note of researchNotes) {
-      if (!note || !note.sourceId) continue;
+      if (!note || !note.sourceId || !note.excerpt) continue;
       const src = sourceById.get(note.sourceId);
-      const excerpt = note.excerpt || '';
-      if (!excerpt) continue;
-      const excerptEsc = escapeMd(excerpt);
+      const excerptEsc = escapeMd(note.excerpt);
       if (src) {
         const sTitle = src.title || '자료';
         const sUrl = src.url && src.url.trim() ? src.url.trim() : null;
         const sTitleEsc = escapeMd(sTitle);
+        lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
         if (sUrl) {
-          lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
           lines.push(`  출처: [${sTitleEsc}](${sUrl}) (자료 ${note.sourceId})`);
         } else {
-          lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
           lines.push(`  출처: ${sTitleEsc} (자료 ${note.sourceId})`);
         }
       } else {
@@ -102,68 +132,19 @@ export function buildPlanningMarkdown(bigPicture) {
       }
       lines.push('');
     }
-  } else {
-    lines.push('아직 조사 자료가 없습니다. 인터뷰 기반 초안입니다.');
+  }
+
+  // 초안 안내 — sources나 researchNotes 중 하나라도 없으면
+  if (requiresDraft) {
+    lines.push('### 초안 안내');
+    lines.push('');
+    lines.push('아직 조사 자료가 충분하지 않습니다. 인터뷰 기반으로 작성된 초안입니다.');
     lines.push('');
   }
 
-  // 단계별 제안 이유
-  if (stageBasis.length > 0) {
-    lines.push('## 단계별 제안 이유');
-    lines.push('');
-    for (const sb of stageBasis) {
-      if (!sb || sb.stageNo == null) continue;
-      const stage = stageMap.get(sb.stageNo);
-      const stageTitle = (stage && stage.title) ? stage.title : `단계 ${sb.stageNo}`;
-      lines.push(`### ${sb.stageNo}. ${escapeMd(stageTitle)}`);
-      lines.push('');
-      const reason = sb.reason || '';
-      if (reason) {
-        lines.push(`- 제안 이유: ${escapeMd(reason)}`);
-        lines.push('');
-      }
-      // support 발췌를 sourceId로 연결
-      const support = sb.support || [];
-      if (support.length > 0) {
-        lines.push('- 이 단계가 참고한 자료:');
-        for (const sup of support) {
-          if (!sup) continue;
-          const src = sourceById.get(sup);
-          if (src) {
-            const t = src.title || '자료';
-            const u = src.url && src.url.trim() ? src.url.trim() : null;
-            const tEsc = escapeMd(t);
-            if (u) lines.push(`  - [${tEsc}](${u})`);
-            else lines.push(`  - ${tEsc}`);
-          } else {
-            lines.push(`  - (자료 ${sup})`);
-          }
-        }
-        lines.push('');
-      }
-      const sourceIds = sb.sourceIds || [];
-      if (sourceIds.length > 0) {
-        lines.push('- 이 단계가 참고한 자료:');
-        for (const id of sourceIds) {
-          const src = sourceById.get(id);
-          if (src) {
-            const t = src.title || '자료';
-            const u = src.url && src.url.trim() ? src.url.trim() : null;
-            const tEsc = escapeMd(t);
-            if (u) lines.push(`  - [${tEsc}](${u})`);
-            else lines.push(`  - ${tEsc}`);
-          } else {
-            lines.push(`  - (자료 ${id})`);
-          }
-        }
-        lines.push('');
-      }
-    }
-  }
-
-  // 조회 기록 — 마지막 3수준 절로 보존
+  // 추가 조회 기록 — 3수준 제목으로 마지막
   if (trace.length > 0) {
-    lines.push('### 조회 기록');
+    lines.push('### 추가 조회 기록');
     lines.push('');
     for (const t of trace) {
       if (!t) continue;
@@ -177,9 +158,9 @@ export function buildPlanningMarkdown(bigPicture) {
     lines.push('');
   }
 
-  // 한계
+  // 한계 — 3수준 제목으로 마지막
   if (warnings.length > 0) {
-    lines.push('## 한계');
+    lines.push('### 한계');
     lines.push('');
     for (const w of warnings) {
       if (w) lines.push(`- ${escapeMd(w)}`);
