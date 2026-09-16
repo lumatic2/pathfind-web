@@ -4,164 +4,60 @@
 import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
 import { logCall, sendError } from './_lib/http.js';
 
-const SYSTEM_PROMPT = `당신은 사용자가 조사한 자료 하나를 설명하는 어시스턴트입니다.
-아래 "자료" 정보를 받아 설명 markdown을 위한 다섯 값만 JSON으로 출력합니다.
-출력은 코드펜스나 설명 문장 없이 JSON 객체 하나만 내놓습니다.
+const SYSTEM_PROMPT = `당신은 조사에서 찾은 자료 1건을 프로젝트 팀이 바로 쓸 수 있는 카드로 정리하는 안내자입니다.
+주어진 자료 사실(이름·종류·근거·주의·검색어·출처)과 프로젝트 요약·단계 맥락만으로 씁니다. 사실에 없는 것은 "확인 불가"라고 적습니다.
 
-출력 객체 스키마(고정, 다섯 키만):
-{
-  "oneLiner": "한 줄 요약 (30자 안팎, 이 자료가 무엇인지 한 문장)",
-  "what": "무엇인가 — 이 자료의 정체·핵심 기능을 2~3문장",
-  "use": "이 로드맵에서 어떻게 쓰나 — 사용자가 하려는 프로젝트에서 어느 단계에 어떻게 쓸 수 있는지 2~3문장",
-  "avoid": "이럴 땐 피한다 — 이 자료를 쓰기 조심스러운 상황·제약 1~2문장",
-  "constraints": "제약과 주의 — 원문 note를 그대로 두고, 아는 범위에서 라이선스·비용·범위·의존성 얘기를 덧붙임 (모르면 원문 note만)"
+다섯 항목을 한국어로 채웁니다:
+- oneLiner: 이 자료가 무엇인지 한 문장(40자 안팎).
+- what: 무엇인가 — 이 자료가 하는 일과 성격 2~3문장. 핵심 어구는 **굵게**.
+- use: 이 패스에서 어떻게 쓰나 — 프로젝트 요약과 이 단계의 할 일에 이어서, 무엇을 가져다 쓰고 무엇을 손봐야 하는지 `- ` 목록 2~4줄.
+- avoid: 이럴 땐 피한다 — 이 자료가 맞지 않는 상황 `- ` 목록 1~3줄.
+- constraints: 제약·주의 — 라이선스·비용·범위·의존성처럼 쓰기 전에 알아야 할 것 `- ` 목록 1~3줄(사실에 없으면 "- 확인 불가" 한 줄).
+
+출력 형식 (JSON만, 다른 텍스트 없이):
+{ "oneLiner": "...", "what": "...", "use": "- ...", "avoid": "- ...", "constraints": "- ..." }`;
+
+const UNKNOWN = '확인 불가';
+
+function t(s) {
+  return String(s ?? '').replace(/\s+/g, ' ').trim();
 }
 
-규칙:
-- 위 다섯 값만 채웁니다. 다른 키는 넣지 않습니다.
-- 모르는 절은 문자열 "확인 불가"로 채웁니다. 추정하지 않습니다.
-- what/use/avoid/constraints는 한국어입니다.
-- oneLiner는 한국어 한 문장입니다.`;
-
-function escapeMarkdownLine(s) {
-  if (typeof s !== 'string') return '';
-  return s
-    .replace(/\|/g, '\\|')
-    .replace(/\n/g, ' ');
+/** 절 본문 정리 — 비면 「확인 불가」, 목록 절은 `- ` 로 시작하게. */
+function section(v, list) {
+  const s = String(v ?? '').trim();
+  if (!s) return list ? `- ${UNKNOWN}` : UNKNOWN;
+  if (!list) return s;
+  return s.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => (/^[-*]\s/.test(l) ? `- ${l.replace(/^[-*]\s+/, '')}` : `- ${l}`)).join('\n');
 }
 
-function buildMarkdown(finding, stage, modelOut) {
-  const name = (finding && finding.name) || '자료';
-  const kind = (finding && finding.kind) || '';
-  const query = (finding && finding.query) || '';
-  const url = (finding && finding.url) || '';
-  const evidence = (finding && finding.evidence) || '';
-  const note = (finding && finding.note) || '';
-  const stageTitle = (stage && stage.title) || '';
-
-  const md = [];
-
-  // 1. 이름 제목
-  md.push(`# ${name}`);
-
-  // 2. 한 줄 요약 (모델)
-  md.push('');
-  md.push(`## 한 줄 요약`);
-  md.push('');
-  md.push((modelOut && modelOut.oneLiner) || '확인 불가');
-
-  // 3. 종류·단계·출처 줄 (고정)
-  md.push('');
-  md.push('## 종류·단계·출처');
-  md.push('');
-  const kindLine = kind ? `종류: ${kind}` : '종류: 확인 불가';
-  const stageLine = stageTitle ? `단계: ${stageTitle}` : '단계: 확인 불가';
-  const sourceLine = url ? `출처: ${url}` : '출처: 확인 불가';
-  md.push(`- ${kindLine}`);
-  md.push(`- ${stageLine}`);
-  md.push(`- ${sourceLine}`);
-  if (query) {
-    md.push(`- 검색어: ${query}`);
-  }
-
-  // 4. 근거 등급이 있을 때만 채널 줄 (evidence가 있으면 근거가 있는 것으로 봄)
-  if (evidence) {
-    md.push('');
-    md.push('## 근거 채널');
-    md.push('');
-    md.push(`- 근거: ${evidence}`);
-  }
-
-  // 5. 무엇인가 (모델)
-  md.push('');
-  md.push('## 무엇인가');
-  md.push('');
-  md.push((modelOut && modelOut.what) || '확인 불가');
-
-  // 6. 이 로드맵에서 어떻게 쓰나 (모델)
-  md.push('');
-  md.push('## 이 로드맵에서 어떻게 쓰나');
-  md.push('');
-  md.push((modelOut && modelOut.use) || '확인 불가');
-
-  // 7. 이럴 땐 피한다 (모델)
-  md.push('');
-  md.push('## 이럴 땐 피한다');
-  md.push('');
-  md.push((modelOut && modelOut.avoid) || '확인 불가');
-
-  // 8. 제약과 주의 — 원문 note 그대로 + 모델이 덧붙임
-  md.push('');
-  md.push('## 제약과 주의');
-  md.push('');
-  if (note) {
-    md.push(`- 원문 note: ${note}`);
-  }
-  if (modelOut && modelOut.constraints && modelOut.constraints !== '확인 불가') {
-    md.push(`- 추가: ${modelOut.constraints}`);
-  } else if (!note) {
-    md.push('확인 불가');
-  }
-
-  // 9. 근거 — evidence 그대로 + 검색어 붙임
-  md.push('');
-  md.push('## 근거');
-  md.push('');
-  if (evidence) {
-    md.push(evidence);
-    if (query) {
-      md.push('');
-      md.push(`(검색어: ${query})`);
-    }
-  } else {
-    md.push('확인 불가');
-  }
-
-  // 10. 관련 — 같은 단계의 다른 자료 이름 + 이 단계 할 일 + 가져다 쓸 것/직접 할 것
-  md.push('');
-  md.push('## 관련');
-  md.push('');
-
-  // 같은 단계 다른 자료
-  const sameStageFindings = (stage && stage.findings) || [];
-  const others = sameStageFindings.filter((f) => f && f.url && f.url !== url && f.name);
-  if (others.length) {
-    md.push('같은 단계 다른 자료:');
-    for (const o of others) {
-      md.push(`- ${o.name} (${o.kind || '자료'}) — ${o.url || '출처 없음'}`);
-    }
-  } else {
-    md.push('같은 단계 다른 자료: 없음');
-  }
-
-  // 이 단계 할 일
-  const tasks = (stage && stage.tasks) || [];
-  if (tasks.length) {
-    md.push('');
-    md.push('이 단계 할 일:');
-    for (const t of tasks) {
-      const orderPrefix = t.order ? `${t.order}. ` : '';
-      md.push(`- ${orderPrefix}${t.task}`);
-    }
-  }
-
-  // verdict 기반 안내
-  const verdict = (stage && stage.verdict) || '';
-  if (verdict) {
-    md.push('');
-    md.push(`이 단계 판정: ${verdict}`);
-    if (verdict === '가져다 써도 됨') {
-      md.push('→ 이 자료는 가져다 쓸 후보로 둡니다.');
-    } else if (verdict === '직접 해야 함') {
-      md.push('→ 이 단계 핵심은 직접 해야 하므로 이 자료는 보조로만 씁니다.');
-    } else if (verdict === '섞어야 함') {
-      md.push('→ 이 자료는 뼈대로 쓰고 일부는 직접 채웁니다.');
-    } else if (verdict === '선례를 못 찾음') {
-      md.push('→ 이 단계에서 쓸 만한 자료를 찾지 못한 상태라 이 자료도 참고용입니다.');
-    }
-  }
-
-  return md.join('\n');
+/** 카드 조립 — 사실은 축자, 모델 절은 정리해서. */
+function buildCard({ finding: f, stage: s, model }) {
+  const name = t(f?.name) || '이름 없는 자료';
+  const lines = [`# ${name}`, ''];
+  lines.push(section(model?.oneLiner, false));
+  lines.push('', `**종류** — ${t(f?.kind) || '자료'} · **단계** — ${s?.no ?? '?'}. ${t(s?.title)}${t(f?.url) ? ` · **출처** — ${t(f.url)}` : ''}`);
+  lines.push('', '## 무엇인가', section(model?.what, false));
+  lines.push('', '## 이 패스에서 어떻게 쓰나', section(model?.use, true));
+  lines.push('', '## 이럴 땐 피한다', section(model?.avoid, true));
+  lines.push('', '## 제약·주의');
+  if (t(f?.note)) lines.push(`- ${t(f.note)}`);
+  const c = section(model?.constraints, true);
+  if (c !== `- ${UNKNOWN}` || !t(f?.note)) lines.push(c);
+  lines.push('', '## 근거');
+  if (t(f?.evidence)) lines.push(`- ${t(f.evidence)}`);
+  if (t(f?.query)) lines.push(`- 찾은 검색어 — ${t(f.query)}`);
+  if (!t(f?.evidence) && !t(f?.query)) lines.push(`- ${UNKNOWN}`);
+  // 관련 — 코드가 만든다(같은 단계의 다른 자료·할 일)
+  const others = (Array.isArray(s?.findings) ? s.findings : []).map((x) => t(x?.name)).filter((n) => n && n !== name);
+  const tasks = (Array.isArray(s?.tasks) ? s.tasks : []).map((x) => t(x?.task)).filter(Boolean);
+  const todos = (Array.isArray(s?.todos) ? s.todos : []).map((x) => `[${t(x?.owner)}] ${t(x?.task)}`).filter((x) => x.length > 3);
+  lines.push('', '## 관련');
+  if (others.length) lines.push(`- 같은 단계 자료 — ${others.join(' · ')}`);
+  if (tasks.length) lines.push(`- 이 단계 할 일 — ${tasks.join(' · ')}`);
+  if (todos.length) lines.push(`- 이미 있는 것 / 직접 할 것 — ${todos.join(' · ')}`);
+  if (!others.length && !tasks.length && !todos.length) lines.push('- 없음');
+  return lines.join('\n');
 }
 
 function parseModelJson(content) {
@@ -273,7 +169,7 @@ export async function POST(request) {
       );
     }
 
-    const markdown = buildMarkdown(finding, stage, modelOut);
+    const markdown = buildCard({ finding, stage, model: modelOut });
     logCall('source-card.POST', 0, 200, { 'x-card-source': 'solar' });
     return new Response(
       JSON.stringify({ markdown, degraded: false }),
