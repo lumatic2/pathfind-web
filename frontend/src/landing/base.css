@@ -191,6 +191,7 @@ body {
 @media (min-width: 768px)  { :root { --gutter: 30px;              --section-y: var(--space-16); } }
 @media (min-width: 1024px) { :root { --gutter: var(--space-14);   --section-y: var(--space-18); } }
 @media (min-width: 1200px) { :root { --gutter: 100px; --measure: 1200px; --section-y: 144px; } }
+@media (min-width: 1600px) { :root { --gutter: var(--space-20); --measure: 1600px; --section-y: 168px; } }
 
 /* 원본 사다리 — 1440 실측값을 그대로 박는다. 여기가 이 파일에서 유일하게
    스케일 밖 숫자를 쓰는 자리이고, 그래서 출처를 줄마다 적는다. */
@@ -214,7 +215,6 @@ body {
     --pad-start-b: 180px;
     --pad-foot-t:  110px;   /* gl-footer 110 / 60 */
     --pad-foot-b:   60px;
-    --start-card: 250px;    /* 표제가 두 줄로 서려면 왼쪽 열이 420px 은 돼야 한다 */
   }
 }
 
