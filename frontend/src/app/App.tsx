@@ -486,7 +486,9 @@ const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedC
 
   const handleDetailChange = useCallback((id: string | null) => {
     setDetailId(id)
-    if (id != null) handleSourceOpen(id)
+    if (id != null && /^stage-\d+-finding-\d+$/.test(id)) {
+      handleSourceOpen(id)
+    }
   }, [handleSourceOpen])
 
   const openSourceDoc = useCallback((id: string) => {
