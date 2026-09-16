@@ -1,165 +1,93 @@
 // POST /api/outline — 단계 항목을 소주제로 묶는다
 // 계약: docs/api-contract.md / roadmap/M05-조사결과패널/M05-스텝5.md
+// 기준: roadmap/목표화면/기준코드/server/outline.mjs (M5 확장 4차 보강 step-13, 사용자 H8)
 
-import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
+import { callSolar } from './_lib/solar.js';
 import { logCall, sendError } from './_lib/http.js';
 
-const MAX_ITEMS_BEFORE_MODEL = 3; // 미만이면 모델 안 부름
+const MAX_ITEMS_BEFORE_MODEL = 3;
 const OUTLINE_MAX_TOKENS = 1024;
 const FORCE_HEADER = 'x-outline-force';
+const MAX_DEPTH = 2;
 
-function isPost(req) {
-  return req.method === 'POST';
-}
+const t = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
-function parseBody(req) {
-  return req.json().catch(() => null);
-}
-
-function buildStageItems(stage) {
-  // stage 배열 순서를 그대로 순번(0-based)으로 쓴다.
-  const items = [];
-  if (Array.isArray(stage.findings)) {
-    stage.findings.forEach((f, i) => items.push({ kind: 'finding', index: i }));
-  }
-  if (Array.isArray(stage.tasks)) {
-    stage.tasks.forEach((t, i) => items.push({ kind: 'task', index: i }));
-  }
-  if (Array.isArray(stage.todos)) {
-    stage.todos.forEach((t, i) => items.push({ kind: 'todo', index: i }));
-  }
-  return items;
-}
-
-function itemLabel(item) {
-  // 모델에 보여 줄 항목 한 줄. 원본 필드 값을 함께 넣으면 clustering 품질이 오른다.
-  const src = item.src ?? '';
-  const short = typeof src === 'string' ? src.replace(/\s+/g, ' ').trim().slice(0, 80) : '';
-  return `${item.kind} #${item.index}: ${short}`;
-}
-
-function buildSystemPrompt() {
-  return `당신은 단계 항목을 소주제로 묶는 어시스턴트입니다.
-
-산출물:
-- JSON 한 덩어리만 내놓습니다. 코드펜스(마커)나 앞뒤 설명 문장은 넣지 않습니다.
-- 루트 객체: { "topics": [ { "title": "string", "items": [ { "kind": "finding"|"task"|"todo", "index": number } ] } ] }
-- topics는 2개 이상 4개 이하. 항목이 적으면 한 층만 만든다(토픽 안에 topics를 두지 않는다).
-- title: 해당 소주제를 나타내는 한 줄, 18자 안팎.
-- items: 요청에서 준 항목 목록 중 이 소주제에 넣을 것. kind는 finding/task/todo, index는 요청에서 받은 배열 순서 그대로.
-- 항목은 뜻이 가까운 것끼리 묶는다. 모든 항목을 한 번씩만 넣는다. 누락·중복 금지.
-- 깊이 2를 넘지 않는다(topics 안에 topics를 두지 않는다).
-
-언어: 한국어. 쌍따옴표는 반각만 사용합니다.`;
-}
-
-function buildUserPrompt(items) {
-  const lines = items.map(itemLabel);
-  return `아래 단계 항목을 뜻이 가까운 것끼리 2~4개 소주제로 묶어 주세요. 항목을 적은 경우에는 한 층만 만듭니다.
-
-${lines.length}개 항목:
-${lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}
-
-출력은 JSON 한 덩어리:
-{ "topics": [ { "title": "...", "items": [ { "kind": "...", "index": 0 } ] } ] }`;
-}
-
-function parseOutlineReply(content) {
-  if (!content) return null;
-  const trimmed = content.trim();
-
-  // 코드펜스 벗기기
-  let text = trimmed;
-  const fence = text.match(/^[\\s\\S]*?```(?:json)?\\s*([\\s\\S]*?)```[\\s\\S]*$/);
-  if (fence) {
-    text = fence[1].trim();
-  } else {
-    const parts = text.split('```');
-    if (parts.length >= 3) {
-      text = parts[parts.length - 1].trim();
-    }
-  }
-
-  // JSON 덩어리 후보 추출
-  const candidates = [text, ...[...text.matchAll(/\\{[\\s\\S]*\\}/g)].map((m) => m[0])];
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate);
-      if (parsed && typeof parsed === 'object') return parsed;
-    } catch {
-      // 다음 후보
-    }
-  }
-  return null;
-}
-
-function validKind(k) {
-  return k === 'finding' || k === 'task' || k === 'todo';
-}
-
-function sanitizeTopics(parsed, itemCount) {
-  if (!parsed || !Array.isArray(parsed.topics)) return [];
-
-  const used = new Set();
+// 항목 목록 — 모델에게 주는 번호표. ref 는 finding-<i>·task-<i>·todo-<i> 그대로.
+function listItems(stage) {
   const out = [];
-
-  for (const topic of parsed.topics) {
-    if (!topic || typeof topic !== 'object') continue;
-    if (Array.isArray(topic.topics)) {
-      // 깊이 2 초과 층 잘라냄 — topics 안의 topics는 버린다
-      continue;
-    }
-    const title = typeof topic.title === 'string' ? topic.title.trim() : '';
-    if (!title) continue;
-
-    const rawItems = Array.isArray(topic.items) ? topic.items : [];
-    const cleanedItems = [];
-    for (const it of rawItems) {
-      if (!it || typeof it !== 'object') continue;
-      const kind = typeof it.kind === 'string' ? it.kind : '';
-      const index = typeof it.index === 'number' && Number.isInteger(it.index) ? it.index : -1;
-      if (!validKind(kind)) continue;
-      if (index < 0 || index >= itemCount) continue; // 존재하지 않는 순번 버림
-      const key = `${kind}:${index}`;
-      if (used.has(key)) continue; // 중복 순번 버림
-      used.add(key);
-      cleanedItems.push({ kind, index });
-    }
-    if (cleanedItems.length === 0) continue; // 항목 하나도 안 남은 소주제 버림
-    out.push({ title, items: cleanedItems });
-  }
-
+  (Array.isArray(stage?.findings) ? stage.findings : []).forEach((f, i) =>
+    out.push({ ref: `finding-${i}`, text: `${t(f?.name)} (자료·${t(f?.kind) || '자료'})` }));
+  (Array.isArray(stage?.tasks) ? stage.tasks : []).forEach((x, i) =>
+    out.push({ ref: `task-${i}`, text: `${t(x?.task)} (할 일)` }));
+  (Array.isArray(stage?.todos) ? stage.todos : []).forEach((x, i) =>
+    out.push({ ref: `todo-${i}`, text: `${t(x?.task)} (${t(x?.owner) || '역할 나눔'})` }));
   return out;
 }
 
-function makeDegradedResponse(source) {
+const SYSTEM_PROMPT = `당신은 조사 결과 한 단계의 항목들을 마인드맵용 소주제로 정리하는 편집자입니다.
+주어진 항목(자료·할 일·역할 나눔)을 뜻이 가까운 것끼리 소주제로 묶습니다. 소주제 제목은 12자 안팎의 명사형이고, 항목의 내용을 대표합니다.
+항목이 많고 결이 갈리면 소주제 안에 하위 소주제를 한 층 더 둘 수 있습니다(최대 2층). 항목이 적거나 결이 하나면 topics 를 빈 배열로 냅니다.
+각 항목은 정확히 한 소주제에 한 번만 넣습니다. 항목 ref 는 주어진 번호표 그대로 씁니다.
+
+출력 형식 (JSON만, 다른 텍스트 없이):
+{ "topics": [ { "title": "소주제", "items": ["finding-0", "task-1"], "topics": [ { "title": "하위 소주제", "items": ["todo-0"] } ] } ] }`;
+
+function parseJson(content) {
+  const s = String(content).trim();
+  try { return JSON.parse(s); } catch { /* 아래로 */ }
+  const block = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (block) { try { return JSON.parse(block[1].trim()); } catch { /* 아래로 */ } }
+  const brace = s.match(/\{[\s\S]*\}/);
+  if (brace) { try { return JSON.parse(brace[0]); } catch { /* 아래로 */ } }
+  throw new Error('parse');
+}
+
+// 결정론 보정 — 유효 ref · 1회 · 빈 소주제 제거 · 깊이 상한 · 하나뿐이면 평평하게.
+function normalizeTopics(rawTopics, stage) {
+  const valid = new Set(listItems(stage).map((x) => x.ref));
+  const used = new Set();
+  const walk = (list, depth) => {
+    if (!Array.isArray(list) || depth > MAX_DEPTH) return [];
+    const out = [];
+    for (const tp of list) {
+      const title = t(tp?.title);
+      const items = [];
+      for (const r of Array.isArray(tp?.items) ? tp.items : []) {
+        const ref = t(r);
+        if (!valid.has(ref) || used.has(ref)) continue;
+        used.add(ref);
+        items.push(ref);
+      }
+      const topics = depth < MAX_DEPTH ? walk(tp?.topics, depth + 1) : [];
+      if (!title || (!items.length && !topics.length)) continue;
+      out.push(topics.length ? { title, items, topics } : { title, items });
+    }
+    return out;
+  };
+  const topics = walk(rawTopics, 1);
+  if (topics.length === 1 && !topics[0].topics?.length) return [];
+  return topics;
+}
+
+function makeResponse(topics, source, degraded) {
   return new Response(
-    JSON.stringify({ topics: [], degraded: true }),
+    JSON.stringify({ topics, degraded }),
     {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'x-outline-source': source || 'fallback',
+        'x-outline-source': source,
       },
     }
   );
 }
 
-function makeOkResponse(topics, source) {
-  return new Response(
-    JSON.stringify({ topics, degraded: false }),
-    {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-outline-source': source || 'solar',
-      },
-    }
-  );
+function parseBody(request) {
+  return request.json().catch(() => null);
 }
 
 export async function POST(request) {
-  if (!isPost(request)) {
+  if (request.method !== 'POST') {
     return sendError(405, 'Method not allowed');
   }
 
@@ -170,45 +98,37 @@ export async function POST(request) {
   }
 
   const stage = body.stage;
-  if (!stage || typeof stage !== 'object') {
-    return sendError(400, 'stage가 없습니다');
+  if (!stage || typeof stage.no !== 'number') {
+    return sendError(400, 'stage.no 가 필요합니다');
   }
 
-  const items = buildStageItems(stage);
-  const itemCount = items.length;
-
-  // 항목 3개 미만 → 모델 안 부르고 빈 topics
-  if (itemCount < MAX_ITEMS_BEFORE_MODEL) {
-    return makeOkResponse([], 'solar');
+  const items = listItems(stage);
+  if (items.length < MAX_ITEMS_BEFORE_MODEL) {
+    return makeResponse([], 'local:flat', false);
   }
 
-  // 시험 스위치: nokey → 키 없는 것처럼 동작
   if (force === 'nokey') {
-    return makeDegradedResponse('fallback');
+    return makeResponse([], 'fallback:no-key', true);
   }
-
-  // messages 구성
-  const system = buildSystemPrompt();
-  const user = buildUserPrompt(items);
-  const messages = [{ role: 'system', content: system }, { role: 'user', content: user }];
 
   try {
-    const forceParse = force === 'parse';
-    const content = await callSolar(messages, {
-      maxTokens: OUTLINE_MAX_TOKENS,
-      forceParse,
-      force429: force === '429',
-    });
+    const context = [
+      `[프로젝트 요약]\n${t(body.summary) || '(없음)'}`,
+      `[단계 ${stage.no}] ${t(stage.title)}\n${t(stage.desc)}`,
+      `[항목 번호표]\n${items.map((x) => `${x.ref}: ${x.text}`).join('\n')}`,
+    ].join('\n\n');
 
-    const parsed = parseOutlineReply(content);
-    const topics = sanitizeTopics(parsed, itemCount);
-    return makeOkResponse(topics, 'solar');
-  } catch (err) {
+    const content = await callSolar(
+      [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: context }],
+      { maxTokens: OUTLINE_MAX_TOKENS, forceParse: force === 'parse', force429: force === '429' }
+    );
+
+    const parsed = parseJson(content);
+    const topics = normalizeTopics(parsed.topics, stage);
+    return makeResponse(topics, 'local', false);
+  } catch (e) {
     logCall('outline.POST', 0, 200, { 'x-outline-source': 'fallback' });
-    if (err.code === 'NO_KEY') {
-      return makeDegradedResponse('fallback');
-    }
-    // 429 포함 모든 호출 실패는 degraded true
-    return makeDegradedResponse('fallback');
+    const reason = String(e.message || e).replace(/[^\x20-\x7e]/g, '?');
+    return makeResponse([], `fallback:${reason}`, true);
   }
 }
