@@ -1,55 +1,48 @@
-// api/channels/public-data.js — 공공데이터포털(data.go.kr) 데이터셋 검색 채널
+// api/channels/public-data.js — 공공데이터포털(data.go.kr) 데이터셋·API 찾기 채널
 // 계약: docs/api-contract.md §조사 채널.
 // export: name, available, searchPublicData.
-// 구현: 공공데이터포털에 목록 검색 API가 없으므로 네이버 웹 검색에
-//        site:data.go.kr을 붙인 한 방으로 데이터셋 페이지를 찾는다.
-//        DATA_GO_KR_KEY는 목록 찾기에 필요 없으므로 쓰지 않는다.
+// 구현: 공공데이터포털엔 목록 검색 API가 없어서 네이버 웹검색 색인을 경유한다.
+//        「질의 data.go.kr」·「질의 공공데이터포털 API」·「공공데이터포털 질의」를 차례로 시도한다.
 
-import { searchNaver } from './naver.js';
+import { available as naverAvailable, searchNaver } from './naver.js';
 
 /** 채널 이름. 고정 문자열. */
 export const name = 'public-data';
 
-/**
- * 공공데이터포털 데이터셋 검색 사용 가능 여부.
- * NAVER_CLIENT_ID, NAVER_CLIENT_SECRET 둘 다 있으면 true, 없으면 false.
- * public-data는 네이버 검색에 의존하므로 네이버 키가 있어야 쓸 수 있다.
- * 예외는 내지 않는다.
- */
+/** 공공데이터포털 데이터셋 검색 사용 가능 여부. 네이버 키가 있어야 쓸 수 있다. */
 export function available() {
-  try {
-    return !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET);
-  } catch {
-    return false;
-  }
+  return naverAvailable();
 }
 
-/**
- * 네이버 웹 검색으로 data.go.kr 데이터셋 페이지를 찾는다.
- * query: 검색어.
- * 반환: Result[] = { id, title, url, snippet, host, form }.
- *       form은 'dataset'.
- * 실패·타임아웃·키 없음은 빈 배열 반환, 예외 없음.
- */
-export async function searchPublicData(query) {
-  if (!query || typeof query !== 'string') return [];
+/** data.go.kr 데이터셋·API 페이지 경로 패턴. */
+const DATASET_PATH = /^\/data\/\d+\/(openapi|fileData|standard|linkedData)\.do/;
 
-  const prefixed = `site:data.go.kr ${query}`;
-  const items = await searchNaver(prefixed, 'webkr', 3);
-
-  // 공공데이터포털(dataset) 결과만 남긴다. 다른 호스트가 섞이면 제외.
-  const filtered = items.filter((item) => {
-    try {
-      const host = new URL(item.url).hostname;
-      return host === 'data.go.kr' || host.endsWith('.data.go.kr');
-    } catch {
-      return false;
+/** 공공데이터포털 데이터셋·API 페이지를 네이버 웹검색 색인으로 찾는다. * query: 검색어, options: { display?: number } (기본 3). * host는 포털이므로 'www.data.go.kr', form은 'API' 또는 '파일'. * 실패를 빈 성공 배열로 삼키지 않는다(네이버 채널이 던진다면 함께 던진다). */
+export async function searchPublicData(query, options = {}) {
+  const display = options.display != null ? options.display : 3;
+  // 색인이 질의마다 흔들린다 — 질의 형태 셋을 차례로 써서 채운다
+  const forms = [`${query} data.go.kr`, `${query} 공공데이터포털 API`, `공공데이터포털 ${query}`];
+  const seen = new Set();
+  const out = [];
+  for (const q of forms) {
+    const items = await searchNaver(q, { kind: 'webkr', display: 10 });
+    for (const it of items) {
+      let u;
+      try { u = new URL(it.url); } catch { continue; }
+      if (!/(^|\.)data\.go\.kr$/.test(u.hostname) || !DATASET_PATH.test(u.pathname)) continue;
+      const key = u.pathname.split('/')[2];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: `public-data-${key}`,
+        title: it.title.replace(/\s*[|·-]\s*공공데이터포털\s*$/, '').trim(),
+        url: `https://www.data.go.kr${u.pathname}`,
+        snippet: it.snippet,
+        host: 'www.data.go.kr',
+        form: /openapi/.test(u.pathname) ? 'API' : '파일',
+      });
+      if (out.length >= display) return out;
     }
-  });
-
-  return filtered.map((item, idx) => ({
-    ...item,
-    id: `public-data-${idx}`,
-    form: 'dataset',
-  }));
+  }
+  return out;
 }
