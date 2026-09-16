@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react'
 
-import { FileText } from 'lucide-react'
+import { FileText, Plus, Library, Download } from 'lucide-react'
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
@@ -46,7 +46,7 @@ type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 const LEFT_TITLE = '조사 결과'
 const LEFT_EMPTY_TITLE = '조사 결과물이 여기에 정리됩니다'
 const LEFT_EMPTY_BODY =
-  '인터뷰 이후 조사를 시작해보세요'
+  '인터뷰 이후 조사를 시작해보세요.'
 const LEFT_COLLAPSE_LABEL = '조사 결과 패널 접기'
 const LEFT_EXPAND_LABEL = '조사 결과 패널 펼치기'
 
@@ -56,9 +56,9 @@ const CENTER_BODY =
 const CENTER_PLACEHOLDER = '시작하려는 일을 한 문단으로 적어 주세요'
 
 const RIGHT_TITLE = '패스'
-const RIGHT_EMPTY_TITLE = '패스가 여기에 그려집니다'
+const RIGHT_EMPTY_TITLE = '그림이 여기에 그려집니다'
 const RIGHT_EMPTY_BODY =
-  '인터뷰가 끝나고 조사를 시작하면 단계 골격이 먼저 서고 조사 결과가 아래로 붙습니다'
+  '인터뷰가 끝나면 조사를 시작하여 마인드맵을 그려보세요.'
 
 const QUOTA_TOOLTIP =
   '패스 하나를 만들 때마다 몇 분 동안 웹을 조사합니다. 이 브라우저에서 2번까지 해 보실 수 있어요'
@@ -123,6 +123,13 @@ export default function App() {
       )
       : null
 
+  const homeLink = (
+    <a href="/" aria-label="홈" data-app-logo className="flex shrink-0 items-center gap-2">
+      <img src="/pathfinder-mark.png" alt="" aria-hidden width={28} height={28} />
+      <img src="/pathfinder-wordmark.png" alt="Pathfinder" aria-hidden width={16} height={16} />
+    </a>
+  )
+
   const topStatusSlot = (
     <span className="center-top-status">
       {quotaBadge}
@@ -130,15 +137,12 @@ export default function App() {
     </span>
   )
 
-  const leftPanelRef = useRef<LeftPanelHandle>(null)
-  const [openCitationN, setOpenCitationN] = useState<number | null>(null)
-
-  const { buildRoadmap } = useFlow()
-  const previewBuildingRef = useRef(false)
-
   const handleRoadmapDownload = useCallback(() => {
     setPreviewDialogOpen(true)
   }, [])
+
+  const { buildRoadmap } = useFlow()
+  const previewBuildingRef = useRef(false)
 
   const handlePreviewOpen = useCallback(() => {
     setPreviewDialogOpen(true)
@@ -155,6 +159,41 @@ export default function App() {
     setPreviewError(null)
     buildRoadmap()
   }, [session.exportState.roadmapMarkdown, buildRoadmap])
+
+  const handlePreviewClose = useCallback(() => {
+    setPreviewDialogOpen(false)
+    setPreviewText(null)
+    setPreviewBusy(false)
+    setPreviewError(null)
+    previewBuildingRef.current = false
+  }, [])
+
+  const handlePreviewRetry = useCallback(() => {
+    setPreviewError(null)
+    setPreviewText(null)
+    previewBuildingRef.current = true
+    setPreviewBusy(true)
+    buildRoadmap()
+  }, [buildRoadmap])
+
+  const topbar = (
+    <div className="flex w-full items-center gap-3 pl-4">
+      {homeLink}
+      <NotebookTopbar
+        title={topTitle}
+        onTitleChange={handleTitleChange}
+        actions={[
+          { id: 'new-roadmap', label: '새 패스', icon: <Plus aria-hidden />, onClick: handleNewRoadmapAsk },
+          { id: 'library', label: '목록', icon: <Library aria-hidden />, onClick: () => { loadArchive(); setDialogOpen(true) } },
+          { id: 'path', label: session.exportState.busy ? '만드는 중' : 'PATH.md', icon: <Download aria-hidden />, primary: true, onClick: handlePreviewOpen, disabled: session.phase !== 'ready' || session.stages.filter((s) => s.status === 'done').length === 0 || session.busy },
+        ]}
+        statusSlot={topStatusSlot}
+      />
+    </div>
+  )
+
+  const leftPanelRef = useRef<LeftPanelHandle>(null)
+  const [openCitationN, setOpenCitationN] = useState<number | null>(null)
 
   useEffect(() => {
     if (!previewDialogOpen) return
@@ -183,22 +222,6 @@ export default function App() {
       downloadText('PATH.md', md)
     }
   }, [previewText])
-
-  const handlePreviewClose = useCallback(() => {
-    setPreviewDialogOpen(false)
-    setPreviewText(null)
-    setPreviewBusy(false)
-    setPreviewError(null)
-    previewBuildingRef.current = false
-  }, [])
-
-  const handlePreviewRetry = useCallback(() => {
-    setPreviewError(null)
-    setPreviewText(null)
-    previewBuildingRef.current = true
-    setPreviewBusy(true)
-    buildRoadmap()
-  }, [buildRoadmap])
 
   const archiveCurrent = useCallback(() => {
     const current = sessionRef.current
@@ -340,37 +363,7 @@ export default function App() {
         onLeftCollapsedChange={setLeftCollapsed}
         rightCollapsed={rightCollapsed}
         onRightCollapsedChange={setRightCollapsed}
-        topbar={
-          <NotebookTopbar
-            title={topTitle}
-            onTitleChange={handleTitleChange}
-            actions={[
-                          {
-                            id: 'path',
-                            label: session.exportState.busy ? '만드는 중' : 'PATH.md',
-                            onClick: handlePreviewOpen,
-                            disabled:
-                              session.phase !== 'ready' ||
-                              session.stages.filter((s) => s.status === 'done').length === 0 ||
-                              session.busy,
-                          },
-                          {
-                            id: 'library',
-                            label: '목록',
-                            onClick: () => {
-                              loadArchive()
-                              setDialogOpen(true)
-                            },
-                          },
-                          {
-                            id: 'new-roadmap',
-                            label: '새 패스',
-                            onClick: handleNewRoadmapAsk,
-                          },
-                        ]}
-            statusSlot={topStatusSlot}
-          />
-        }
+        topbar={topbar}
         footer={footerAlert}
       />
       <ArchiveDialog
@@ -696,10 +689,10 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
   const suggestions: string[] =
     isBlankInterview
       ? [
-          "퇴직하고 동네에서 원데이 목공 클래스를 열어 보고 싶어요",
-          "학교 동아리 회비를 자동으로 정산하는 도구가 필요해요",
-          "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
-          directInputLabel,
+        "퇴직하고 동네에서 원데이 목공 클래스를 열어 보고 싶어요",
+        "동네 카페 사장님이 단골을 기억하게 돕는 앱을 만들고 싶어요",
+        "읽은 논문을 주제별로 묶어 주는 개인용 서비스를 만들고 싶어요",
+        directInputLabel,
         ]
       : session.phase === "ready"
         ? lastMessage.suggestions == null
@@ -1026,7 +1019,7 @@ function RightPanel() {
     <div className="panel-right">
       <MindmapPanel
         layout="fan"
-        mapTitle={session.mapTitle ?? undefined}
+        mapTitle={session.mapTitle ?? session.bigPicture?.title}
         onMapTitleChange={(title) => patch({ mapTitle: title.trim().length > 0 ? title : null })}
         sourcesLabel=""
         onShowSources={undefined}
