@@ -371,6 +371,7 @@ export function useFlow() {
         // 응답 검사: 큰 그림과 단계 목록이 있어야 골격을 만든다
         if (res.bigPicture == null || !Array.isArray(res.bigPicture.stages) || res.bigPicture.stages.length === 0) {
           planningLock.current = false
+          retryingRef.current = false
           patch({
             planningAttempt: current.planningAttempt != null
               ? { ...current.planningAttempt, status: "failed" }
@@ -471,8 +472,6 @@ export function useFlow() {
         }).then(() => {
           // startResearch가 출발시킨 세대가 아니면 완료 단계를 건너뛰고 정리만 한다
           if (generationRef.current !== gen || sessionEpochRef.current !== epoch) {
-            planningLock.current = false
-            retryingRef.current = false
             return
           }
           const completed = sessionRef.current
@@ -492,13 +491,14 @@ export function useFlow() {
             selectedId: null,
           })
           planningLock.current = false
+          retryingRef.current = false
         })
       })
       .catch((err) => {
-        planningLock.current = false
-        retryingRef.current = false
         // pathfind 실패 → 승인 카드로 되돌림 (횟수는 되돌리지 않음)
         if (!isCurrentRequest(gen, epoch)) return
+        planningLock.current = false
+        retryingRef.current = false
         patch({
           planningAttempt: current.planningAttempt != null
             ? { ...current.planningAttempt, status: "failed" }
