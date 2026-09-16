@@ -2,6 +2,7 @@ import type { MindmapNode } from "../components/mindmap-spine-tree"
 import type { Verdict, StageRunStatus, Stage } from "./types"
 import { VERDICTS } from "./types"
 import type { Session, SourceDoc, StageSlot, Finding, Task, Todo, OutlineTopic } from "./types"
+import { buildPlanningDoc } from "./planningDoc"
 
 const CHANNEL_HOST: Record<string, string> = {
   stats: "kosis.kr",
@@ -368,7 +369,13 @@ export function sourceTree(session: Session): SourceDoc[] {
   if (!session.bigPicture) return []
 
   const stages = session.stages
-  return stages.map((slot) => buildStage(slot)) as SourceDoc[]
+  const stageDocs = stages.map((slot) => buildStage(slot)) as SourceDoc[]
+
+  const planningDoc = buildPlanningDoc(session.bigPicture)
+  if (planningDoc) {
+    return [planningDoc, ...stageDocs]
+  }
+  return stageDocs
 }
 
 function buildStage(slot: StageSlot): SourceDoc {
@@ -960,6 +967,87 @@ function extractFirstSentence(text: string): string | null {
   const line = text.split('\n')[0]
   if (line.trim().length > 0) return line.trim()
   return null
+}
+
+/** 본문에 자료 인용 마커([1] 형태)가 이미 붙어 있는지 본다. */
+function hasCitationMarkers(text: string): boolean {
+  return /\[\d+\]/.test(text)
+}
+
+/**
+ * 단계 표시 본문(판정 문장·이유 문단)에, findings에서 본문과 그대로 겹치는 자료 이름 앞에
+ * 1기반 순서 번호를 붙인다. 저장본·서버 응답은 바꾸지 않고 표시용 문자열만 수정한다.
+ * - 본문에 이미 인용 마커가 하나라도 있으면 건드리지 않는다.
+ * - 같은 이름이 findings에 두 번 이상 있으면 모호하므로 건너뛴다.
+ * - 이름 글자열이 단어 경계에 맞게 그대로 나오는 첫 자리에만 붙인다(부분 겹침은 건너뛴다).
+ */
+function attachFindingCitationsToBody(text: string, findings: readonly Finding[]): string {
+  if (!text || !findings || findings.length === 0) return text
+  if (hasCitationMarkers(text)) return text
+
+  const nameCounts: Record<string, number> = {}
+  for (const f of findings) {
+    if (!f.name) continue
+    nameCounts[f.name] = (nameCounts[f.name] ?? 0) + 1
+  }
+
+  const candidates: { name: string; idx: number }[] = []
+  for (let i = 0; i < findings.length; i++) {
+    const name = findings[i].name
+    if (!name) continue
+    if (nameCounts[name] === 1) {
+      candidates.push({ name, idx: i + 1 })
+    }
+  }
+  candidates.sort((a, b) => b.name.length - a.name.length)
+
+  let result = text
+  for (const { name, idx } of candidates) {
+    const pos = findLiteralPosition(result, name)
+    if (pos === -1) continue
+    result =
+      result.slice(0, pos + name.length) + ` [${idx}]` + result.slice(pos + name.length)
+  }
+  return result
+}
+
+/** 텍스트에서 이름이 단어 경계에 맞게 그대로 나오는 첫 위치를 찾는다. 없으면 -1. */
+function findLiteralPosition(text: string, name: string): number {
+  let pos = 0
+  while (true) {
+    const idx = text.indexOf(name, pos)
+    if (idx === -1) return -1
+    const before = idx > 0 ? text[idx - 1] : ''
+    const after = idx + name.length < text.length ? text[idx + name.length] : ''
+    if (!isWordChar(before) && !isWordChar(after)) return idx
+    pos = idx + 1
+  }
+}
+
+
+
+/** 텍스트에서 이름이 단어 경계에 맞게 그대로 나오는 첫 위치를 찾는다. 없으면 -1. */
+function isWordChar(c: string): boolean {
+  if (!c) return false
+  const code = c.charCodeAt(0)
+  return (
+    (code >= 0x1100 &&
+      (code <= 0x11ff ||
+        (code >= 0x2e80 && code <= 0xa4cf) ||
+        (code >= 0xac00 && code <= 0xd7af) ||
+        (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0x20000 && code <= 0x2fffd) ||
+        (code >= 0x30000 && code <= 0x3fffd) ||
+        code === 0x3001 ||
+        code === 0x3002 ||
+        code === 0x002e ||
+        code === 0x002c ||
+        code === 0x003a ||
+        code === 0x003b)) ||
+    (code >= 0x0030 && code <= 0x0039) ||
+    (code >= 0x0041 && code <= 0x005a) ||
+    (code >= 0x0061 && code <= 0x007a)
+  )
 }
 
 const CHANNEL_HUMAN: Record<string, string> = {
