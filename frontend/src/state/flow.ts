@@ -42,14 +42,21 @@ function questionMeta(turn: GrillTurn) {
 }
 
 export function useFlow() {
-  const { session, patch } = useSession()
+  const { session, patch, sessionEpoch } = useSession()
   const sessionRef = useRef(session)
+  const sessionEpochRef = useRef(sessionEpoch)
   sessionRef.current = session
+  sessionEpochRef.current = sessionEpoch
   const generationRef = useRef(0)
   const retryingRef = useRef(false)
 
+  function isCurrentRequest(gen: number, epoch: number): boolean {
+    return generationRef.current === gen && sessionEpochRef.current === epoch
+  }
+
   /** 상한이 1로 내려갈 때 한 번만 불린다. degraded를 남기고 강등 말풍선을 붙인다. */
   const onDegrade = useCallback((_newConcurrency: number) => {
+    if (!isCurrentRequest(generationRef.current, sessionEpochRef.current)) return
     patch({
       degraded: true,
       messages: [
@@ -66,8 +73,8 @@ export function useFlow() {
   }, [patch])
 
   /** 단계 1개 조사. 요약·슬롯을 갱신하고 결과 줄을 진행한다. */
-  async function runStage(index: number, summary: string, currentStage: Stage, gen: number): Promise<void> {
-    if (generationRef.current !== gen) return
+  async function runStage(index: number, summary: string, currentStage: Stage, gen: number, epoch: number): Promise<void> {
+    if (generationRef.current !== gen || sessionEpochRef.current !== epoch) return
     const latest = sessionRef.current
     const slot = latest.stages[index]
     if (slot == null) return
@@ -88,6 +95,7 @@ export function useFlow() {
         err instanceof Error
           ? err.message
           : '이 단계는 자료를 못 찾았습니다. 나머지는 계속합니다.'
+      if (!isCurrentRequest(gen, epoch)) return
       patch({
         stages: latest.stages.map((s, i) =>
           i === index ? { ...s, status: 'failed' as const, error: message } : s,
@@ -133,6 +141,7 @@ export function useFlow() {
     }
 
     // 6) 슬롯 상태 done, stage 교체
+    if (!isCurrentRequest(gen, epoch)) return
     const nextStages = latest.stages.map((s, i) =>
       i === index ? { ...s, status: 'done' as const, stage: merged } : s,
     )
@@ -141,6 +150,7 @@ export function useFlow() {
     // 7) 이 단계만 outline 불러서 채운다 (빈 배열이면 필드를 두지 않고, 실패해도 done 유지)
     outline({ stage: merged, summary })
       .then((res) => {
+        if (!isCurrentRequest(gen, epoch)) return
         if (res.topics.length > 0) {
           patch({
             stages: sessionRef.current.stages.map((s, i) =>
@@ -161,6 +171,7 @@ export function useFlow() {
       })
 
     // 8) 결과 줄 (kind progress) — 미리 깔아둔 stage-result-${index} 자리를 덮는다
+    if (!isCurrentRequest(gen, epoch)) return
     const citationTitles = findings.map((f) => (typeof f === 'object' && f != null ? (f as { name?: string }).name ?? '' : ''))
     const citationIds = findings.map((_f, i) => `stage-${currentStage.no}-finding-${i}`)
     const markerSuffix =
@@ -343,6 +354,7 @@ export function useFlow() {
     if (existingAttempt == null || !existingAttempt.approved || existingAttempt.summary !== current.summary) {
       consumeQuota()
     }
+    generationRef.current++
     patch({
       phase: "skeleton",
       pending: null,
@@ -357,6 +369,8 @@ export function useFlow() {
 
   const reviseSummary = useCallback(() => {
     const current = sessionRef.current
+    // 새 패스 및 보관본 전환에서도 이전 요청을 무효화한다
+    generationRef.current++
     patch({
       messages: [
         ...current.messages,
@@ -399,7 +413,8 @@ export function useFlow() {
     const idx = current.stages.indexOf(failedOrPending)
     if (idx < 0) return
     const gen = generationRef.current
-    runStage(idx, current.summary, failedOrPending.stage, gen)
+    const epoch = sessionEpochRef.current
+    runStage(idx, current.summary, failedOrPending.stage, gen, epoch)
   }, [patch])
 
   /** 완주 말풍선 텍스트. startResearch 완료 핸들러와 resumeResearch 완료 핸들러가 공유한다. */
@@ -415,6 +430,7 @@ export function useFlow() {
 
     // 캡처한 세대가 여전히 현재인지 확인. 새 요청이 시작돼 세대가 바뀌었으면 이 요청은 무효다.
     const gen = ++generationRef.current
+    const epoch = sessionEpochRef.current
     patch({
       messages: [
         ...current.messages,
@@ -442,7 +458,7 @@ export function useFlow() {
     pathfind({ summary: current.summary })
       .then((res) => {
         // 마지막 시작 세대가 아니면 이 응답을 처리하지 않는다
-        if (generationRef.current !== gen) return
+        if (!isCurrentRequest(gen, epoch)) return
         // 응답 검사: 큰 그림과 단계 목록이 있어야 골격을 만든다
         if (res.bigPicture == null || !Array.isArray(res.bigPicture.stages) || res.bigPicture.stages.length === 0) {
           patch({
@@ -539,11 +555,11 @@ export function useFlow() {
           items,
           concurrency: CONCURRENCY,
           worker: (item) =>
-            runStage(item.payload, current.summary, stages[item.payload].stage, gen),
+            runStage(item.payload, current.summary, stages[item.payload].stage, gen, epoch),
           onDegrade,
         }).then(() => {
           // startResearch가 출발시킨 세대가 아니면 완료 단계를 건너뛰고 정리만 한다
-          if (generationRef.current !== gen) {
+          if (generationRef.current !== gen || sessionEpochRef.current !== epoch) {
             retryingRef.current = false
             return
           }
@@ -568,6 +584,7 @@ export function useFlow() {
       .catch((err) => {
         retryingRef.current = false
         // pathfind 실패 → 승인 카드로 되돌림 (횟수는 되돌리지 않음)
+        if (!isCurrentRequest(gen, epoch)) return
         patch({
           planningAttempt: current.planningAttempt != null
             ? { ...current.planningAttempt, status: "failed" }
@@ -586,6 +603,7 @@ export function useFlow() {
   const resumeResearch = useCallback(() => {
     const current = sessionRef.current
     const gen = generationRef.current
+    const epoch = sessionEpochRef.current
 
     // busy이거나 phase가 researching이 아니면 아무것도 하지 않는다
     if (current.busy || current.phase !== 'researching') return
@@ -625,11 +643,11 @@ export function useFlow() {
       items,
       concurrency: CONCURRENCY,
       worker: (item) =>
-        runStage(item.payload, current.summary, current.stages[item.payload].stage, gen),
+        runStage(item.payload, current.summary, current.stages[item.payload].stage, gen, epoch),
       onDegrade,
     }).then(() => {
       // resumeResearch가 불을 붙인 세대가 아니면 완료 핸들러를 건너뛴다
-      if (generationRef.current !== gen) return
+      if (generationRef.current !== gen || sessionEpochRef.current !== epoch) return
       const completed = sessionRef.current
       patch({
         messages: [
@@ -675,8 +693,11 @@ export function useFlow() {
 
     // 한 번에 하나씩만 채운다
     const item = pending[0]
+    const gen = generationRef.current
+    const epoch = sessionEpochRef.current
     outline({ stage: item.slot.stage, summary: current.summary })
       .then((res) => {
+        if (!isCurrentRequest(gen, epoch)) return
         if (res.topics.length > 0) {
           patch({
             stages: sessionRef.current.stages.map((s, i) =>
@@ -697,7 +718,7 @@ export function useFlow() {
       })
       .finally(() => {
         // 하나를 처리했으니 나머지도 채운다
-        fillMissingOutlines()
+        if (isCurrentRequest(gen, epoch)) fillMissingOutlines()
       })
   }
 
