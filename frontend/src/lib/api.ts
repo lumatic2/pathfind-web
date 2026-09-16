@@ -132,7 +132,7 @@ export type ChannelPlanItem = { channel: string; tool: string; why: string; quer
 export async function channelPlan(
   input: { stage: Stage },
 ): Promise<{ planned: ChannelPlanItem[] }> {
-  return post<{ planned: ChannelPlanItem[] }>('/api/channel-plan', input, 15000);
+  return post<{ planned: ChannelPlanItem[] }>('/api/stage', { ...input, planOnly: true }, 15000);
 }
 
 // 2. pathfind
