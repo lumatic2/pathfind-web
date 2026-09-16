@@ -5,5 +5,8 @@
     "api/*.js": {
       "maxDuration": 90
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/hermes/:route+", "destination": "/api/hermes?route=:route+" }
+  ]
 }
