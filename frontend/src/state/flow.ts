@@ -494,8 +494,9 @@ export function useFlow() {
           return `- ${i + 1}. ${s.stage.title}${desc ? ` · ${desc}` : ''}`
         }).join('\n')
         const planning = res.bigPicture.planning
-        const hasMaterials = planning != null &&
-          (planning.sources.length > 0 || planning.researchNotes.length > 0)
+        const hasDirectRefs = planning != null &&
+          planning.sources.length > 0 &&
+          planning.researchNotes.length > 0
         const msgParts: string[] = [
           res.bigPicture.intro,
           '',
@@ -504,7 +505,7 @@ export function useFlow() {
         if (planning?.basisSummary?.trim()) {
           msgParts.push(planning.basisSummary.trim().slice(0, 400))
         }
-        if (hasMaterials) {
+        if (hasDirectRefs) {
           if (planning?.warnings?.length) {
             msgParts.push(planning.warnings[0].trim().slice(0, 180))
           }

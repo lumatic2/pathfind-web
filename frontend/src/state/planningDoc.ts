@@ -19,8 +19,8 @@ export function buildPlanningDoc(bigPicture: BigPicture | null): SourceDoc | nul
     lines.push("")
   }
 
-  // 실제 자료
-  lines.push("## 실제 자료")
+  // 검색 결과 (직접 참고한 자료와 구분)
+  lines.push("## 검색 결과")
   lines.push("")
   if (p.sources.length > 0) {
     for (const s of p.sources) {
@@ -31,8 +31,11 @@ export function buildPlanningDoc(bigPicture: BigPicture | null): SourceDoc | nul
       }
       lines.push("")
     }
-  } else {
-    lines.push("자료가 없습니다. 인터뷰 기반 초안입니다.")
+  }
+
+  // 초안 표시: 직접 참고한 자료가 없을 때
+  if (p.sources.length === 0 || p.researchNotes.length === 0) {
+    lines.push("직접 참고한 자료가 없습니다. 인터뷰 기반 초안입니다.")
     lines.push("")
   }
 
