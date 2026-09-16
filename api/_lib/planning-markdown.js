@@ -22,7 +22,6 @@ export function buildPlanningMarkdown(bigPicture) {
   const warnings = planning.warnings || [];
   const basisSummary = planning.basisSummary || '';
   const stages = (bigPicture && bigPicture.stages) || [];
-  const hasMaterial = sources.length > 0 || researchNotes.length > 0;
   const requiresDraft = sources.length === 0 || researchNotes.length === 0;
 
   const stageMap = new Map();
@@ -35,10 +34,6 @@ export function buildPlanningMarkdown(bigPicture) {
   }
 
   const lines = [];
-  if (planning.researchedAt) {
-    lines.push(`**조사 일시:** ${planning.researchedAt}`);
-    lines.push('');
-  }
 
   // 단계를 정한 이유와 자료 — 2수준 제목 하나로
   lines.push('## 단계를 정한 이유와 자료');
@@ -71,23 +66,24 @@ export function buildPlanningMarkdown(bigPicture) {
       const support = sb.support || [];
       const sourceIds = sb.sourceIds || [];
       const strIds = sourceIds.filter(id => typeof id === 'string');
+      const strSuppIds = support.filter(s => typeof s === 'string');
       const objSupps = support.filter(s => s && typeof s === 'object' && s.sourceId && typeof s.excerpt === 'string');
-      const allIds = [...strIds, ...objSupps.map(s => s.sourceId)];
-      if (allIds.length > 0 || objSupps.length > 0) {
+      const shownIds = new Set();
+      for (const id of strIds) shownIds.add(id);
+      for (const id of strSuppIds) shownIds.add(id);
+      if (shownIds.size > 0 || objSupps.length > 0) {
         lines.push('- 이 단계가 참고한 자료:');
-        for (const id of strIds) {
+        for (const id of shownIds) {
           const src = sourceById.get(id);
-          if (src) {
-            const t = src.title || '자료';
-            const u = src.url && src.url.trim() ? src.url.trim() : null;
-            const tEsc = escapeMd(t);
-            if (u) lines.push(`  - [${tEsc}](${u})`);
-            else lines.push(`  - ${tEsc}`);
-          } else {
-            lines.push(`  - (자료 ${id})`);
-          }
+          if (!src) continue;
+          const t = src.title || '자료';
+          const u = src.url && src.url.trim() ? src.url.trim() : null;
+          const tEsc = escapeMd(t);
+          if (u) lines.push(`  - [${tEsc}](${u})`);
+          else lines.push(`  - ${tEsc}`);
         }
         for (const obj of objSupps) {
+          if (shownIds.has(obj.sourceId)) continue;
           const src = sourceById.get(obj.sourceId);
           if (!src) continue;
           const excEsc = escapeMd(obj.excerpt);
@@ -103,9 +99,9 @@ export function buildPlanningMarkdown(bigPicture) {
     }
   }
 
-  // 참고한 조사 내용 — research-informed일 때만 3수준 제목으로
-  if (hasMaterial) {
-    lines.push('### 참고한 조사 내용');
+  // 선행 조사 출처 — sources 목록을 단계별 제안 뒤에 보여 줌
+  if (sources.length > 0) {
+    lines.push('### 선행 조사 출처');
     lines.push('');
     for (const src of sources) {
       if (!src || !src.id) continue;
@@ -125,6 +121,12 @@ export function buildPlanningMarkdown(bigPicture) {
       if (src.channel) lines.push(`  채널: ${src.channel}`);
       lines.push('');
     }
+  }
+
+  // 참고한 조사 내용 — research-informed일 때만 3수준 제목으로
+  if (planning.mode === 'research-informed' && researchNotes.length > 0) {
+    lines.push('### 참고한 조사 내용');
+    lines.push('');
     for (const note of researchNotes) {
       if (!note || !note.sourceId || !note.excerpt) continue;
       const src = sourceById.get(note.sourceId);
