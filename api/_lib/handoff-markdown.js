@@ -210,9 +210,7 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
   } else if (loop && typeof loop === 'object') {
     lines.push('## 다음 회차');
     lines.push('');
-    if (typeof loop === 'string' && loop.trim()) {
-      lines.push(loop.trim());
-    } else if (loop.message && typeof loop.message === 'string') {
+    if (loop.message && typeof loop.message === 'string') {
       lines.push(loop.message.trim());
       if (loop.items && Array.isArray(loop.items)) {
         lines.push('');
