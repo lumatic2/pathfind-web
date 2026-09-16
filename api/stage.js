@@ -285,46 +285,26 @@ function kindForWebByHost(host) {
 
 // ---------- verdict 정규화 (코드) ----------
 
-const VERDICT_CAN = '가져다 써도 됨';
-const VERDICT_MUST = '직접 해야 함';
-const VERDICT_MIX = '섞어야 함';
-const VERDICT_NONE = '선례를 못 찾음';
+/** 모델이 고르는 이름 → 계약 값 (6차 · 「선례」 낱말 제거).
+ *
+ * 모델에게는 「선례」라는 낱말을 한 번도 보여 주지 않는다. 5차·6차 실측에서 모델이
+ * verdictLine 산문에 그 낱말을 그대로 옮겨 적었다 — 프롬프트가 「종류 이름으로 적어라」고
+ * 지시해도 못 이겼다. 계약 값 이름이 세 군데에서 그 낱말을 가르치고 있었기 때문이다.
+ *
+ * 그래서 모델이 고르는 이름만 바꾸고 저장되는 계약 값은 그대로 둔다.
+ */
+const VERDICTS = ['가져다 써도 됨', '직접 해야 함', '섞어야 함', '선례를 못 찾음'];
+const VERDICT_ALIAS = { '쓸 만한 자료 없음': '선례를 못 찾음' };
 
-// 모델이 프롬프트에서 보는 이름(쓸 만한 자료 없음)을 저장·응답 값(선례를 못 찾음)으로 되돌린다.
-// 옛 이름(선례를 못 찾음)이 그대로 와도 아래 표가 그대로 통과시킨다.
-const VERDICT_MODEL_TO_STORED = {
-  '쓸 만한 자료 없음': VERDICT_NONE,
-  '선례를 못 찾음': VERDICT_NONE,
-};
-
-const VERDICT_PREFIX = {
-  [VERDICT_CAN]: VERDICT_CAN,
-  [VERDICT_MUST]: VERDICT_MUST,
-  [VERDICT_MIX]: VERDICT_MIX,
-  [VERDICT_NONE]: VERDICT_NONE,
-};
-
-function mapModelVerdict(raw) {
-  if (!raw) return raw;
-  return VERDICT_MODEL_TO_STORED[raw] ?? raw;
-}
-
-function normalizeVerdict(raw, findingsCount) {
-  raw = mapModelVerdict(raw);
-  if (!raw) {
-    if (findingsCount === 0) return VERDICT_MUST;
-    return VERDICT_NONE;
-  }
-  const trimmed = (raw || '').trim();
-  // 앞부분 일치로 폴드
-  for (const [key, val] of Object.entries(VERDICT_PREFIX)) {
-    if (trimmed.startsWith(val)) return val;
-  }
-  // 자료가 있는데 선례를 못 찾음 → 직접 해야 함
-  if (findingsCount > 0 && trimmed.includes('선례')) return VERDICT_MUST;
-  // 자료가 있는데 판결 이상 → 가져다 써도 됨
-  if (findingsCount > 0) return VERDICT_CAN;
-  return VERDICT_NONE;
+/** 판정은 자료가 뒷받침해야 한다 — 자료 0건이면 「가져다 써도 됨」·「섞어야 함」이 성립하지 않는다. */
+function normalizeVerdict(v, findingsCount) {
+  const t = String(v ?? '').trim();
+  const aliased = Object.keys(VERDICT_ALIAS).find((k) => t.startsWith(k));
+  const hit = aliased ? VERDICT_ALIAS[aliased] : VERDICTS.find((k) => t.startsWith(k));
+  if (!findingsCount) return hit === '직접 해야 함' ? hit : '선례를 못 찾음';
+  // 자료가 있는데 「못 찾음」은 모순 — 「참고는 되지만 직접 만든다」가 계약 값으로는 「직접 해야 함」이다
+  if (!hit || hit === '선례를 못 찾음') return hit ? '직접 해야 함' : '가져다 써도 됨';
+  return hit;
 }
 
 // ---------- 시스템 프롬프트 ----------
@@ -1266,41 +1246,119 @@ export async function POST(request) {
     };
 
     const verdict = normalizeVerdict(parsed?.verdict, findingsAfterReview.length);
-    const verdictLine = parsed?.verdictLine || '';
-    const rawVerdictReason = composeReason(
-      parsed?.verdictReason,
-      parsed?.reasonPoints,
-    ) || (findingsAfterReview.length ? '자료를 확인했습니다.' : '조사 상한 안에서는 쓸 만한 자료를 찾지 못했습니다.');
 
-    // 최종 선정 자료로 본문 인용 번호를 다시 매긴다 (버린 자료 마크는 제거, 남은 자료는 최종 순서로).
-    const fieldsByMark = (parsed?.findings || []).reduce((acc, f, idx) => {
-      const mark = `[${idx + 1}]`;
-      acc[mark] = { id: f.id };
-      return acc;
-    }, {});
-    const verdictReason = renumberBody(rawVerdictReason, findingsAfterReview, fieldsByMark);
+    /** 모델 산출 → 화면에 설 문자열 둘. 재요청 뒤 같은 조립을 다시 태우려고 함수로 묶었다.
+     *  `srcToFinal` 은 재요청은 내용을 그대로 두고 근거만 달아 달라는 요청이라 자료 목록이 안 바뀐다. */
+    const assembleText = (p) => {
+      // verdictLine 도 최종 자료 순번으로 다시 매긴다 — 현재는 verdictLine을 안건드렸으나 목표화면은 여기도 renumberMarks를 태운다.
+      const verImporterNumberMarks = (text) => {
+        const finalIds = new Set(findingsAfterReview.map((f) => f.id));
+        const idToNewNum = new Map();
+        findingsAfterReview.forEach((f, idx) => {
+          if (f.id) idToNewNum.set(f.id, idx + 1);
+        });
+        return String(text ?? '').replace(/(\s*)\[(\d{1,2})\]/g, (_whole, space, raw) => {
+          const src = (parsed?.findings || []).find((f, i) => i + 1 === Number(raw));
+          const id = src?.id;
+          if (!id || !finalIds.has(id)) return '';
+          const to = idToNewNum.get(id);
+          return to ? `${space}[${to}]` : '';
+        });
+      };
 
-    // ----- 자료가 있는데 살아 있는 인용 번호가 0개면 한 번만 다시 묻는다 -----
-    const markCount = countCitationMarks(verdictReason);
-    const afterRetry = (markCount === 0 && findingsAfterReview.length > 0)
-      ? await retryMissingCitationNumbers(rawVerdictReason, verdictReason, findingsAfterReview)
-      : verdictReason;
-    const finalVerdictReason = attachNumbersByMaterialName(
-      afterRetry,
-      findingsAfterReview,
-    );
+      const verdictLine = verImporterNumberMarks(parsed?.verdictLine).trim();
+      /** 이유 문단의 층위는 스키마가 담당한다 — 산문 대신 배열로 받고 글머리표 조립은 코드가 한다. */
+      const reasonPoints = (Array.isArray(parsed?.reasonPoints) ? parsed.reasonPoints : [])
+        .map((x) => ({ label: String(x?.label ?? '').trim(), text: String(x?.text ?? '').trim() }))
+        .filter((x) => x.text)
+        .slice(0, 5);
+      const leadRaw = String(parsed?.verdictReason ?? '').trim();
+      const leadLines = leadRaw.split(/\r?\n/);
+      const lead = (reasonPoints.length ? leadLines.filter((l) => !/^\s*[-*•]\s+/.test(l)) : leadLines).join('\n').replace(/\n\s*\n+/g, '\n\n').trim();
+      const reasonBody = [lead, ...(reasonPoints.length ? [reasonPoints.map((x) => (x.label ? `- **${x.label}**: ${x.text}` : `- ${x.text}`)).join('\n')] : [])]
+        .filter(Boolean)
+        .join('\n\n');
+      /** 모델이 이유 문장들을 통째로 비우면 — 찾은 자료 note 를 글머리표로 옮긴다(지어내는 게 아니라 자리 이동). */
+      const fromNotes = findingsAfterReview
+        .map((f, i) => ({ name: String(f.name ?? '').trim(), note: String(f.note ?? '').trim(), n: i + 1 }))
+        .filter((x) => x.name && x.note)
+        .slice(0, 4)
+        .map((x) => `- **${x.name}**: ${x.note} [${x.n}]`)
+        .join('\n');
+      const verdictReason = verImporterNumberMarks(reasonBody).trim() || (fromNotes ? '찾은 자료를 이렇게 쓸 수 있습니다.\n\n' + fromNotes : '');
+      return { verdictLine, verdictReason };
+    };
+    let { verdictLine, verdictReason } = assembleText(parsed);
 
-    let options = parsed?.options || stage.choices || [];
-    let todos = (parsed?.todos || []).map((t) => ({
-      task: t.task,
-      owner: t.owner === '직접 함' ? '직접 함' : '가져다 씀',
-      note: t.note || '',
-    }));
-
-    if (todos.length === 0 && findingsAfterReview.length === 0) {
-      for (const t of stage.tasks || []) {
-        todos.push({ task: t.task, owner: '직접 함', note: t.why || '' });
+    /** 본문 마커가 0인 단계만 한 번 더 묻는다(재요청은 도구를 안 부르고 이미 쓴 말에 근거만 달아 달라고 한다). */
+    const countMarks = (parsed) => {
+      const texts = [
+        String(parsed?.verdictLine ?? ''),
+        String(parsed?.verdictReason ?? ''),
+        ...(Array.isArray(parsed?.reasonPoints) ? parsed.reasonPoints.map((x) => String(x?.text ?? '')) : []),
+      ];
+      return (texts.join('\n').match(/\[\d{1,2}\]/g) ?? []).length;
+    };
+    if (!countMarks({ verdictLine, verdictReason }) && findingsAfterReview.length) {
+      try {
+        const lastContent = parsed ? String(parsed?.content || '') : '';
+        const messagesForRetry = [
+          { role: 'assistant', content: lastContent || null },
+          { role: 'user', content: `같은 내용을 그대로 두고, 근거가 된 자료를 그 문장 끝에 [n] 으로 달아 최종 JSON 만 다시 출력합니다. n 은 findings 의 순서(첫 항목이 1)이고 1~${findingsAfterReview.length} 만 씁니다. 근거로 댈 자료가 없는 문장에는 달지 않습니다.` },
+        ];
+        const again = await callSolar(messagesForRetry, { tools: false, maxTokens: 3000, timeoutMs: 90000 });
+        const reparsed = parseSolarJson(again.content || '');
+        const redone = reparsed ? assembleText(reparsed) : null;
+        if (redone && countMarks(redone) > 0) {
+          verdictLine = redone.verdictLine;
+          verdictReason = redone.verdictReason;
+          parsed = reparsed;
+        }
+      } catch (e) {
+        // 재요청 실패 — 원래 결과를 그대로 쓴다(폴백은 아래 이름 대조).
       }
+    }
+
+    /** 재요청도 실패했으면 꼬리 배지로 내려가기 전에 이름 대조로 한 번 더 붙잡는다. */
+    if (!countMarks({ verdictLine, verdictReason }) && findingsAfterReview.length) {
+      const names = findingsAfterReview.map((f, i) => ({ n: i + 1, name: String(f.name ?? '') }));
+      const attachMarksByName = (text, cites) => {
+        const src = String(text ?? '');
+        const list = (cites ?? [])
+          .map((c) => ({ n: Number(c?.n), name: String(c?.name ?? '').trim() }))
+          .filter((c) => Number.isInteger(c.n) && c.n > 0 && c.name.length >= 2);
+        if (!src.trim() || !list.length) return src;
+        const parts = src.split(/(?<=[.!?])(?=\s)|(?=\n)/);
+        const used = new Set();
+        return parts
+          .map((part) => {
+            if (/\[\d{1,2}\]/.test(part)) return part;
+            const hit = list.find((c) => !used.has(c.n) && part.includes(c.name));
+            if (!hit) return part;
+            used.add(hit.n);
+            const m = /^([\s\S]*?)([.!?]\s*)$/.exec(part);
+            return m ? `${m[1]} [${hit.n}]${m[2]}` : `${part} [${hit.n}]`;
+          })
+          .join('');
+      };
+      const lined = {
+        verdictLine: attachMarksByName(verdictLine, names),
+        verdictReason: attachMarksByName(verdictReason, names),
+      };
+      const got = countMarks(lined);
+      if (got > 0) {
+        verdictLine = lined.verdictLine;
+        verdictReason = lined.verdictReason;
+      }
+    }
+
+    let options = (Array.isArray(parsed?.options) ? parsed.options : stage.choices ?? []).map(String).slice(0, 5);
+    let todos = (Array.isArray(parsed?.todos) ? parsed.todos : [])
+      .filter((t) => t && typeof t.task === 'string' && t.task.trim())
+      .map((t) => ({ task: t.task.trim(), owner: t.owner === '직접 함' ? '직접 함' : '가져다 씀', note: String(t.note ?? '') }))
+      .slice(0, 5);
+    if (!todos.length && !findingsAfterReview.length) {
+      for (const t of stage.tasks ?? []) todos.push({ task: t.task, owner: '직접 함', note: t.why || '' });
     }
 
     options = options.slice(0, 5);
@@ -1325,7 +1383,7 @@ export async function POST(request) {
       tasks: stage.tasks,
       verdict,
       verdictLine,
-      verdictReason: finalVerdictReason,
+      verdictReason,
       findings: frontendFindings,
       choices: stage.choices || [],
       options,
