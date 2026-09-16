@@ -228,11 +228,10 @@ export function Compare() {
             <div className="band__col">
               <p className="band__col-title"><span className="band__mood -high" aria-hidden="true" />{C.right.heading}</p>
               <div className="band__wheel">
-                <div className="band__wheel-square">
+                <div className="band__orbit">
                   <svg className="band__threads" viewBox="0 0 400 400" aria-hidden="true" focusable="false">
-                    <circle cx="200" cy="200" r="118" />
+                    <circle cx="200" cy="200" r="160" />
                   </svg>
-                  <span className="band__hub">{C.right.hub}</span>
                   {/* 회전은 스포크를 담은 로터에 걸고, 스포크는 역회전한다 — 원본 `-v2` 와 같은 2단 구조 */}
                   <div className="band__wheel-rotor">
                     {C.right.spokes.map((t) => (
@@ -242,6 +241,7 @@ export function Compare() {
                     ))}
                   </div>
                 </div>
+                <span className="band__hub">{C.right.hub}</span>
               </div>
             </div>
           </div>

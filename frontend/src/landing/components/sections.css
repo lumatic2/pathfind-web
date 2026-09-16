@@ -197,7 +197,7 @@
   flex: 0 0 100%;
   position: relative;
   margin: 0;
-  padding: calc(var(--avatar) / 2 + var(--space-10)) var(--space-12) var(--space-8);
+  padding: calc(var(--avatar) / 2 + var(--space-10)) var(--space-12) var(--space-14);
   background: var(--quote-surface);
   border-radius: var(--r-card);
   text-align: center;
@@ -381,16 +381,24 @@
 }
 
 /* 판정 도식 원은 정사각 상자 안에서만 그린다 — 판이 세로로 길면 원이 타원으로 찌그러진다 */
-.band__wheel-square {
-  position: relative;
+/* 밴드 안 원판 — 정사각 기준에서 orbit 으로 바꿈 */
+.band__orbit {
+  position: absolute;
+  inset: 0;
+  left: 50%;
+  translate: -50% 0;
   aspect-ratio: 1;
   width: 100%;
-  max-width: min(var(--wheel-w), 320px);
-  margin-inline: auto;
 }
-
-/* 스포크 자리는 정사각 기준이라 값 그대로 둔다 */
-.band__wheel-rotor { position: absolute; inset: 0; transform-origin: center; }
+@media (max-width: 640px) {
+  .band__orbit {
+    top: 50%;
+    bottom: auto;
+    width: 100%;
+    height: auto;
+    translate: -50% -50%;
+  }
+}
 /* 한 열로 접히면 패널이 좁아져 라벨끼리 겹친다 — 가로로 못 벌리면 세로로 벌린다 */
 @media (max-width: 640px) {
   .band__scatter,
