@@ -291,6 +291,7 @@ export function useFlow() {
               history: [...latest.history, completed],
               pending: res,
               turnCount: res.turnCount,
+              busy: false,
             })
           } else {
             const remaining = readQuota().remaining
