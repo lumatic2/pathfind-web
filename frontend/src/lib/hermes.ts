@@ -208,3 +208,156 @@ export function streamEvents(
   void pump()
   return handle
 }
+
+export type PollEventsOptions = {
+  cursor?: number
+  onEvent: (event: HermesEvent, index: number) => void
+  onClose?: (reason: "done" | "aborted" | "error") => void
+}
+
+export function pollEvents(
+  runId: string,
+  { cursor: start, onEvent, onClose }: PollEventsOptions,
+): StreamHandle {
+  let cursor = start ?? 0
+  let closed = false
+  let onCloseCalled = false
+  let retries = 0
+  let currentController: AbortController | null = null
+  let fetchTimeout: ReturnType<typeof setTimeout> | null = null
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  const cancelTimers = () => {
+    if (fetchTimeout) clearTimeout(fetchTimeout)
+    if (timer) clearTimeout(timer)
+    fetchTimeout = null
+    timer = null
+  }
+
+  const wait = (ms: number) =>
+    new Promise<void>((r) => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { timer = null; r() }, ms)
+    })
+
+  const handle: StreamHandle = {
+    get cursor() {
+      return cursor
+    },
+    close: () => {
+      if (closed) return
+      closed = true
+      currentController?.abort()
+      cancelTimers()
+      if (!onCloseCalled) {
+        onCloseCalled = true
+        onClose?.("aborted")
+      }
+    },
+  }
+
+  const closeWith = (reason: "done" | "error") => {
+    if (closed) return
+    closed = true
+    currentController?.abort()
+    cancelTimers()
+    if (!onCloseCalled) {
+      onCloseCalled = true
+      onClose?.(reason)
+    }
+  }
+
+  const pump = async () => {
+    while (!closed) {
+      let res: Response
+      try {
+        const controller = new AbortController()
+        currentController = controller
+        fetchTimeout = setTimeout(
+          () => controller.abort(),
+          10_000,
+        )
+        res = await fetch(
+          `/api/hermes/runs/${encodeURIComponent(runId)}/events.json?cursor=${cursor}`,
+          { signal: controller.signal },
+        )
+        clearTimeout(fetchTimeout)
+        fetchTimeout = null
+        currentController = null
+      } catch (err) {
+        if (fetchTimeout) {
+          clearTimeout(fetchTimeout)
+          fetchTimeout = null
+        }
+        currentController = null
+        if (closed) return
+        if (err instanceof GatewayBusy) return void closeWith("error")
+        if (++retries > 3) return void closeWith("error")
+        await wait(1000 * retries)
+        continue
+      }
+
+      if (!res.ok) {
+        if (res.status === 429) return void closeWith("error")
+        if (++retries > 3) return void closeWith("error")
+        await wait(1000 * retries)
+        continue
+      }
+
+      retries = 0
+      let body:
+        | {
+            runId?: string
+            status?: string
+            done?: boolean
+            cursor?: number
+            events?: unknown[]
+          }
+        | null = null
+      try {
+        body = JSON.parse(await res.text())
+      } catch {
+        if (closed) return
+        if (++retries > 3) return void closeWith("error")
+        await wait(1000 * retries)
+        continue
+      }
+
+      if (!body || typeof body !== "object") {
+        if (++retries > 3) return void closeWith("error")
+        await wait(1000 * retries)
+        continue
+      }
+
+      const events = Array.isArray(body.events) ? body.events : []
+      const nextCursor =
+        typeof body.cursor === "number" ? body.cursor : cursor
+      const done = Boolean(body.done)
+
+      if (nextCursor < cursor) return void closeWith("error")
+      if (nextCursor - cursor !== events.length)
+        return void closeWith("error")
+
+      for (let i = 0; i < events.length; i += 1) {
+        if (closed) break
+        try {
+          const event = events[i] as HermesEvent
+          cursor += 1
+          onEvent(event, cursor)
+        } catch {
+          // 깨진 프레임 하나는 건너뛴다
+        }
+      }
+
+      if (done) {
+        return void closeWith("done")
+      }
+
+      cursor = nextCursor
+      await wait(2000)
+    }
+  }
+
+  void pump()
+  return handle
+}
