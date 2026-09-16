@@ -116,7 +116,7 @@ function parseJsonContent(content) {
  * @param {string} approvalSummary - grill summary 또는 초기 아이디어 문단
  * @param {object} clock           - { now(): number }
  * @param {function} modelFn       - (messages, timeoutMs, signal) => Promise<string>
- * @param {function} searchFn      - (query1, query2, signal, timeoutMs) => Promise<{sources, trace}>
+ * @param {function} searchFn      - (query1, query2, signal, timeoutMs) => Promise<{sources, trace, offTopic}>
  * @param {function} normalizeFn   - (modelDesign, sources) => {ok, status, error?, data?}
  * @param {AbortSignal} [outerSignal]
  * @returns {Promise<{bigPicture, planning, handoffMarkdown:string}>}
@@ -158,14 +158,17 @@ export async function planFromResearch(
   }
   let sources = [];
   let trace = null;
+  let offTopic = null;
   try {
     const result = await searchFn(queries.activity, queries.readiness, overall.signal, searchTimeout);
     sources = result.sources || [];
     trace = result.trace;
+    offTopic = result.offTopic ?? null;
   } catch (err) {
     // 전량 실패해도 빈 자료로 설계 호출까지 진행한다.
     sources = [];
     trace = err.trace ?? { calls: [], totalCalls: 0, succeededCalls: 0, failedCalls: 0, totalElapsedMs: 0 };
+    offTopic = null;
   }
 
   // 3) 단계 설계 (40초 상한)
@@ -229,8 +232,10 @@ export async function planFromResearch(
   const warnings = [
     ...(check.data.planning.warnings?.filter(Boolean) ?? []),
   ];
-  if (sources.length === 0) {
+  if (offTopic == null && sources.length === 0) {
     warnings.push('모든 검색이 연결 실패하여 인터뷰 기반 초안입니다.');
+  } else if (offTopic?.allExcluded && sources.length === 0) {
+    warnings.push('선행 조사에서 주제와 맞는 자료를 모두 걸러 인터뷰 기반 초안입니다.');
   } else if (!check.data.planning.researchNotes?.length) {
     warnings.push('직접 참고한 자료가 없어 인터뷰 기반 초안입니다.');
   }
@@ -247,7 +252,17 @@ export async function planFromResearch(
       { name: 'response_ready', elapsedMs: Math.max(0, responseReadyAt - startedAt) },
     ],
     warnings,
+    offTopic,
   };
+
+  if (offTopic?.allExcluded && sources.length === 0) {
+    const limit = Array.isArray(planning.limitations)
+      ? [...planning.limitations, '선행 조사에서 주제와 맞는 자료를 찾지 못해 인터뷰 기반 초안입니다.']
+      : planning.limitations
+        ? [planning.limitations, '선행 조사에서 주제와 맞는 자료를 찾지 못해 인터뷰 기반 초안입니다.']
+        : ['선행 조사에서 주제와 맞는 자료를 찾지 못해 인터뷰 기반 초안입니다.'];
+    planning.limitations = limit.length === 1 ? limit[0] : limit;
+  }
 
   // handoffMarkdown은 이 연결 단계에서 채우지 않는다(다른 단계 관할).
   return {
