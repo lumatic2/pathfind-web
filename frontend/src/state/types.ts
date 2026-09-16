@@ -42,7 +42,7 @@ export type Planning = {
   basisSummary: string
   sources: PlanningSource[]
   researchNotes: { sourceId: string; excerpt: string }[]
-  stageBasis: Record<number, { basis: string; reason: string; sourceIds: string[]; support: string[] }>
+  stageBasis: Record<number, { basis: string; reason: string; sourceIds: string[]; support: (string | { sourceId: string; excerpt: string; supports: string })[] }>
   trace: { query: string; channel: string; status: string; count: number; elapsedMs: number }[]
   warnings: string[]
   events: { name: string; elapsedMs: number }[]
@@ -105,7 +105,7 @@ export type GrillTurn = {
   questionTitle: string
   questionBody: string
   suggestion: string
-  exampleButtons: string[] | GrillChoice[]
+  exampleButtons: Array<string | GrillChoice>
   answer: string
 }
 
@@ -114,7 +114,7 @@ export type GrillResponse = {
   questionTitle: string
   questionBody: string
   suggestion: string
-  exampleButtons: string[] | GrillChoice[]
+  exampleButtons: Array<string | GrillChoice>
   done: boolean
   summary?: string
   opening?: string
@@ -151,7 +151,7 @@ export type ChatEntry = {
   role: ChatRole
   text: string
   kind?: "question" | "summary-approval" | "progress" | "node-explain" | "chat"
-  suggestions?: string[] | GrillChoice[]
+  suggestions?: Array<string | GrillChoice>
   citationTitles?: string[]
   citationIds?: string[]
 }

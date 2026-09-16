@@ -111,7 +111,7 @@ export async function grill(
   body: {
     question?: string;
     answer?: string;
-    history?: { questionTitle: string; questionBody: string; suggestion: string; exampleButtons: string[] | GrillChoice[]; answer?: string }[];
+    history?: { questionTitle: string; questionBody: string; suggestion: string; exampleButtons: Array<string | GrillChoice>; answer?: string }[];
     turnCount?: number;
   },
 ): Promise<GrillResponse> {
@@ -255,7 +255,8 @@ export interface ExplainRequest {
 export interface ExplainResponse {
   explanation: string;
   citationTitles: string[];
-  followups: string[];
+  citationIds?: string[];
+  followups?: string[];
   degraded: boolean;
 }
 
@@ -264,8 +265,6 @@ export async function explain(
 ): Promise<ExplainResponse> {
   return post<ExplainResponse>('/api/explain', body);
 }
-
-// 6. chat
 export interface ChatRequest {
   summary: string;
   bigPicture?: BigPicture;
@@ -273,6 +272,7 @@ export interface ChatRequest {
   history: { role: 'user' | 'assistant'; text: string; kind?: string }[];
 }
 
+// 6. chat
 export interface ChatResponse {
   answer: string;
   basis: string;
