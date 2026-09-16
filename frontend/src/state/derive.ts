@@ -106,6 +106,12 @@ const TITLE_DIRECT = "직접 만들 것, 참고할 자료가 없어 직접 만�
 const TITLE_BUSY = "아직 조사하고 있습니다"
 const TITLE_FAILED = "이 단계는 자료를 못 찾았습니다"
 
+const BRING_OWNER = "가져다 씀"
+const ITEM_DOT: Record<"existing" | "need", NonNullable<MindmapNode["dot"]>> = {
+  existing: { verdict: "existing", color: "var(--verdict-existing)", title: "이미 있는 것 — 가져다 쓰거나 손봐서 씁니다." },
+  need: { verdict: "need", color: "var(--verdict-need)", title: "직접 만들 것 — 가져다 쓸 자료가 없어 직접 만듭니다." },
+}
+
 export const channelShort: Record<string, string> = {
   web: "웹",
   oss: "GitHub",
@@ -611,41 +617,11 @@ function stageNode(session: Session, slot: StageSlot): MindmapNode {
           ? "failed"
           : undefined
 
-  const labelRaw = `${no}. ${stage.title}`
-  const label = shortLabel(labelRaw, 28)
+  const labelRaw = `${no}. ${asText(stage.title)}`
+  const label = shortLabel(labelRaw, LABEL_MAX)
   const hint = stage.desc
 
-  const findings = stage.findings ?? []
-  const tasks = stage.tasks ?? []
-  const todos = stage.todos ?? []
-  const greenCount = findings.length + todos.filter((t) => t.owner === "가져다 씀").length
-  const orangeCount = tasks.length + todos.filter((t) => t.owner === "직접 함").length
-  const totalCount = greenCount + orangeCount
-
-  let dot: MindmapNode["dot"]
-  if (slot.status === "done" && totalCount >= 1) {
-    dot = {
-      verdict: "분할",
-      color: "var(--verdict-bring)",
-      color2: "var(--verdict-direct)",
-      split: greenCount / totalCount,
-      title: `가져다 쓸 것 ${greenCount}개, 직접 만들 것 ${orangeCount}개`,
-    }
-  } else if (slot.status === "pending" || slot.status === "running") {
-    dot = {
-      verdict: "",
-      color: "var(--text-secondary)",
-      hollow: true,
-      title: TITLE_BUSY,
-    }
-  } else {
-    dot = {
-      verdict: "",
-      color: "var(--text-secondary)",
-      hollow: true,
-      title: TITLE_FAILED,
-    }
-  }
+  const dot = verdictDot(slot)
 
   const children = buildStageChildren(session, slot, no, stage)
   return {
@@ -653,7 +629,7 @@ function stageNode(session: Session, slot: StageSlot): MindmapNode {
     label,
     status,
     hint,
-    data: { full: hint },
+    data: { kind: "stage", no, status: slot.status, full: labelRaw },
     dot,
     children: children.length > 0 ? children : undefined,
   }
@@ -796,41 +772,36 @@ function orphanLeaves(session: Session, slot: StageSlot, no: number, placed: Set
 }
 
 function findingLeaf(no: number, idx: number, f: Finding): MindmapNode {
-  const label = shortLabel(f.name, 18)
-  const full = [f.name, f.evidence, f.url].filter(Boolean).join("\n")
+  const full = asText(f.name)
   return {
     id: `s${no}-finding-${idx}`,
-    label,
+    label: nodeLabel(full),
     hint: full,
-    data: { full },
-    dot: { verdict: "가져다 씀", color: "var(--verdict-bring)", title: TITLE_BRING },
+    dot: ITEM_DOT.existing,
+    data: { kind: "finding", full, own: "existing", f },
   }
 }
 
 function taskLeaf(no: number, idx: number, t: Task): MindmapNode {
-  const label = shortLabel(t.task, 18)
+  const full = asText(t.task)
   return {
     id: `s${no}-task-${idx}`,
-    label,
-    hint: t.why,
-    data: { full: t.why },
-    dot: { verdict: "직접 함", color: "var(--verdict-direct)", title: TITLE_DIRECT },
+    label: nodeLabel(full),
+    hint: full,
+    dot: ITEM_DOT.need,
+    data: { kind: "task", full, own: "need", t },
   }
 }
 
 function todoLeaf(no: number, idx: number, t: Todo): MindmapNode {
-  const label = shortLabel(t.task, 18)
-  const isBring = t.owner === "가져다 씀"
+  const full = asText(t.task)
+  const own = asText(t.owner) === BRING_OWNER ? "existing" : "need"
   return {
     id: `s${no}-todo-${idx}`,
-    label,
-    hint: t.note,
-    data: { full: t.note },
-    dot: {
-      verdict: isBring ? "가져다 씀" : "직접 함",
-      color: isBring ? "var(--verdict-bring)" : "var(--verdict-direct)",
-      title: isBring ? TITLE_BRING : TITLE_DIRECT,
-    },
+    label: nodeLabel(full),
+    hint: full,
+    dot: ITEM_DOT[own],
+    data: { kind: "todo", full, own, t },
   }
 }
 
@@ -856,29 +827,9 @@ function walkMindmapAncestors(node: MindmapNode, id: string, acc: string[]): boo
 }
 
 export function mindmapLegend() {
-  return [
-    {
-      verdict: "가져다 씀",
-      label: "이미 있는 것",
-      title: TITLE_BRING,
-      color: "var(--verdict-bring)",
-      hollow: false,
-    },
-    {
-      verdict: "직접 함",
-      label: "직접 만들 것",
-      title: TITLE_DIRECT,
-      color: "var(--verdict-direct)",
-      hollow: false,
-    },
-    {
-      verdict: "",
-      label: "조사 중",
-      title: TITLE_BUSY,
-      color: "var(--text-secondary)",
-      hollow: true,
-    },
-  ]
+  const items: LegendItem[] = (["existing", "need"] as const).map((k) => ({ label: ITEM_DOT[k].title.split(" — ")[0], ...ITEM_DOT[k] }))
+  items.push({ verdict: "pending", label: "조사 중", title: "아직 조사하고 있습니다.", color: "var(--verdict-none)", hollow: true })
+  return items
 }
 
 const VERDICT_TO_HUMAN: Record<Verdict, string> = {
