@@ -134,12 +134,15 @@ export type OutlineTopic = {
   topics?: OutlineTopic[]
 }
 
-// 앱 좌측 패널이 한 단계를 담는 슬롯. status 로 조사 진행을, outline 으로 펼쳐진 개요를 함께 둔다.
+// 앱 좌측 패널이 한 단계를 담는 슬롯. status 로 조사 진행을, outline 으로 펼쳐진 개요를 함께 둔다. runId 와 runCursor, runStatus 는 보강 실행이 이 단계에 붙었을 때만 채워진다.
 export type StageSlot = {
   status: StageRunStatus
   stage: Stage
   error?: string
   outline?: OutlineTopic[]
+  runId?: string | null
+  runCursor?: number
+  runStatus?: "queued" | "running" | "waiting_for_approval" | "stopping" | "completed" | "failed" | "cancelled" | "interrupted" | null
 }
 
 // 대화창에 쌓이는 메시지 역할.
@@ -154,6 +157,7 @@ export type ChatEntry = {
   suggestions?: Array<string | GrillChoice>
   citationTitles?: string[]
   citationIds?: string[]
+  pinned?: boolean
 }
 
 // 왼쪽 패널에 쌓이는 문서·폴더 노드. children 이 있으면 폴더, 없으면 잎.
@@ -179,8 +183,8 @@ export type ExportState = {
   busy: boolean
 }
 
-// Hermes 게이트웨이에서 돌아간 런의 상태. queued / running / done / failed 또는 null.
-export type HermesRunStatus = "queued" | "running" | "done" | "failed" | null
+// Hermes 게이트웨이에서 돌아간 런의 상태. queued / running / waiting_for_approval / stopping / completed / failed / cancelled / interrupted / done 또는 null. done 은 저장 호환을 위해 남겨 둔 옛 값이다.
+export type HermesRunStatus = "queued" | "running" | "waiting_for_approval" | "stopping" | "completed" | "failed" | "cancelled" | "interrupted" | "done" | null
 
 // 브라우저가 localStorage에 쓰는 키 이름.
 export const STORAGE_KEYS = {
@@ -235,6 +239,8 @@ export type Session = {
   sourceCards?: Record<string, string>
   sourceExpandedIds?: string[]
   id?: string
+  pinned?: boolean
+  reinforcing?: boolean
 }
 
 // 처음 앱을 열었을 때의 세션 값.
@@ -256,6 +262,7 @@ export const INITIAL_SESSION: Session = {
   runCursor: 0,
   runActivity: null,
   researchPath: null,
+  reinforcing: false,
   degraded: false,
   error: null,
   busy: false,

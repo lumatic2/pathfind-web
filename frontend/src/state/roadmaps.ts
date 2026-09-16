@@ -219,6 +219,7 @@ export function toCurrentSession(item: SavedRoadmap): Session {
     runCursor: 0,
     runActivity: null,
     researchPath: null,
+    reinforcing: false,
     degraded: false,
     error: null,
     busy: false,
