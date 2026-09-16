@@ -12,6 +12,8 @@ function parseRoute(raw) {
   if (!r) return null;
   if (r === 'health') return { kind: 'health', id: null, sub: null };
   if (r === 'runs') return { kind: 'runs', id: null, sub: null };
+  const mId = r.match(/^runs\/([^\/]+)$/);
+  if (mId) return { kind: 'runs:id', id: mId[1], sub: null };
   const m = r.match(/^runs\/([^\/]+)\/(events\.json|stop)$/);
   if (m) return { kind: 'runs:id', id: m[1], sub: m[2] };
   if (/^runs\/[^\/]+\/events$/.test(r)) return { kind: 'sse-unavailable', id: null, sub: null };
@@ -52,12 +54,15 @@ export async function GET(request) {
   if (parsed.kind === 'health') return handleHealth();
   if (parsed.kind === 'runs:id' && parsed.sub === 'events.json') {
     const cursorRaw = url.searchParams.get('cursor');
+    let relayRoute = route;
     if (cursorRaw !== null) {
       const n = Number(cursorRaw);
       if (!Number.isInteger(n) || n < 0) return sendError(400, 'cursor는 0 이상 정수만 허용');
+      relayRoute = route + '?cursor=' + n;
     }
-    return fetchRelay('GET', route, null);
+    return fetchRelay('GET', relayRoute, null);
   }
+  if (parsed.kind === 'runs:id' && parsed.sub === null) return fetchRelay('GET', route, null);
   if (parsed.kind === 'runs:id' && parsed.sub === 'stop') return fetchRelay('POST', route, null);
   return sendError(405, 'Method not allowed');
 }
