@@ -380,10 +380,21 @@ export function useFlow() {
 
   /** 완주 말풍선 텍스트. startResearch 완료 핸들러와 resumeResearch 완료 핸들러가 공유한다. */
   function buildCompletionText(completed: ReturnType<typeof useSession>['session']): string {
+    const doneCount = completed.stages.filter((s) => s.status === 'done').length
     const failedCount = completed.stages.filter((s) => s.status === 'failed').length
+    const unfinishedCount = completed.stages.filter(
+      (s) => s.status === 'pending' || s.status === 'running',
+    ).length
+
+    if (unfinishedCount > 0) {
+      return `아직 조사가 끝나지 않았습니다. ${doneCount}개 단계를 채웠고 ${failedCount}개 단계는 자료를 못 찾았고 ${unfinishedCount}개 단계는 조사 중입니다.`
+    }
+    if (doneCount === 0) {
+      return `조사를 완료한 단계가 없습니다. ${failedCount}개 단계는 자료를 못 찾았습니다.`
+    }
     return failedCount === 0
       ? `🧰 조사를 마쳤습니다! 오른쪽 마인드맵에서 궁금한 것을 누르면 설명해 드려요.`
-      : `조사를 마쳤습니다! ${completed.stages.length - failedCount}개 단계를 채웠고 ${failedCount}개 단계는 자료를 못 찾았습니다. 오른쪽 마인드맵에서 노드를 누르면 설명해 드려요.`
+      : `조사를 마쳤습니다! ${doneCount}개 단계를 채웠고 ${failedCount}개 단계는 자료를 못 찾았습니다. 오른쪽 마인드맵에서 노드를 누르면 설명해 드려요.`
   }
 
   const startResearch = useCallback(() => {
