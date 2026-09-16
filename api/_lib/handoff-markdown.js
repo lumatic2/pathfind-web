@@ -101,7 +101,7 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
     lines.push(introText);
     lines.push('');
   }
-  lines.push(`> 작성일: ${isoDate} · 단계: ${totalStages}개 · 자료: ${totalFindings}건`);
+  lines.push(`> 단계 ${totalStages}개 · 참고 자료 ${totalFindings}건 · ${dateKorean()}에 만들었습니다.`);
   lines.push('');
 
   const planningMd = buildPlanningMarkdown(bigPicture);
@@ -179,7 +179,8 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
       }
       const orderedTasks = [...byTask.values()];
       if (orderedTasks.length > 0) {
-        lines.push('**할 일:**');
+        lines.push('### 할 일');
+        lines.push('');
         for (const t of orderedTasks) {
           const notePart = t.note ? ` (${t.note})` : '';
           lines.push(`- [ ] ${t.task} [${t.owner}]${notePart}`);
@@ -192,15 +193,21 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
         : (s.choices && s.choices.length) ? s.choices : [];
       const nonempty = options.filter(c => c && c.trim());
       if (nonempty.length > 0) {
-        lines.push('**선택지:**');
-        nonempty.forEach((c, i) => { lines.push(`${i + 1}. ${c.trim()}`); });
+        lines.push('### 선택지');
+        lines.push('');
+        nonempty.forEach(c => lines.push(`- ${c.trim()}`));
         lines.push('');
       }
     }
   }
 
   const loop = bigPicture && bigPicture.prototypeLoop;
-  if (loop && typeof loop === 'object') {
+  if (loop && typeof loop === 'string' && loop.trim()) {
+    lines.push('## 다음 회차에 이어 갈 것');
+    lines.push('');
+    lines.push(loop.trim());
+    lines.push('');
+  } else if (loop && typeof loop === 'object') {
     lines.push('## 다음 회차');
     lines.push('');
     if (typeof loop === 'string' && loop.trim()) {
