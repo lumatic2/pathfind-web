@@ -110,9 +110,14 @@ function emit(): void {
 
 let state: Session = sanitizeForRestore(loadSession())
 let epoch = 0
+let cached: Session & { sessionEpoch: number } | null = null
 
 function dispatch(action: Action): void {
+  if (action.type === "REPLACE" || action.type === "RESET") {
+    epoch++
+  }
   state = reducer(state, action)
+  cached = Object.assign({}, state, { sessionEpoch: epoch })
   emit()
 }
 
@@ -124,7 +129,10 @@ function subscribe(_onStoreChange: () => void): () => void {
 }
 
 function snapshot(): Session & { sessionEpoch: number } {
-  return { ...state, sessionEpoch: epoch }
+  if (cached != null) return cached
+  const s: Session & { sessionEpoch: number } = Object.assign({}, state, { sessionEpoch: epoch })
+  cached = s
+  return s
 }
 
 export function useSession(): {
@@ -142,12 +150,10 @@ export function useSession(): {
 
   const replace = useCallback((session: Session) => {
     dispatch({ type: "REPLACE", payload: session })
-    epoch++
   }, [])
 
   const reset = useCallback(() => {
     dispatch({ type: "RESET" })
-    epoch++
   }, [])
 
   return { session: value, patch, replace, reset, sessionEpoch: value.sessionEpoch }
