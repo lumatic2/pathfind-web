@@ -91,6 +91,12 @@ export function validatePlanningResponse(raw: unknown): Planning {
     const title = typeof sr.title === 'string' ? sr.title : '';
     const url = typeof sr.url === 'string' ? sr.url : '';
     const snippet = typeof sr.snippet === 'string' ? sr.snippet : '';
+    if (snippet === '') {
+      throw new PlanningResponseError(422, `sources[${i}].snippet이 비어 있습니다`);
+    }
+    if (!/^https?:\/\//.test(url)) {
+      throw new PlanningResponseError(422, `sources[${i}].url이 유효한 URL이 아닙니다: ${url}`);
+    }
     const queries = Array.isArray(sr.queries) ? sr.queries.filter((q): q is string => typeof q === 'string') : [];
     const channel = typeof sr.channel === 'string' ? sr.channel : '';
     const accessedAt = typeof sr.accessedAt === 'string' ? sr.accessedAt : '';
@@ -125,6 +131,13 @@ export function validatePlanningResponse(raw: unknown): Planning {
       throw new PlanningResponseError(422, `researchNotes[${i}].excerpt가 비어 있습니다`);
     }
     researchNotes.push({ sourceId, excerpt });
+  }
+  // researchNotes의 excerpt가 실제 sources의 snippet과 일치하는지 확인
+  for (const n of researchNotes) {
+    const matched = sources.find(s => s.id === n.sourceId);
+    if (!matched || matched.snippet !== n.excerpt) {
+      throw new PlanningResponseError(422, `researchNotes의 excerpt가 sources의 snippet과 일치하지 않습니다 (sourceId: ${n.sourceId})`);
+    }
   }
 
   // ── stages (네 개~일곱 개, no 연속) ─────────────────────
@@ -193,6 +206,9 @@ export function validatePlanningResponse(raw: unknown): Planning {
   } else {
     throw new PlanningResponseError(422, 'planning.stageBasis가 객체가 아닙니다');
   }
+  if (Object.keys(stageBasis).length !== stagesRaw.length) {
+    throw new PlanningResponseError(422, 'planning.stageBasis 개수가 stages 개수와 다릅니다');
+  }
   for (const key of Object.keys(stageBasis)) {
     const no = Number(key);
     if (!Number.isInteger(no) || no < 1) {
@@ -212,8 +228,20 @@ export function validatePlanningResponse(raw: unknown): Planning {
     if (typeof vb.reason !== 'string') {
       throw new PlanningResponseError(422, `stageBasis[${no}].reason가 문자열이 아닙니다`);
     }
+    if (vb.basis !== 'adaptation') {
+      throw new PlanningResponseError(422, `stageBasis[${no}].basis가 adaptation이 아닙니다: ${vb.basis}`);
+    }
+    if (vb.reason === '') {
+      throw new PlanningResponseError(422, `stageBasis[${no}].reason이 비어 있습니다`);
+    }
     const sourceIdsArr = Array.isArray(vb.sourceIds) ? vb.sourceIds : [];
     const supportArr = Array.isArray(vb.support) ? vb.support : [];
+    if (sourceIdsArr.length !== 0) {
+      throw new PlanningResponseError(422, `stageBasis[${no}].sourceIds가 비어 있어야 합니다`);
+    }
+    if (supportArr.length !== 0) {
+      throw new PlanningResponseError(422, `stageBasis[${no}].support가 비어 있어야 합니다`);
+    }
     for (const sid of sourceIdsArr) {
       if (typeof sid !== 'string' || sid === '') {
         throw new PlanningResponseError(422, `stageBasis[${no}].sourceIds에 빈 식별자가 있습니다`);
@@ -295,6 +323,9 @@ export function validatePlanningResponse(raw: unknown): Planning {
       throw new PlanningResponseError(422, `trace에서 채널 ${ch}의 기록이 ${channelCounts[ch]}개입니다 (채널별 2개 필요)`);
     }
   }
+  if (!trace.some(t => t.status === 'success' || t.status === 'empty')) {
+    throw new PlanningResponseError(422, 'trace에 성공 또는 빈 검색 결과가 하나도 없습니다');
+  }
 
   // ── events (네 사건, 순서, 단조 증가 시각) ──────────────
   const eventsRaw = p.events;
@@ -340,6 +371,9 @@ export function validatePlanningResponse(raw: unknown): Planning {
     if (typeof warningsRaw[i] !== 'string' || warningsRaw[i] === '') {
       throw new PlanningResponseError(422, `warnings[${i}]가 빈 문자열이 아닙니다`);
     }
+  }
+  if (researchNotes.length === 0 && warningsRaw.length === 0) {
+    throw new PlanningResponseError(422, 'researchNotes가 없으면 warnings도 있어야 합니다');
   }
 
   // ── groundingChecks (빈 배열이어야 함) ──────────────────
