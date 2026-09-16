@@ -269,7 +269,6 @@
   gap: var(--space-1);
 }
 .quote__name { font-size: var(--fs-lead); font-weight: 700; }
-.quote__role { color: var(--muted-foreground); }
 
 /* ────────────────────────────────────────────────────────
    Compare — 원본 `gl-package`
@@ -384,11 +383,11 @@
 /* 밴드 안 원판 — 정사각 기준에서 orbit 으로 바꿈 */
 .band__orbit {
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
   left: 50%;
   translate: -50% 0;
   aspect-ratio: 1;
-  width: 100%;
 }
 @media (max-width: 640px) {
   .band__orbit {
@@ -672,12 +671,6 @@
   gap: var(--start-gap);
   align-items: start;
 }
-/* 두 열은 **≥1200 에서만** 선다. 900~1199 에서 가르면 왼쪽 열이 130px 대로 좁아져
-   표제가 네 줄로 접힌다(진단 D9). 그 폭에서는 표제를 위에 통째로 눕히는 편이 읽힌다. */
-@media (min-width: 1200px) {
-  .start { grid-template-columns: minmax(0, 1fr) auto; }
-}
-
 /* 표제는 공통 h2 한 단 아래 — 우리 둘째 줄이 원본보다 길어서 50px 로는 열 안에 안 선다 */
 .start__title { max-width: none; }
 
