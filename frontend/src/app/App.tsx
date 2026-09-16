@@ -176,22 +176,6 @@ export default function App() {
     buildRoadmap()
   }, [buildRoadmap])
 
-  const topbar = (
-    <div className="flex w-full items-center gap-3 pl-4">
-      {homeLink}
-      <NotebookTopbar
-        title={topTitle}
-        onTitleChange={handleTitleChange}
-        actions={[
-          { id: 'new-roadmap', label: '새 패스', icon: <Plus aria-hidden />, onClick: handleNewRoadmapAsk },
-          { id: 'library', label: '목록', icon: <Library aria-hidden />, onClick: () => { loadArchive(); setDialogOpen(true) } },
-          { id: 'path', label: session.exportState.busy ? '만드는 중' : 'PATH.md', icon: <Download aria-hidden />, primary: true, onClick: handlePreviewOpen, disabled: session.phase !== 'ready' || session.stages.filter((s) => s.status === 'done').length === 0 || session.busy },
-        ]}
-        statusSlot={topStatusSlot}
-      />
-    </div>
-  )
-
   const leftPanelRef = useRef<LeftPanelHandle>(null)
   const [openCitationN, setOpenCitationN] = useState<number | null>(null)
 
@@ -265,6 +249,22 @@ export default function App() {
   const handleNewRoadmapAsk = useCallback(() => {
     setNewDialogOpen(true)
   }, [])
+
+  const topbar = (
+    <div className="flex w-full items-center gap-3 pl-4">
+      {homeLink}
+      <NotebookTopbar
+        title={topTitle}
+        onTitleChange={handleTitleChange}
+        actions={[
+          { id: 'new-roadmap', label: '새 패스', icon: <Plus aria-hidden />, onClick: handleNewRoadmapAsk },
+          { id: 'library', label: '목록', icon: <Library aria-hidden />, onClick: () => { loadArchive(); setDialogOpen(true) } },
+          { id: 'path', label: session.exportState.busy ? '만드는 중' : 'PATH.md', icon: <Download aria-hidden />, primary: true, onClick: handlePreviewOpen, disabled: session.phase !== 'ready' || session.stages.filter((s) => s.status === 'done').length === 0 || session.busy },
+        ]}
+        statusSlot={topStatusSlot}
+      />
+    </div>
+  )
 
   const handleNewRoadmapConfirm = useCallback(() => {
     setNewDialogOpen(false)
