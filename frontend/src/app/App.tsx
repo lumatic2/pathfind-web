@@ -559,7 +559,7 @@ const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedC
   }, [session.phase, session.stages, session.sourceCards, session.summary, patch])
 
   return (
-    <div className="panel-left">
+    <div className="panel-left h-full min-h-0">
       <GroundedSourcePanel
         sources={sources}
         selectedIds={[]}
@@ -1015,7 +1015,7 @@ function RightPanel() {
   )
 
   return (
-    <div className="panel-right">
+    <div className="panel-right h-full min-h-0">
       <MindmapPanel
         layout="fan"
         mapTitle={session.mapTitle ?? session.bigPicture?.title}
