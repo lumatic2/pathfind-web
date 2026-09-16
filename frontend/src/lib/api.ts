@@ -8,7 +8,10 @@ import type {
   Stage,
   Finding,
   OutlineTopic,
+  Planning,
 } from '../state/types';
+
+import { validatePlanningResponse, PlanningResponseError } from '../lib/planningResponse';
 
 /* ============================================================
  * 오류
@@ -135,7 +138,39 @@ export interface PathfindResponse {
 export async function pathfind(
   body: PathfindRequest,
 ): Promise<PathfindResponse> {
-  return post<PathfindResponse>('/api/pathfind', body);
+  const raw = await post<Record<string, unknown>>('/api/pathfind', body, 120000);
+  try {
+    validatePlanningResponse(raw);
+  } catch (e) {
+    if (e instanceof PlanningResponseError) {
+      throw new ApiError(e.status, planningErrorToMessage(e));
+    }
+    throw e;
+  }
+  const bp = raw.bigPicture as Record<string, unknown>;
+  return {
+    bigPicture: {
+      title: String(bp.title ?? ''),
+      intro: String(bp.intro ?? ''),
+      stages: (bp.stages as Stage[]) ?? [],
+      prototypeLoop: String(bp.prototypeLoop ?? ''),
+      planning: bp.planning ? (bp.planning as Planning) : undefined,
+    },
+    handoffMarkdown: typeof raw.handoffMarkdown === 'string' ? raw.handoffMarkdown : undefined,
+  };
+}
+
+function planningErrorToMessage(e: PlanningResponseError): string {
+  const msg = e.message;
+  if (
+    msg === '응답이 객체가 아닙니다' ||
+    msg === 'bigPicture가 없습니다' ||
+    msg === 'bigPicture.stages가 배열이 아닙니다' ||
+    msg === 'planning 필드가 없습니다'
+  ) {
+    return '단계 설계 응답을 받지 못했습니다. 다시 시도해 주세요.';
+  }
+  return '단계 설계 자료를 확인하지 못했습니다. 다시 시도해 주세요.';
 }
 
 // 3. stage
