@@ -66,6 +66,64 @@ export function useFlow() {
     return generationRef.current === gen && sessionEpochRef.current === epoch
   }
 
+  async function reinforceOneStage(
+    summary: string,
+    gen: number,
+    epoch: number,
+  ): Promise<void> {
+    if (!isCurrentRequest(gen, epoch)) return
+    if (sessionRef.current.phase !== 'ready') return
+    if (reinforceControllerRef.current != null) return
+    const key = `${epoch}:${gen}`
+    if (reinforceAttemptRef.current === key) return
+    const index = sessionRef.current.stages.findIndex(
+      (slot) => slot.status === 'done' && needsReinforce(slot.stage) === true,
+    )
+    if (index < 0) return
+    reinforceAttemptRef.current = key
+    const controller = new AbortController()
+    reinforceControllerRef.current = controller
+    try {
+      const health = await hermes.health()
+      if (!health.enabled || !isCurrentRequest(gen, epoch) || controller.signal.aborted) return
+      const latestStages = sessionRef.current.stages
+      const slot = latestStages[index]
+      if (slot == null) return
+      patch({
+        stages: latestStages.map((s, i) =>
+          i === index ? { ...s, reinforcing: true } : s,
+        ),
+        runActivity: '자료가 부족한 단계 하나를 더 찾고 있습니다.',
+      })
+      const result = await researchHermesStage(slot.stage, summary, {
+        signal: controller.signal,
+        onEvent: (event) => {
+          if (!isCurrentRequest(gen, epoch) || controller.signal.aborted) return
+          const text = activityLine(event)
+          if (text) patch({ runActivity: text })
+        },
+      })
+      if (!isCurrentRequest(gen, epoch) || controller.signal.aborted) return
+      const latestStages2 = sessionRef.current.stages
+      const slot2 = latestStages2[index]
+      if (slot2 != null && result != null && isBetterStage(result, slot2.stage)) {
+        await runStage(index, summary, slot2.stage, gen, epoch, result)
+      }
+    } catch {
+      // 상태 변경 없이 실패를 삼킨다 — 기존 결과를 남긴다
+    } finally {
+      if (reinforceControllerRef.current === controller) {
+        reinforceControllerRef.current = null
+      }
+      if (isCurrentRequest(gen, epoch)) {
+        patch({
+          reinforcing: false,
+          runActivity: null,
+        })
+      }
+    }
+  }
+
   /** 상한이 1로 내려갈 때 한 번만 불린다. degraded를 남기고 강등 말풍선을 붙인다. */
   const onDegrade = useCallback((_newConcurrency: number) => {
     if (!isCurrentRequest(generationRef.current, sessionEpochRef.current)) return
