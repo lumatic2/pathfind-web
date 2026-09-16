@@ -281,9 +281,6 @@ export function pollEvents(
           `/api/hermes/runs/${encodeURIComponent(runId)}/events.json?cursor=${cursor}`,
           { signal: controller.signal },
         )
-        clearTimeout(fetchTimeout)
-        fetchTimeout = null
-        currentController = null
       } catch (err) {
         if (fetchTimeout) {
           clearTimeout(fetchTimeout)
@@ -298,6 +295,11 @@ export function pollEvents(
       }
 
       if (!res.ok) {
+        if (fetchTimeout) {
+          clearTimeout(fetchTimeout)
+          fetchTimeout = null
+        }
+        currentController = null
         if (res.status === 429) return void closeWith("error")
         if (++retries > 3) return void closeWith("error")
         await wait(1000 * retries)
@@ -316,6 +318,11 @@ export function pollEvents(
         | null = null
       try {
         body = JSON.parse(await res.text())
+        if (fetchTimeout) {
+          clearTimeout(fetchTimeout)
+          fetchTimeout = null
+        }
+        currentController = null
       } catch {
         if (closed) return
         if (++retries > 3) return void closeWith("error")
@@ -324,6 +331,11 @@ export function pollEvents(
       }
 
       if (!body || typeof body !== "object") {
+        if (fetchTimeout) {
+          clearTimeout(fetchTimeout)
+          fetchTimeout = null
+        }
+        currentController = null
         if (++retries > 3) return void closeWith("error")
         await wait(1000 * retries)
         continue
@@ -334,9 +346,22 @@ export function pollEvents(
         typeof body.cursor === "number" ? body.cursor : cursor
       const done = Boolean(body.done)
 
-      if (nextCursor < cursor) return void closeWith("error")
-      if (nextCursor - cursor !== events.length)
+      if (nextCursor < cursor) {
+        if (fetchTimeout) {
+          clearTimeout(fetchTimeout)
+          fetchTimeout = null
+        }
+        currentController = null
         return void closeWith("error")
+      }
+      if (nextCursor - cursor !== events.length) {
+        if (fetchTimeout) {
+          clearTimeout(fetchTimeout)
+          fetchTimeout = null
+        }
+        currentController = null
+        return void closeWith("error")
+      }
 
       for (let i = 0; i < events.length; i += 1) {
         if (closed) break
