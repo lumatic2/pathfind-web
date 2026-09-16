@@ -100,7 +100,7 @@ export function parseStageJson(output: string): Partial<Stage> | null {
   const candidates = [text]
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/)
   if (fence) candidates.push(fence[1].trim())
-  const brace = text.match(/\{[\\s\S]*\}/)
+  const brace = text.match(/\{[\s\S]*\}/)
   if (brace) candidates.push(brace[0])
   for (const c of candidates) {
     try {

@@ -77,8 +77,9 @@ export type Stage = {
   tasks: Task[]
   choices: string[]
   verdict?: Verdict
-  verdictReason?: string
   verdictLine?: string
+  verdictReason?: string
+  citations?: Array<{ n?: unknown; name?: unknown }>
   findings?: Finding[]
   options?: string[]
   todos?: Todo[]
