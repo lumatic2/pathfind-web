@@ -7,10 +7,12 @@
 //        jsonVD=Y로 표준 JSON 배열을 받는다. JSON.parse로 바로 읽는다.
 //        이 API는 짧은 검색어(통계표명에 들어갈 낱말 하나·둘)에 잘 답하고
 //        문장형 검색어에는 0건이 나온다. 그래서 검색어를 단계적으로 줄여 다시 찾는다.
+//
+// 7차 보강(step-2): searchKosis가 stage(단계 문맥)를 받아 검색어 후보를 확장하고
+//   단계 글 낱말을 실제로 공유하는 표가 나온 후보를 고른다.
 
 const KOSIS_SEARCH_URL = 'https://kosis.kr/openapi/statisticsSearch.do';
 const TIMEOUT_MS = 10000;
-const DISPLAY = 3;
 
 /** 채널 이름. 고정 문자열. */
 export const name = 'kosis';
@@ -28,29 +30,98 @@ export function available() {
   }
 }
 
+// 단계 글의 한글 2자 이상 토막에서 통계 규칙에 걸리는 낱말(예산·시세·매출·추이 …).
+// 법령 관문과 같은 잣대를 쓴다(stage.mjs의 stageContextWords와 같은 규칙).
+const STATS_RULE = /비용|예산|시세|시장|수요|인구|매출|규모|통계|가격|단가|수익|고객층|연령|소득|성장|점유|추이/;
+
+/**
+ * 단계 객체의 글(토막)에서 한글 2자 이상 낱말을 중복 없이 뽑는다.
+ * stage가 없으면 [], 배열이면 그대로 반환(이미 추출된 낱말 목록).
+ */
+function stageWords(stage) {
+  if (!stage) return [];
+  if (Array.isArray(stage)) return stage;
+  const text = [
+    stage.title,
+    stage.desc,
+    ...(stage.tasks ?? []).map((t) => `${t.task} ${t.why ?? ''}`),
+    ...(stage.choices ?? []),
+  ].join('\n');
+  return [...new Set(String(text).match(/[가-힣]{2,}/g) ?? [])];
+}
+
 /**
  * KOSIS 통계표 검색을 수행한다.
  * query: 검색어(문장형일 수 있음).
- * 반환: Result[] = { id, title, url, snippet, host, form }.
- *       form은 'table'.
- * 검색 결과가 0건이면 검색어를 줄여(최대 2회 폴백) 다시 찾는다.
- * 키·네트워크 오류는 그대로 throw하고, "결과 없음" 오류만 삼킨다.
+ * options: { display?: number, stage?: StageObject | string[] } — display 기본값은 3.
+ * 반환: Result[] = { id, title, url, snippet, host, form }. form은 'table'.
+ *
+ * 검색어 후보를 여러 개 만들어 각각 조회한 뒤, 단계 글 낱말을 실제로 공유하는 표가
+ * 나온 후보를 고른다. 단계 글이 없으면 종전처럼 첫 결과의 첫 후보를 그대로 쓴다.
+ * 고르기가 실패해도 잃는 것은 없다 — 첫 결과(firstHit)를 그대로 반환한다.
+ * 키·네트워크 오류는 그대로 throw하고, "결과 없음"만 삼킨다.
  * 실패·타임아웃·파싱 실패는 빈 배열 반환, 예외 없음(채널 단위).
  */
-export async function searchKosis(query) {
+export async function searchKosis(query, { display = 3, stage } = {}) {
   if (!query || typeof query !== 'string') return [];
   if (!process.env.KOSIS_API_KEY) return [];
 
-  const tried = await trySearchKm(query);
-  if (tried.length > 0) return tried;
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  const ctxWords = stageWords(stage);
+  const ruleWords = ctxWords.filter((w) => STATS_RULE.test(w));
 
-  // 0건이면 검색어를 줄여 다시 시도
-  return fallbackSearch(query);
+  // 검색어 후보: 전체 → 앞 둘 → (첫 낱말 + 규칙 낱말) → 첫 낱말.
+  // 단계는 최대 5개까지.
+  const forms = [...new Set([
+    words.join(' '),
+    words.slice(0, 2).join(' '),
+    ...ruleWords.slice(0, 2).map((w) => `${words[0] ?? ''} ${w}`.trim()),
+    words[0] ?? '',
+  ].filter(Boolean))].slice(0, 5);
+
+  // 얹은 규칙 낱말 자신은 상관성의 증거로 세지 않는다 —
+  // 「공예 예산」이 「에너지 연구개발 공공예산」을 물어 온다(실측).
+  const injected = new Map(
+    ruleWords.slice(0, 2).map((w) => [`${words[0] ?? ''} ${w}`.trim(), w])
+  );
+
+  let lastErr = null;
+  let firstHit = null;
+
+  for (const q of forms) {
+    try {
+      const out = await trySearchKm(q, display);
+      if (out.length === 0) continue;
+      if (!firstHit) firstHit = out;
+      // 단계 글이 없으면 고를 잣대가 없다 — 종전대로 첫 결과
+      if (ctxWords.length === 0) return out;
+      const skip = injected.get(q);
+      if (out.some((r) =>
+        ctxWords.some((w) => w !== skip && w.length >= 2 && String(r.title).includes(w))
+      )) {
+        return out;
+      }
+    } catch (e) {
+      lastErr = e;
+      if (!/kosis 30/.test(String(e.message))) throw e; // 30 = 결과 없음. 그 밖(키·네트워크)은 바로 올린다
+    }
+  }
+
+  if (firstHit) return firstHit;
+  if (lastErr && !/kosis 30/.test(String(lastErr.message))) throw lastErr;
+  return [];
 }
 
 // --- 내부: 단일 검색 시도 (throw 없이 결과만 반환) ---
 
-async function trySearchKm(searchNm) {
+/**
+ * KOSIS 통계표 검색을 한 번 시도한다.
+ * searchNm: 검색할 통계표명(검색어).
+ * display: 반환할 최대 결과 수.
+ * 반환: Result[] (중복 제거된 최대 display건). 0건이면 [].
+ * HTTP 오류(키·네트워크)는 throw, 타임아웃·파싱 실패·0건은 빈 배열.
+ */
+async function trySearchKm(searchNm, display = DISPLAY) {
   const params = new URLSearchParams({
     method: 'getList',
     apiKey: process.env.KOSIS_API_KEY,
@@ -58,7 +129,7 @@ async function trySearchKm(searchNm) {
     format: 'json',
     jsonVD: 'Y',
     startCount: '1',
-    resultCount: String(DISPLAY),
+    resultCount: String(display),
     sort: 'RANK',
   });
 
@@ -83,29 +154,22 @@ async function trySearchKm(searchNm) {
       // 파싱 실패: 빈 배열 반환 (예외 없음, 채널 단위).
       return [];
     }
-    const rows = extractRows(data);
 
-    if (rows.length === 0) {
-      return [];
+    const rawRows = extractRows(data);
+    if (rawRows.length === 0) return [];
+
+    // TBL_ID 기준 중복 제거 후 display건까지만.result로 변환.
+    const seen = new Set();
+    const out = [];
+    for (const raw of rawRows) {
+      const key = raw.tableId;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      const row = statRowToResult(raw, out.length);
+      out.push(row);
+      if (out.length >= display) break;
     }
-
-    return rows.map((row, idx) => {
-      const url = buildTableUrl(row);
-      let host = '';
-      try {
-        host = new URL(url).hostname;
-      } catch {
-        host = '';
-      }
-      return {
-        id: `kosis-${idx}`,
-        title: row.title || '',
-        url,
-        snippet: row.snippet || '',
-        host,
-        form: 'table',
-      };
-    });
+    return out;
   } catch (err) {
     clearTimeout(timer);
     // AbortError(타임아웃)·네트워크 실패는 빈 배열로 처리.
@@ -115,36 +179,6 @@ async function trySearchKm(searchNm) {
     // 그 외 오류는 키·네트워크 오류로 보고 그대로 throw.
     throw err;
   }
-}
-
-// --- 내부: 검색 결과 없음일 때만 검색어를 줄여 재시도 ---
-
-async function fallbackSearch(originalQuery) {
-  // 문장형·긴 검색어 대응: 공백 기준 분할 → 3자 이상 낱말만 → 앞 둘 → 앞 한 단어.
-  const words = originalQuery.split(/[\s\u0020\u3000]+/)
-    .map((w) => w.trim())
-    .filter((w) => w.length > 0);
-
-  // 전체 검색어 자체를 한 번 더 확인하는 건 trySearchKm에서 이미 했으므로
-  // 여기서는 단어 기반 축소만 수행한다.
-  const meaningful = words.filter((w) => w.length >= 3);
-  const candidates = [];
-
-  if (meaningful.length >= 2) {
-    candidates.push(meaningful.slice(0, 2).join(' '));
-  }
-  if (meaningful.length >= 1) {
-    candidates.push(meaningful[0]);
-  }
-
-  // 후보 중 앞쪽부터 시도하고, 결과가 나오면 바로 반환.
-  for (const cand of candidates) {
-    const result = await trySearchKm(cand);
-    if (result.length > 0) return result;
-  }
-
-  // 모든 후보가 0건이면 빈 배열.
-  return [];
 }
 
 // --- 내부: KOSIS 응답 파싱 ---
@@ -209,6 +243,30 @@ function mapRow(raw) {
     linkUrl: String(linkUrl).trim(),
     viewUrl: String(viewUrl).trim(),
     snippet: String(snippet).trim(),
+  };
+}
+
+// --- 내부: 통계표 행 → Result 변환 ---
+
+/**
+ * 정규화된 통계표 행 하나를 Result 객체로 변환한다.
+ * id와 form은 반환 직전에만 붙인다.
+ */
+function statRowToResult(row, idx) {
+  const url = buildTableUrl(row);
+  let host = '';
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    host = '';
+  }
+  return {
+    id: `kosis-${idx}`,
+    title: row.title || '',
+    url,
+    snippet: row.snippet || '',
+    host,
+    form: 'table',
   };
 }
 
