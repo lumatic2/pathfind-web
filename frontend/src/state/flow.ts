@@ -55,13 +55,13 @@ export function useFlow() {
   const planningLock = useRef(false)
   const reinforceControllerRef = useRef<AbortController | null>(null)
   const reinforceAttemptRef = useRef<string | null>(null)
+  if (sessionEpoch !== sessionEpochRef.current) {
+    generationRef.current++
+    planningLock.current = false
+    retryingRef.current = false
+  }
+  sessionEpochRef.current = sessionEpoch
   useEffect(() => {
-    if (sessionEpoch !== sessionEpochRef.current) {
-      generationRef.current++
-      planningLock.current = false
-      retryingRef.current = false
-    }
-    sessionEpochRef.current = sessionEpoch
     return () => {
       if (reinforceControllerRef.current) {
         reinforceControllerRef.current.abort()
@@ -583,11 +583,11 @@ export function useFlow() {
           })
           planningLock.current = false
           retryingRef.current = false
+          setTimeout(() => {
+            if (!isCurrentRequest(gen, epoch)) return
+            reinforceOneStage(current.summary, gen, epoch)
+          }, 0)
         })
-        setTimeout(() => {
-          if (!isCurrentRequest(gen, epoch)) return
-          reinforceOneStage(current.summary, gen, epoch)
-        }, 0)
       })
       .catch((err) => {
         // pathfind 실패 → 승인 카드로 되돌림 (횟수는 되돌리지 않음)
