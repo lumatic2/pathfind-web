@@ -642,15 +642,23 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
     session.error != null ? "error" : researchActive && anyRunning ? "waiting" : session.busy ? "waiting" : "idle"
 
   const researchFoot =
-    researchActive && totalCount > 0
+    session.reinforcing
       ? (
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-          <span className="font-semibold text-foreground">{doneCount}/{totalCount} 단계 조사 중</span>
-          {' '}
-         보통 3에서 5분 걸립니다. 이 창을 열어 두시면 이어서 진행됩니다.
+          {session.runActivity && session.runActivity.trim().length > 0 ? session.runActivity : '자료가 부족한 단계 하나를 더 찾고 있습니다.'}
+          <br />
+          먼저 나온 결과를 이용하셔도 됩니다. 이 창을 열어 두세요.
         </p>
       )
-      : null
+      : researchActive && totalCount > 0
+        ? (
+          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+            <span className="font-semibold text-foreground">{doneCount}/{totalCount} 단계 조사 중</span>
+            {' '}
+           보통 3에서 5분 걸립니다. 이 창을 열어 두시면 이어서 진행됩니다.
+          </p>
+        )
+        : null
 
   const errorFoot =
     session.error != null && researchActive
