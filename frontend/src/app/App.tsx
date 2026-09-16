@@ -711,15 +711,19 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
                 typeof s === "string" ? s : (s as GrillChoice).label
               )
           : pendingLabels.length > 0
-            ? pendingLabels
-            : []
+            ? [...pendingLabels.filter((l) => l !== directInputLabel), directInputLabel]
+            : [directInputLabel]
 
   const suggestionReasons = isApproval ? {} : pendingReasons
   const recommendedSuggestion = isApproval ? undefined : pendingRecommended
   const suggestionsPrompt =
-    session.pending?.exampleButtons != null
-      ? `이대로 조사를 시작할까요? 남은 ${remaining}회 중 1회를 씁니다`
-      : undefined
+    session.phase === "confirm"
+      ? session.planningAttempt?.status === "failed"
+        ? "같은 요약으로 다시 조사합니다. 이용 횟수는 추가로 차감하지 않습니다."
+        : `이대로 조사를 시작할까요? 남은 ${remaining}회 중 1회를 씁니다.`
+      : session.phase === "interview" && session.turnCount > 0
+        ? `몇 가지만 여쭤볼게요 · ${Math.min(session.turnCount + 1, 5)}/5`
+        : undefined
 
   const rawChatMessages: AppChatMessage[] = (() => {
     const out: AppChatMessage[] = []
