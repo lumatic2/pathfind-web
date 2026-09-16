@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useMemo, forwardRef, useImperativeHandle } from 'react'
 
 import { FileText } from 'lucide-react'
-import toolboxIcon from '../../../../public/app-toolbox.png'
 import { useSession } from '../state/store'
 import { useQuota, readQuota } from '../state/quota'
 import { useFlow } from '../state/flow'
@@ -952,7 +951,7 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
         emptyTitle="무엇을 시작하려 하세요?"
         emptyIcon={
           <img
-            src={toolboxIcon}
+            src="/app-toolbox.png"
             alt=""
             aria-hidden
             style={{ height: 64, width: 'auto' }}
