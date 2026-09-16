@@ -65,54 +65,43 @@ const AVAILABLE_CHANNEL_NAMES = CHANNELS.filter((c) => c.available).map((c) => c
 
 // ---------- 키워드 규칙 ----------
 
-const LAW_KEYWORDS = [
-  '허가', '신고', '등록', '계약', '세금', '세무', '개인정보', '임대차', '영업',
-  '법령', '법적', '법률', '규제', '약관', '저작권', '사업자', '보험', '근로',
-  '안전', '위생', '인증', '표시',
-];
-
-const STATS_KEYWORDS = [
-  '비용', '예산', '시세', '시장', '수요', '인구', '매출', '규모', '통계',
-  '가격', '단가', '수익', '고객층', '연령', '소득', '성장', '점유', '추이',
-];
-
-const PUBLIC_DATA_KEYWORDS = [
-  '상권', '지역', '시설', '현황', '지자체', '공공', '행정', '동네', '주변',
-  '위치', '입지', '교통', '학교', '병원', '관광', '기상', '날씨',
-];
-
-const OSS_KEYWORDS = [
-  '앱', '서비스', '자동화', '도구', '시스템', '웹', '프로그램', '봇', 'api',
-  '소프트웨어', '사이트', '플랫폼', '알림', '예약', '결제', '데이터베이스',
-  '대시보드', '크롤',
-];
-
-function keywordMatch(text, keywords) {
-  const lower = (text || '').toLowerCase();
-  return keywords.some((kw) => lower.includes(kw.toLowerCase()));
+function stageText(stage) {
+  return [stage.title, stage.desc, ...(stage.tasks ?? []).map((t) => `${t.task} ${t.why ?? ''}`), ...(stage.choices ?? [])].join('\n');
 }
 
-function selectChannels(title, desc, tasks, choices) {
-  const combined = [title, desc, ...tasks.map((t) => t.task || ''), ...tasks.map((t) => t.why || ''), ...(choices || [])]
-    .filter(Boolean)
-    .join('\n');
-  const selected = new Set();
+const OSS_STRONG = /앱|API|소프트웨어|사이트|데이터베이스|대시보드|크롤|봇|웹|자동화|오픈소스|라이브러리|코드|개발|서버|배포|스키마/;
+const OSS_WEAK = /도구|서비스|예약|결제|알림|프로그램|시스템|플랫폼/;
+const OSS_CONTEXT = new RegExp(`${OSS_STRONG.source}|구현|데이터|추출|저장`);
+function ossApplies(text) {
+  if (OSS_STRONG.test(text)) return true;
+  return OSS_WEAK.test(text) && OSS_CONTEXT.test(text);
+}
 
-  if (keywordMatch(combined, LAW_KEYWORDS)) selected.add('law');
-  if (keywordMatch(combined, STATS_KEYWORDS)) selected.add('stats');
-  if (keywordMatch(combined, PUBLIC_DATA_KEYWORDS)) selected.add('public_data');
-  if (keywordMatch(combined, OSS_KEYWORDS)) selected.add('oss');
+const CHANNEL_RULES = {
+  law: /허가|신고|등록|계약|세금|세무|개인정보|임대차|영업|법령|법적|법률|규제|약관|저작권|사업자|보험|근로|안전|위생|인증|표시/,
+  stats: /비용|예산|시세|시장|수요|인구|매출|규모|통계|가격|단가|수익|고객층|연령|소득|성장|점유|추이/,
+  public_data: /상권|지역|시설|현황|지자체|공공|행정|동네|주변|위치|입지|교통|학교|병원|관광|기상|날씨/,
+  oss: new RegExp(`${OSS_STRONG.source}|${OSS_WEAK.source}`),
+};
 
-  // 웹은 키만 있으면 항상
-  if (naverAvailable()) selected.add('web');
+/** 키 있는 채널 가운데 규칙에 걸린 것. 웹은 키만 있으면 항상. */
+function planChannels(stage, keys) {
+  const text = stageText(stage);
+  return keys.filter((k) => k === 'web' || (k === 'oss' ? ossApplies(text) : CHANNEL_RULES[k] && CHANNEL_RULES[k].test(text)));
+}
 
-  // available 아닌 채널 제거
-  for (const name of selected.values()) {
-    const ch = CHANNELS.find((c) => c.name === name);
-    if (!ch || !ch.available) selected.delete(name);
-  }
+/** 단계 글에서 그 채널 규칙에 실제로 걸린 낱말을 뽑는다(5차 step-12). */
+function matchedRuleWords(stage, channel) {
+  const re = CHANNEL_RULES[channel];
+  if (!re) return [];
+  const hits = stageText(stage).match(new RegExp(re.source, 'g')) ?? [];
+  return [...new Set(hits)].sort((a, b) => b.length - a.length);
+}
 
-  return [...selected];
+/** 단계 글의 내용 낱말 — 한글 2자 이상 토막만 쓴다. */
+function stageContextWords(stage) {
+  const hits = String(stageText(stage)).match(/[가-힣]{2,}/g) ?? [];
+  return [...new Set(hits)];
 }
 
 // ---------- 낱말 길이 제약 ----------
@@ -644,71 +633,49 @@ ${pre ? `--- 미리 조사한 결과 (위 채널을 미리 돌려둔 결과) ---
 
 // ---------- 쿼리 생성 호출 (작은 호출, max_tokens 400) ----------
 
-async function generateQueries(stage, summary, plannedChannels) {
-  const planningPrompt = `다음 단계 정보를 보고, 아래 채널 목록에 채널마다 검색어 하나씩을 JSON 배열로 제시합니다.
-출력은 이 스키마 그대로 JSON 배열 하나만: [{"channel":"채널이름","query":"검색어"}]
-채널별 검색어 지침:
-- web: 한국어 핵심 명사 2~4개
-- oss: 영문 키워드 2~4개
-- law: 법령 이름에 들어갈 낱말 1~2개
-- stats: 통계표 이름에 들어갈 낱말 1~2개
-- public_data: 데이터셋 이름에 들어갈 낱말 2~3개
+const QUERY_HINT = {
+  web: '한국어 핵심 명사 2~4개(예: 카페 예약 시스템 사례)',
+  oss: '영문 키워드 2~4개(예: cafe reservation booking)',
+  law: '법령 이름에 들어갈 낱말 1~2개(예: 식품위생, 전자상거래)',
+  stats: '통계표 이름에 들어갈 낱말 1~2개(예: 소상공인, 온라인쇼핑)',
+  public_data: '데이터셋 이름에 들어갈 낱말 2~3개(예: 상권 정보, 인구 현황)',
+};
+const QUERY_MAX_WORDS = { web: 4, oss: 4, law: 2, stats: 2, public_data: 3 };
+const QUERY_SYSTEM = `아이디어 패스의 한 단계를 조사하려고 채널별 검색어를 정합니다. 요청한 채널마다 검색어 하나씩을 냅니다. 채널마다 검색어 모양이 다릅니다 — 안내를 그대로 따릅니다.
+출력 형식 (JSON만, 다른 텍스트 금지): {"<채널>": "<검색어>", ...} — 요청한 채널 키만 씁니다.`;
+const HANGUL = /[가-힣]/;
 
-대상 채널: ${plannedChannels.join(', ')}
+function trimQuery(channel, q) {
+  const words = String(q ?? '').replace(/[\",.]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, QUERY_MAX_WORDS[channel] ?? 4).join(' ');
+}
 
-[단계]
-제목: ${stage.title}
-설명: ${stage.desc}
-할 일:
-${(stage.tasks || []).map((t) => `- ${t.order}. ${t.task} (${t.why})`).join('\n') || '없음'}
-선택지: ${stage.choices?.join(', ') || '없음'}
-`;
-  const messages = [
-    { role: 'system', content: '당신은 검색어 기획자입니다. JSON 배열만 출력합니다.' },
-    { role: 'user', content: planningPrompt },
-  ];
-
+/** 규칙에 걸린 채널의 검색어를 모델에게 한 번에 받는다. */
+async function planQueries(stage, summary, planned) {
+  let parsed = null;
   try {
-    const res = await callSolar(messages, { tools: false, tool_choice: 'auto', maxTokens: MAX_TOKENS_QUERY });
-    if (!res.content) return [];
-    const parsed = JSON.parse(res.content.trim());
-    if (!Array.isArray(parsed)) return [];
-    // 채널에서 요구하는 낱말 상한으로 다시 자르기
-    return parsed
-      .filter((item) => item && typeof item === 'object' && item.channel && typeof item.query === 'string')
-      .map((item) => {
-        let q = item.query.trim();
-        if (!q) return null;
-        // 채널별 상한
-        switch (item.channel) {
-          case 'web':
-            q = clampWords(q, 4);
-            break;
-          case 'oss':
-            q = clampWords(q, 4);
-            break;
-          case 'law':
-            q = clampWords(q, 2);
-            break;
-          case 'stats':
-            q = clampWords(q, 2);
-            break;
-          case 'public_data':
-            q = clampWords(q, 3);
-            break;
-          default:
-            break;
-        }
-        return { channel: item.channel, query: q };
-      })
-      .filter(Boolean);
-  } catch (e) {
-    logCall('stage.generateQueries', 0, 0, {});
-    // 단계 제목에서 같은 상한으로 대체
-    const fallbackWords = clampWords(stage.title, 3);
-    if (!fallbackWords) return [];
-    // 계획된 채널 각각에 같은 대체 검색어
-    return plannedChannels.map((ch) => ({ channel: ch, query: fallbackWords }));
+    const r = await callSolar([
+      { role: 'system', content: QUERY_SYSTEM },
+      { role: 'user', content: `[프로젝트 요약]\n${summary || '(없음)'}\n\n[조사할 단계]\n${stageText(stage)}\n\n[채널]\n${planned.map((k) => `- ${k}: ${QUERY_HINT[k]}`).join('\n')}` },
+    ], { maxTokens: MAX_TOKENS_QUERY });
+    parsed = parseSolarJson(r.content);
+  } catch { /* 아래 폴백 */ }
+  const out = Object.fromEntries(planned.map((k) => [k, trimQuery(k, parsed?.[k]) || trimQuery(k, stage.title)]));
+  if (planned.includes('oss') && HANGUL.test(out.oss)) out.oss = await toEnglishQuery(out.oss || stage.title);
+  return out;
+}
+
+/** 한국어 검색어 → GitHub 용 영문 키워드 2~4개. 실패하면 빈 문자열. */
+async function toEnglishQuery(text) {
+  try {
+    const r = await callSolar([
+      { role: 'system', content: 'GitHub 저장소를 찾기 위한 영문 키워드 2~4개만 출력합니다. 소문자 영문과 공백만 씁니다. 다른 텍스트는 쓰지 않습니다.' },
+      { role: 'user', content: String(text) },
+    ], { maxTokens: 40 });
+    const ascii = String(r.content ?? '').replace(/[^A-Za-z0-9 +._-]/g, ' ').replace(/\s+/g, ' ').trim();
+    return ascii ? trimQuery('oss', ascii) : '';
+  } catch {
+    return '';
   }
 }
 
@@ -980,7 +947,7 @@ export async function POST(request) {
     }
 
     // 1) 채널 선택 (코드 규칙)
-    const planned = selectChannels(stage.title, stage.desc, stage.tasks || [], stage.choices || []);
+    const planned = planChannels(stage, activeChannels);
     // activeChannels 제약 반영
     const plannedActive = planned.filter((n) => activeChannels.includes(n));
     // web-only면 web만, break면 해당 채널 제외
@@ -994,8 +961,8 @@ export async function POST(request) {
     const tools = buildToolDefs();
 
     // 2) 쿼리 생성 호출 (작은 호출)
-    const queries = await generateQueries(stage, summary, plannedFinal);
-    const queryMap = new Map(queries.map((q) => [q.channel, q.query]));
+    const plannedQueries = planQueries(/* key= */ null, stage, summary, plannedFinal);
+    const queryMap = new Map(Object.entries(plannedQueries));
 
     // 3) 프리서치: 규칙 채널을 한 단계 안에서 직렬로 돈다 (외부 API 429 회피).
     const preResults = [];
@@ -1021,7 +988,7 @@ export async function POST(request) {
       const q = queryMap.get(ch) || stage.title;
       let results = [];
       let chCalls = 0;
-      const stageWords = extractStageWords(stage);
+      const stageWords = stageContextWords(stage);
       const { results: chResults, calls: chSearchCalls } = await runChannelSearch(ch, q, stage);
       chCalls = chSearchCalls;
       const stats = ensureStats(ch);
@@ -1148,7 +1115,7 @@ export async function POST(request) {
 
         // web 결과에서 stats/public_data로 분류된 항목도 관문을 지나게 한다
         if (chname === 'web' && stage && results.some((r) => r.channel === 'stats' || r.channel === 'public_data')) {
-          const stageWords = extractStageWords(stage);
+          const stageWords = stageContextWords(stage);
           const routed = [];
           for (const r of results) {
             if (r.channel === 'stats' || r.channel === 'public_data') {
