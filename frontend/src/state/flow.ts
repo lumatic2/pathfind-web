@@ -46,10 +46,17 @@ function questionMeta(turn: GrillTurn) {
 }
 
 export function useFlow() {
-  const { session, patch, sessionEpoch } = useSession()
+  const { session, patch: patchSession, sessionEpoch } = useSession()
   const sessionRef = useRef(session)
   const sessionEpochRef = useRef(sessionEpoch)
   sessionRef.current = session
+  const patch = useCallback(
+    (changes: Partial<ReturnType<typeof useSession>['session']>) => {
+      sessionRef.current = { ...sessionRef.current, ...changes }
+      patchSession(changes)
+    },
+    [patchSession],
+  )
   const generationRef = useRef(0)
   const retryingRef = useRef(false)
   const planningLock = useRef(false)
