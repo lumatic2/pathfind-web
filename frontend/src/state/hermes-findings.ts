@@ -87,7 +87,7 @@ export function normalizeHermesFinding(f: Finding): Finding {
     if (looksLikeReview(host)) finalChannel = "web_review"
   }
   const grade = String((f as { grade?: unknown }).grade ?? "").trim() || FIXED_GRADE[finalChannel] || ""
-  return { ...f, channel: finalChannel, ...(grade ? { grade } : {}) }
+  return { ...f, channel: finalChannel as Finding["channel"], ...(grade ? { grade: grade as Finding["grade"] } : {}) }
 }
 
 /** 이벤트 한 개 → 중앙에 흐를 활동 줄 한 개. 흘릴 게 없으면 null.
