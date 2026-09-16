@@ -240,8 +240,8 @@ export default function App() {
       {/* 랜딩에서 넘어온 사람이 같은 자리에서 같은 로고를 만난다 — 크롬은 이 요소를 이어서 움직인다
           (`[data-app-logo]` ↔ 랜딩 `.nav__logo`, 이름 `pathfinder-logo`). 누르면 랜딩으로 돌아간다. */}
       <a href="/" aria-label="Pathfinder 홈" data-app-logo className="flex shrink-0 items-center gap-2">
-        <img src="/pathfinder-mark.png" alt="" aria-hidden className="h-7 w-auto" />
-        <img src="/pathfinder-wordmark.png" alt="Pathfinder" className="h-4 w-auto" />
+        <img src="/pathfinder-mark.png" alt="" aria-hidden className="h-7 w-auto" style={{ height: 28, width: 35, flexShrink: 0 }} />
+        <img src="/pathfinder-wordmark.png" alt="Pathfinder" className="h-4 w-auto" style={{ height: 16, width: 96, flexShrink: 0 }} />
       </a>
       <NotebookTopbar
         className="min-w-0 flex-1 pl-0"
@@ -559,7 +559,7 @@ const LeftPanel = forwardRef<LeftPanelHandle, { collapsed: boolean; onCollapsedC
   }, [session.phase, session.stages, session.sourceCards, session.summary, patch])
 
   return (
-    <div className="panel-left h-full min-h-0">
+    <div className="panel-left flex flex-1 flex-col min-h-0">
       <GroundedSourcePanel
         sources={sources}
         selectedIds={[]}
@@ -951,10 +951,10 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
   }, [researchActive, onSilence])
 
   return (
-    <div className="panel-center">
+    <div className="panel-center flex min-h-0 flex-1 flex-col">
       <ChatConversationPanel
         variant="grounded"
-        className="h-full max-w-none rounded-none border-0 bg-card"
+        className="min-h-0 flex-1 max-w-none rounded-none border-0 bg-card"
         title="대화"
         messages={chatMessages}
         status={status}
@@ -1027,7 +1027,7 @@ function RightPanel() {
   )
 
   return (
-    <div className="panel-right h-full min-h-0">
+    <div className="panel-right flex flex-1 flex-col min-h-0">
       <MindmapPanel
         layout="fan"
         mapTitle={session.mapTitle ?? session.bigPicture?.title}
