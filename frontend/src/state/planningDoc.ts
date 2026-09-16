@@ -3,18 +3,17 @@ import type { BigPicture, SourceDoc } from "./types"
 const PLANNING_ID = "planning-sources"
 
 function safe(s: string): string {
-  return String(s).replace(/\s+/g, " ").replace(/[\\`*_{}[\\]<>#|]/g, "\\$&")
+  return String(s).replace(/\s+/g, " ").replace(/[\`*_{}[\]<>#|]/g, "\\$&")
 }
 
 function link(s: { title: string; url: string }): string {
   if (!/^https?:\/\//.test(s.url)) return safe(s.title)
-  return `[${safe(s.title)}](${s.url.replace(/[()<>\s]/g, c => encodeURIComponent(c).replace(/\(/g, "%28").replace(/\)/g, "%29"))}`
+  return `[${safe(s.title)}](${s.url.replace(/[()<>\s]/g, c => encodeURIComponent(c).replace(/\(/g, "%28").replace(/\)/g, "%29"))})`
 }
 
 export function buildPlanningDoc(bigPicture: BigPicture | null): SourceDoc | null {
   if (bigPicture == null || bigPicture.planning == null) return null
   const p = bigPicture.planning
-
   const stageBasisArr = Object.entries(p.stageBasis).map(([no, b]) => [Number(no), b] as const)
 
   const out = [
@@ -90,4 +89,24 @@ export function buildPlanningDoc(bigPicture: BigPicture | null): SourceDoc | nul
     markdown: out.join("\n"),
     status: "done",
   }
+}
+
+/** 중앙 에이전트 설명: 설계 요지와 대표 근거를 읽고 상세 문서로 이어간다. */
+export function planningExplanation(bp: BigPicture): string {
+  const p = bp.planning
+  if (!p) return ""
+  const brief = (text: string, limit: number) => text.length > limit ? text.slice(0, limit) + "…" : text
+  if (p.mode === "research-informed") return [p.researchNotes?.length ? "**사례를 참고해 목표에 맞는 실행 단계를 제안했습니다.**" : "**인터뷰 내용을 바탕으로 실행 단계 초안을 제안했습니다.**", "", brief(p.basisSummary, 400),
+    "", "단계와 순서는 사용자 상황에 맞춘 제안입니다. 참고 자료와 단계별 설계 이유는 왼쪽 **단계를 정할 때 참고한 자료**에서 볼 수 있습니다.",
+    ...(p.warnings.length ? ["", brief(p.warnings[0], 180)] : [])].join("\n")
+  const source = Object.values(p.stageBasis).find(b => b.basis === "source")
+  const adaptation = Object.values(p.stageBasis).find(b => b.basis === "adaptation")
+  const out = ["**조사한 내용을 바탕으로 실행 순서를 정했습니다.**", "", p.basisSummary, ""]
+  if (source) {
+    const title = p.sources.find(s => source.sourceIds.includes(s.id))?.title
+    out.push(`- **자료에서 확인한 점:** ${source.reason}${title ? ` (참고: ${title})` : ""}`)
+  }
+  if (adaptation) out.push(`- **상황에 맞춰 조정한 점:** ${adaptation.reason}`)
+  out.push("", "단계별 근거 구절과 출처는 왼쪽 **단계를 정할 때 참고한 자료**에서 자세히 볼 수 있습니다.")
+  return out.join("\n")
 }
