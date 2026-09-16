@@ -23,15 +23,17 @@
 
   /* --- verdict 4색 (DESIGN.md Light 표, 이름 그대로) --- */
   --verdict-bring:      #10b981;
+  --verdict-existing:   #10b981;
   --verdict-mix:        #7c3aed;
   --verdict-direct:     #f59e0b;
+  --verdict-need:       #f59e0b;
   --verdict-none:       #6b7280;
 
   /* --- requiredCssVars 24개 (이름·값 전부) --- */
   --background:         var(--surface);
   --foreground:         var(--text);
   --card:               var(--surface);
-  --input:              var(--surface);
+  --input:              #ffffff;
   --muted:              var(--accent-soft);
   --muted-foreground:   var(--text-secondary);
   --primary:            #6F2DBD;
