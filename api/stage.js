@@ -214,7 +214,7 @@ function gateResultsIfNeeded(channelName, query, stage, results, stageWords) {
   let dropped = 0;
   for (const r of results) {
     try {
-      const relevant = isRelevantHit(r, [], stageWords, { query: String(query || '') });
+      const relevant = isRelevantHit(r, String(query || ''), stageWords, { query: String(query || '') });
       if (relevant) {
         kept.push(r);
       } else {
