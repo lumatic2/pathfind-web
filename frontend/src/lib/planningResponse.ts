@@ -172,10 +172,27 @@ export function validatePlanningResponse(raw: unknown): Planning {
   if (stageBasisRaw === undefined || stageBasisRaw === null) {
     throw new PlanningResponseError(422, 'planning.stageBasis가 없습니다');
   }
-  if (typeof stageBasisRaw !== 'object' || Array.isArray(stageBasisRaw)) {
+  let stageBasis: Record<string, unknown>;
+  if (Array.isArray(stageBasisRaw)) {
+    // 배열을 stageNo 키를 갖는 Record로 한 번 바꿔 쓴다 (참조 구현 api.ts 와 동일).
+    const arr = stageBasisRaw as unknown[];
+    stageBasis = {};
+    for (const item of arr) {
+      if (item === null || typeof item !== 'object') {
+        throw new PlanningResponseError(422, 'stageBasis 배열 항목이 객체가 아닙니다');
+      }
+      const r = item as Record<string, unknown>;
+      const no = typeof r.stageNo === 'number' && Number.isInteger(r.stageNo) ? r.stageNo : -1;
+      if (no < 1 || !stageNos.has(no)) {
+        throw new PlanningResponseError(422, `stageBasis 배열 항목에 유효하지 않은 stageNo가 있습니다: ${no}`);
+      }
+      stageBasis[String(no)] = item;
+    }
+  } else if (typeof stageBasisRaw === 'object') {
+    stageBasis = stageBasisRaw as Record<string, unknown>;
+  } else {
     throw new PlanningResponseError(422, 'planning.stageBasis가 객체가 아닙니다');
   }
-  const stageBasis = stageBasisRaw as Record<string, unknown>;
   for (const key of Object.keys(stageBasis)) {
     const no = Number(key);
     if (!Number.isInteger(no) || no < 1) {
@@ -206,8 +223,29 @@ export function validatePlanningResponse(raw: unknown): Planning {
       }
     }
     for (const sup of supportArr) {
-      if (typeof sup !== 'string' || sup === '') {
-        throw new PlanningResponseError(422, `stageBasis[${no}].support에 빈 항목이 있습니다`);
+      if (typeof sup === 'string') {
+        if (sup === '') {
+          throw new PlanningResponseError(422, `stageBasis[${no}].support에 빈 문자열이 있습니다`);
+        }
+      } else if (sup !== null && typeof sup === 'object') {
+        const o = sup as Record<string, unknown>;
+        const sourceId = typeof o.sourceId === 'string' ? o.sourceId : '';
+        if (sourceId === '') {
+          throw new PlanningResponseError(422, `stageBasis[${no}].support 객체의 sourceId가 비어 있습니다`);
+        }
+        if (!sourceIds.has(sourceId)) {
+          throw new PlanningResponseError(422, `stageBasis[${no}].support 객체의 sourceId(${sourceId})가 sources에 없습니다`);
+        }
+        const excerpt = typeof o.excerpt === 'string' ? o.excerpt : '';
+        if (excerpt === '') {
+          throw new PlanningResponseError(422, `stageBasis[${no}].support 객체의 excerpt가 비어 있습니다`);
+        }
+        const supports = typeof o.supports === 'string' ? o.supports : '';
+        if (!['stage', 'order', 'prerequisite'].includes(supports)) {
+          throw new PlanningResponseError(422, `stageBasis[${no}].support 객체의 supports가 유효하지 않습니다: ${supports}`);
+        }
+      } else {
+        throw new PlanningResponseError(422, `stageBasis[${no}].support 항목이 문자열/객체가 아닙니다`);
       }
     }
   }
