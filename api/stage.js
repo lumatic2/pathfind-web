@@ -2,9 +2,15 @@
 // 계약: docs/api-contract.md §3 · §7. 경로별 제공자 추상화 유지.
 // 변경: 기존 단일 web_search 2회 상한 → 채널 5종(나이버·GitHub·법령·공공데이터·통계) 중
 //       단계 텍스트 키워드로 코드 규칙 채널 선택 → 프리서치 병렬 병렬 → 분석 호출.
+//
+// 7차 step-28 보강: 검색 채널의 인자와 결과를 단계 조사에 연결.
+//  - channelOpts: 목표화면 channelOpts를 그대로 계산(law→{extraTerms,contextWords}, stats→{stage})
+//  - runChannelSearch: display·stage·extraTerms·contextWords·trace를 채널 함수에 전달
+//  - searchWeb → searchWebBundle: 네이버 webkr·blog·cafearticle 병렬 + rankReviews 연결
+//  - 도구 호출부(github_search·law_search·web_search)도 runChannelSearch + channelOpts로 통일
 
 import { sendError, logCall } from './_lib/http.js';
-import { available as naverAvailable, searchNaver, name as NAVER_NAME } from './_channels/naver.js';
+import { available as naverAvailable, rankReviews, searchNaver, name as NAVER_NAME } from './_channels/naver.js';
 import { available as githubAvailable, searchGithub, name as GITHUB_NAME } from './_channels/github.js';
 import { lawAvailable, searchLaw, NAME as LAW_NAME, isRelevantHit } from './_channels/law.js';
 import { available as publicDataAvailable, searchPublicData, name as PUBLIC_DATA_NAME } from './_channels/public-data.js';
@@ -64,6 +70,7 @@ const CHANNELS = [
 const AVAILABLE_CHANNEL_NAMES = CHANNELS.filter((c) => c.available).map((c) => c.name);
 
 // ---------- 채널 계획 전용 도구 이름 (목표화면 assembly 대응) ----------
+
 const PLAN_TOOL_BY_CHANNEL = {
   web: 'pathfind_web_search',
   oss: 'pathfind_oss_search',
@@ -113,6 +120,17 @@ function stageContextWords(stage) {
   return [...new Set(hits)];
 }
 
+/**
+ * 목표화면 channelOpts와 같은 값. law는 extraTerms·contextWords, stats는 stage를 돌려 준다.
+ * buildCatalog가 받는 결선 형식으로만 반환한다.
+ */
+function channelOpts(channel, stage) {
+  if (!stage) return undefined;
+  if (channel === 'law') return { extraTerms: matchedRuleWords(stage, 'law'), contextWords: stageContextWords(stage) };
+  if (channel === 'stats') return { stage };
+  return undefined;
+}
+
 // ---------- 낱말 길이 제약 ----------
 
 function clampWords(text, maxWords) {
@@ -143,6 +161,29 @@ export function extractStageWords(stage) {
     .filter((t) => t.length >= 2);
 
   return [...new Set(tokens)];
+}
+
+// ---------- 웹 번들 (목표화면 searchWebBundle) ----------
+
+/**
+ * 네이버 webkr·blog·cafearticle을 병렬로 호출하고, 블로그·카페 결과에 rankReviews를 연결해
+ * web Review 1건씩만 남긴다(목표화면 searchWebBundle·channelOpts 반영).
+ *
+ * opts.display는 webkr에만 쓰고, 블로그·카페는 최대 3건 받아 rankReviews로 1건씩 추린다.
+ * 채널 실패는 캐치하지 않고 호출부로 올린다 — webkr 실패만 표면화된다.
+ */
+async function searchWebBundle(query, opts = {}) {
+  const display = opts.display ?? MAX_RESULTS_PER_CHANNEL;
+  const [web, blog, cafe] = await Promise.all([
+    searchNaver(query, { kind: 'webkr', display }),
+    searchNaver(query, { kind: 'blog', display: 3 }).catch(() => []),
+    searchNaver(query, { kind: 'cafearticle', display: 3 }).catch(() => []),
+  ]);
+  const reviews = [
+    ...rankReviews(blog).slice(0, 1),
+    ...rankReviews(cafe).slice(0, 1),
+  ];
+  return [...web, ...reviews.map((r) => ({ ...r, channel: 'web_review' }))];
 }
 
 // ---------- 관문: 통계·공공데이터 결과 관련성 필터 ----------
@@ -409,7 +450,7 @@ function buildToolDefs() {
         parameters: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: '영문 키워드 2~4개. 예: "react dashboard template".' },
+            query: { type: 'string', description: '영문 키워드 2~4개. 예: \"react dashboard template\".' },
           },
           required: ['query'],
         },
@@ -427,7 +468,7 @@ function buildToolDefs() {
         parameters: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: '법령 이름 핵심 낱말 1~2개. 예: "개인정보 보호".' },
+            query: { type: 'string', description: '법령 이름 핵심 낱말 1~2개. 예: \"개인정보 보호\".' },
           },
           required: ['query'],
         },
@@ -484,72 +525,60 @@ async function callSolar(messages, { tools = false, tool_choice = 'auto', maxTok
 
 // ---------- 채널별 실제 검색 실행 ----------
 
-async function runChannelSearch(channelName, query, stage = null) {
+/**
+ * 채널을 실제로 부른다. display·stage·extraTerms·contextWords·trace를 채널 함수에 전달.
+ * web은 searchWebBundle(네이버 병렬 + rankReviews), 나머지는 각 채널 함수를 opts와 함께 호출.
+ * 채널 실패는 부분 실패로 남기고 전체 성공으로 숨기지 않는다.
+ */
+async function runChannelSearch(channelName, query, stage = null, opts = {}) {
   const ch = CHANNELS.find((c) => c.name === channelName);
   if (!ch || !ch.search) return { results: [], calls: 0 };
   try {
     if (channelName === 'web') {
-      // 웹은 서브타입 3종을 한 단계 안에서 직렬로 돈다 (외부 API 429 회피).
-      const results = [];
-      const webSubtypes = ['webkr', 'blog', 'cafearticle'];
-      for (let i = 0; i < webSubtypes.length; i++) {
-        const subResults = await searchNaver(query, webSubtypes[i], MAX_RESULTS_PER_CHANNEL);
-        results.push(
-          ...subResults.map((r, idx) => {
-            const ch =
-              i === 0 ? 'web' : 'web_review';
-            return { ...r, channel: ch };
-          }),
-        );
-      }
-      return { results, calls: 3 };
+      const results = await searchWebBundle(query, opts);
+      return { results, calls: 1 };
     }
     if (channelName === 'oss') {
-      const results = await searchGithub(query, MAX_RESULTS_PER_CHANNEL);
+      const results = await searchGithub(query, { display: opts.display ?? MAX_RESULTS_PER_CHANNEL, stage: opts.stage ?? stage });
       return { results: results.map((r) => ({ ...r, channel: 'oss' })), calls: 1 };
     }
     if (channelName === 'law') {
-      const results = await searchLaw(query, MAX_RESULTS_PER_CHANNEL);
+      const results = await searchLaw(query, {
+        display: opts.display ?? MAX_RESULTS_PER_CHANNEL,
+        extraTerms: opts.extraTerms,
+        contextWords: opts.contextWords,
+        trace: opts.trace,
+        stage: opts.stage ?? stage,
+      });
       return { results: results.map((r) => ({ ...r, channel: 'law' })), calls: 1 };
     }
     if (channelName === 'stats') {
-      const results = await searchKosis(query, MAX_RESULTS_PER_CHANNEL);
+      const results = await searchKosis(query, {
+        display: opts.display ?? MAX_RESULTS_PER_CHANNEL,
+        stage: opts.stage ?? stage,
+      });
       return { results, calls: 1 };
     }
     if (channelName === 'public_data') {
-      const results = await searchPublicData(query);
+      const results = await searchPublicData(query, { display: opts.display ?? MAX_RESULTS_PER_CHANNEL });
       return { results, calls: 1 };
     }
     return { results: [], calls: 0 };
   } catch (e) {
-    logCall('stage.runChannelSearch', 0, 0, {});
-    return { results: [], calls: 0 };
+    logCall('stage.runChannelSearch', 0, 0, { channel: channelName, err: String(e).slice(0, 80) });
+    return { results: [], calls: 0, error: String(e).slice(0, 120) };
   }
 }
 
-// 기존 searchWeb 재사용 (SEARCH_API_KEY 기반)
-async function searchWeb(query) {
-  const key = process.env.SEARCH_API_KEY;
-  if (!key) throw new Error('SEARCH_API_KEY not configured');
-  const url = process.env.SEARCH_API_URL || 'https://api.tavily.com/search';
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, api_key: key, max_results: MAX_RESULTS_PER_CHANNEL }),
-  });
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`검색 API 오류 (${res.status}): ${errBody.slice(0, 200)}`);
-  }
-  const data = await res.json();
-  return (data.results || []).map((r, idx) => ({
-    id: `naver-web-${idx}`,
-    title: r.title || '검색 결과',
-    url: r.url || '',
-    host: (() => { try { return new URL(r.url || '').hostname; } catch { return ''; } })(),
-    snippet: (r.content || '').slice(0, 300),
-    channel: 'web',
-  }));
+// ---------- searchWeb: 네이버 searchWebBundle을 경유 ----------
+
+/**
+ * 기존 searchWeb 자리. 이제 네이버 searchWebBundle을 돌려 web·web_review 결과를 받는다.
+ * display·trace 등 opts를 searchWebBundle에 전달한다.
+ */
+async function searchWeb(query, opts = {}) {
+  const results = await searchWebBundle(query, opts);
+  return { web: results.filter((r) => r.channel === 'web'), web_review: results.filter((r) => r.channel === 'web_review') };
 }
 
 // ---------- id 카탈로그 (모델이 id로만 가리키게) ----------
@@ -991,7 +1020,8 @@ export async function POST(request) {
       let results = [];
       let chCalls = 0;
       const stageWords = stageContextWords(stage);
-      const { results: chResults, calls: chSearchCalls } = await runChannelSearch(ch, q, stage);
+      const opts = channelOpts(ch, stage);
+      const { results: chResults, calls: chSearchCalls } = await runChannelSearch(ch, q, stage, opts);
       chCalls = chSearchCalls;
       const stats = ensureStats(ch);
       stats.calls += chSearchCalls;
@@ -1031,6 +1061,7 @@ export async function POST(request) {
               ch,
               topicQuery,
               stage,
+              channelOpts(ch, stage),
             );
             const tStats = ensureStats(ch);
             tStats.returned += tResults.length;
@@ -1105,14 +1136,8 @@ export async function POST(request) {
         const q = args.query || '';
         if (!q) break;
 
-        let results = [];
-        if (tc.function.name === 'github_search') {
-          results = await searchGithub(q, MAX_RESULTS_PER_CHANNEL);
-        } else if (tc.function.name === 'law_search') {
-          results = await searchLaw(q, MAX_RESULTS_PER_CHANNEL);
-        } else {
-          results = await searchWeb(q);
-        }
+        const opts = channelOpts(chname, stage);
+        const { results } = await runChannelSearch(chname, q, stage, opts);
         ensureStats(chname).returned += results.length;
 
         // web 결과에서 stats/public_data로 분류된 항목도 관문을 지나게 한다
