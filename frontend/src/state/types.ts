@@ -214,6 +214,7 @@ export type Session = {
   turnCount: number
   history: GrillTurn[]
   pending: GrillResponse | null
+  opening?: string
   summary: string
   bigPicture: BigPicture | null
   stages: StageSlot[]

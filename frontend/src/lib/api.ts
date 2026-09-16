@@ -3,6 +3,7 @@
 // 서버 파일(api/*.js)은 건드리지 않는다.
 
 import type {
+  GrillChoice,
   GrillResponse,
   BigPicture,
   Stage,
@@ -97,6 +98,7 @@ function normalizeGrillResponse(raw: unknown): GrillResponse {
     summary: r.summary ? String(r.summary) : undefined,
     turnCount:
       typeof r.turnCount === 'number' ? r.turnCount : 0,
+    opening: r.opening ? String(r.opening) : undefined,
   } as GrillResponse;
 }
 
@@ -109,7 +111,7 @@ export async function grill(
   body: {
     question?: string;
     answer?: string;
-    history?: { questionTitle: string; questionBody: string; suggestion: string; exampleButtons: string[] }[];
+    history?: { questionTitle: string; questionBody: string; suggestion: string; exampleButtons: string[] | GrillChoice[]; answer?: string }[];
     turnCount?: number;
   },
 ): Promise<GrillResponse> {
