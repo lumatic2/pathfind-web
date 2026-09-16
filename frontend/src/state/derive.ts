@@ -1235,3 +1235,21 @@ export type GroundedStage = {
   /** `order` 중 **본문에 실제로 달린** 개수. 나머지(꼬리)는 결과 줄 끝의 마커가 받는다. */
   citedInBody: number
 }
+
+export function attachMarksByName(text: string, cites: Array<{ n: number; name: string }>): string {
+  const src = String(text ?? "")
+  const list = cites.filter((c) => Number.isInteger(c.n) && c.n > 0 && String(c.name ?? "").trim().length >= 2)
+  if (!src.trim() || !list.length) return src
+  const used = new Set<number>()
+  return src
+    .split(/(?<=[.!?])(?=\s)|(?=\n)/)
+    .map((part) => {
+      if (/[\[\]\d{1,2}\]/.test(part)) return part
+      const hit = list.find((c) => !used.has(c.n) && part.includes(c.name))
+      if (!hit) return part
+      used.add(hit.n)
+      const m = /^([\s\S]*?)([.!?]\s*)$/.exec(part)
+      return m ? `${m[1]} [${hit.n}]${m[2]}` : `${part} [${hit.n}]`
+    })
+    .join("")
+}
