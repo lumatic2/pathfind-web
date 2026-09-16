@@ -6,6 +6,8 @@
  * 계약 정본 → `research/2026-09-13-hermes-gateway-contract.md`
  */
 
+/// <reference types="vite/client" />
+
 export type HermesEvent = {
   event: string
   run_id?: string
