@@ -159,7 +159,11 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
       const byTask = new Map();
       for (const t of tasks) {
         if (!t || !t.task) continue;
-        byTask.set(t.task, { task: t.task, owner: '직접 함', note: '' });
+        byTask.set(t.task, {
+          task: t.task,
+          owner: t.owner && t.owner.trim() ? t.owner.trim() : '직접 함',
+          note: t.note && t.note.trim() ? t.note.trim() : '',
+        });
       }
       for (const t of todos) {
         if (!t || !t.task) continue;
@@ -184,7 +188,8 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
       }
 
       // 선택지 — options를 우선하고, options가 없으면 choices(옛)만 있는 경우도 보존
-      const options = s.options || s.choices || [];
+      const options = (s.options && s.options.length) ? s.options
+        : (s.choices && s.choices.length) ? s.choices : [];
       const nonempty = options.filter(c => c && c.trim());
       if (nonempty.length > 0) {
         lines.push('**선택지:**');
