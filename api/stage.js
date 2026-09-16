@@ -1141,7 +1141,7 @@ export async function POST(request) {
         if (!q) break;
         queries.push({ channel: chname, query: q });
         const opts = channelOpts(chname, stage);
-        const { results, error: channelFailed } = await runChannelSearch(chname, q, stage, opts);
+        let { results, error: channelFailed } = await runChannelSearch(chname, q, stage, opts);
         if (channelFailed) logCall('stage.toolRun.failed', 0, 502, { 'x-channel': chname });
         ensureStats(chname).returned += results.length;
 
@@ -1204,7 +1204,7 @@ export async function POST(request) {
     const catalog = buildCatalog(preResults, toolResults);
 
     // 모델 findings 조립 (카탈로그 없는 id 버림)
-    const parsed = parseSolarJson(toolResult.content || '');
+    let parsed = parseSolarJson(toolResult.content || '');
     const findings = assembleFindings(parsed, catalog);
 
     const TARGET_CHANNELS = new Set(['law', 'stats', 'public_data']);
@@ -1310,7 +1310,7 @@ export async function POST(request) {
           if (f.id) idToNewNum.set(f.id, idx + 1);
         });
         return String(text ?? '').replace(/(\s*)\[(\d{1,2})\]/g, (_whole, space, raw) => {
-          const src = (parsed?.findings || []).find((f, i) => i + 1 === Number(raw));
+          const src = (p?.findings || []).find((f, i) => i + 1 === Number(raw));
           const id = src?.id;
           if (!id || !finalIds.has(id)) return '';
           const to = idToNewNum.get(id);
@@ -1318,13 +1318,13 @@ export async function POST(request) {
         });
       };
 
-      const verdictLine = verImporterNumberMarks(parsed?.verdictLine).trim();
+      const verdictLine = verImporterNumberMarks(p?.verdictLine).trim();
       /** 이유 문단의 층위는 스키마가 담당한다 — 산문 대신 배열로 받고 글머리표 조립은 코드가 한다. */
-      const reasonPoints = (Array.isArray(parsed?.reasonPoints) ? parsed.reasonPoints : [])
+      const reasonPoints = (Array.isArray(p?.reasonPoints) ? p.reasonPoints : [])
         .map((x) => ({ label: String(x?.label ?? '').trim(), text: String(x?.text ?? '').trim() }))
         .filter((x) => x.text)
         .slice(0, 5);
-      const leadRaw = String(parsed?.verdictReason ?? '').trim();
+      const leadRaw = String(p?.verdictReason ?? '').trim();
       const leadLines = leadRaw.split(/\r?\n/);
       const lead = (reasonPoints.length ? leadLines.filter((l) => !/^\s*[-*•]\s+/.test(l)) : leadLines).join('\n').replace(/\n\s*\n+/g, '\n\n').trim();
       const reasonBody = [lead, ...(reasonPoints.length ? [reasonPoints.map((x) => (x.label ? `- **${x.label}**: ${x.text}` : `- ${x.text}`)).join('\n')] : [])]
