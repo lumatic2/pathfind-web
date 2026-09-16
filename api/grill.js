@@ -38,10 +38,10 @@ function buildHistoryMessages(history) {
       : '';
     return [
       {
-        role: 'user',
-        content: `[질문]\n제목: ${h.questionTitle}\n\n${h.questionBody}\n\n[추천] ${h.suggestion}\n\n[예시 버튼]\n${buttons}`,
+        role: 'assistant',
+        content: JSON.stringify({ questionTitle: h.questionTitle, questionBody: h.questionBody, suggestion: h.suggestion, exampleButtons: h.exampleButtons }),
       },
-      { role: 'assistant', content: `[내 답변] ${h.answer}` },
+      { role: 'user', content: `내 답변: ${h.answer}` },
     ];
   });
 }
