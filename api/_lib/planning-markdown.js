@@ -2,6 +2,13 @@
 // 내려받는 문서 — 조사 기록과 단계별 제안 절을 조립한다.
 // 모델·외부 API 호출 없음.
 
+/** 마크다운 특수 문자를 이스케이프한다(text에서만). */
+function escapeMd(s) {
+  if (typeof s !== 'string') return '';
+  return s
+    .replace(/[\\`*_{}\\[\\]#>|]/g, '\\$&');
+}
+
 /** bigPicture의 planning을 받아 내려받는 문서 한 절을 조립한다.
  * planning이 없으면 빈 문자열(옛 입력 보존), 자료가 없으면 초안 표시. */
 export function buildPlanningMarkdown(bigPicture) {
@@ -15,15 +22,18 @@ export function buildPlanningMarkdown(bigPicture) {
   const warnings = planning.warnings || [];
   const basisSummary = planning.basisSummary || '';
   const stages = (bigPicture && bigPicture.stages) || [];
+  const hasMaterial = sources.length > 0 || researchNotes.length > 0;
 
   const stageMap = new Map();
   for (const s of stages) {
     if (s && typeof s === 'object' && s.no != null) stageMap.set(s.no, s);
   }
+  const sourceById = new Map();
+  for (const src of sources) {
+    if (src && src.id) sourceById.set(src.id, src);
+  }
 
-  const hasMaterial = sources.length > 0 || researchNotes.length > 0;
   const lines = [];
-
   lines.push('# 내려받은 문서 — 조사 기록과 단계별 제안');
   lines.push('');
 
@@ -32,43 +42,68 @@ export function buildPlanningMarkdown(bigPicture) {
     lines.push('');
   }
 
-  // 참고 자료 — 실제 검색 자료(제목·링크·발췌)와 모델 제안 이유를 구분한다.
-  lines.push('## 참고 자료');
+  // 단계를 정한 이유와 자료 — 2수준 제목 하나로 통합
+  lines.push('## 단계를 정한 이유와 자료');
+  lines.push('');
+  if (basisSummary && basisSummary.trim()) {
+    lines.push(basisSummary.trim());
+    lines.push('');
+  }
+  lines.push(`- 자료 수: ${sources.length}건`);
+  if (planning.researchedAt) {
+    lines.push(`- 조회 시각: ${planning.researchedAt}`);
+  }
+  lines.push('');
+  lines.push('검색 결과의 제목과 발췌를 읽었고, 링크 본문 전체를 읽은 기록은 아닙니다.');
+  lines.push('');
+
+  // 참고한 조사 내용 — sources와 researchNotes 발췌를 sourceId로 연결
+  lines.push('## 참고한 조사 내용');
   lines.push('');
   if (hasMaterial) {
     for (const src of sources) {
       if (!src || !src.id) continue;
       const title = src.title || '자료';
       const url = src.url && src.url.trim() ? src.url.trim() : null;
-      const snippet = src.snippet || '';
-      const channel = src.channel || '';
+      const titleEsc = escapeMd(title);
       if (url) {
-        lines.push(`- [${title}](${url})`);
+        lines.push(`- [${titleEsc}](${url})`);
       } else {
-        lines.push(`- ${title}`);
+        lines.push(`- ${titleEsc}`);
       }
-      if (snippet) lines.push(`  ${snippet}`);
-      if (channel) lines.push(`  채널: ${channel}`);
+      if (src.accessedAt) lines.push(`  접근: ${src.accessedAt}`);
+      if (src.snippet) lines.push(`  발췌: ${escapeMd(src.snippet)}`);
+      if (src.queries && src.queries.length > 0) {
+        lines.push(`  검색어: ${src.queries.map(escapeMd).join(', ')}`);
+      }
+      if (src.channel) lines.push(`  채널: ${src.channel}`);
       lines.push('');
     }
     for (const note of researchNotes) {
       if (!note || !note.sourceId) continue;
+      const src = sourceById.get(note.sourceId);
       const excerpt = note.excerpt || '';
-      if (excerpt) {
-        lines.push(`- 발췌(직접 참고): ${excerpt}`);
-        lines.push('');
+      if (!excerpt) continue;
+      const excerptEsc = escapeMd(excerpt);
+      if (src) {
+        const sTitle = src.title || '자료';
+        const sUrl = src.url && src.url.trim() ? src.url.trim() : null;
+        const sTitleEsc = escapeMd(sTitle);
+        if (sUrl) {
+          lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
+          lines.push(`  출처: [${sTitleEsc}](${sUrl}) (자료 ${note.sourceId})`);
+        } else {
+          lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
+          lines.push(`  출처: ${sTitleEsc} (자료 ${note.sourceId})`);
+        }
+      } else {
+        lines.push(`- 발췌(직접 참고): ${excerptEsc}`);
+        lines.push(`  출처: (자료 ${note.sourceId})`);
       }
+      lines.push('');
     }
   } else {
     lines.push('아직 조사 자료가 없습니다. 인터뷰 기반 초안입니다.');
-    lines.push('');
-  }
-
-  // 전체 제안 이유
-  if (basisSummary && basisSummary.trim()) {
-    lines.push('## 전체 제안 이유');
-    lines.push('');
-    lines.push(basisSummary.trim());
     lines.push('');
   }
 
@@ -80,23 +115,43 @@ export function buildPlanningMarkdown(bigPicture) {
       if (!sb || sb.stageNo == null) continue;
       const stage = stageMap.get(sb.stageNo);
       const stageTitle = (stage && stage.title) ? stage.title : `단계 ${sb.stageNo}`;
-      lines.push(`### ${sb.stageNo}. ${stageTitle}`);
+      lines.push(`### ${sb.stageNo}. ${escapeMd(stageTitle)}`);
       lines.push('');
       const reason = sb.reason || '';
       if (reason) {
-        lines.push(`- 제안 이유: ${reason}`);
+        lines.push(`- 제안 이유: ${escapeMd(reason)}`);
+        lines.push('');
+      }
+      // support 발췌를 sourceId로 연결
+      const support = sb.support || [];
+      if (support.length > 0) {
+        lines.push('- 이 단계가 참고한 자료:');
+        for (const sup of support) {
+          if (!sup) continue;
+          const src = sourceById.get(sup);
+          if (src) {
+            const t = src.title || '자료';
+            const u = src.url && src.url.trim() ? src.url.trim() : null;
+            const tEsc = escapeMd(t);
+            if (u) lines.push(`  - [${tEsc}](${u})`);
+            else lines.push(`  - ${tEsc}`);
+          } else {
+            lines.push(`  - (자료 ${sup})`);
+          }
+        }
         lines.push('');
       }
       const sourceIds = sb.sourceIds || [];
       if (sourceIds.length > 0) {
         lines.push('- 이 단계가 참고한 자료:');
         for (const id of sourceIds) {
-          const src = sources.find(s => s && s.id === id);
+          const src = sourceById.get(id);
           if (src) {
             const t = src.title || '자료';
             const u = src.url && src.url.trim() ? src.url.trim() : null;
-            if (u) lines.push(`  - [${t}](${u})`);
-            else lines.push(`  - ${t}`);
+            const tEsc = escapeMd(t);
+            if (u) lines.push(`  - [${tEsc}](${u})`);
+            else lines.push(`  - ${tEsc}`);
           } else {
             lines.push(`  - (자료 ${id})`);
           }
@@ -106,9 +161,9 @@ export function buildPlanningMarkdown(bigPicture) {
     }
   }
 
-  // 조회 기록
+  // 조회 기록 — 마지막 3수준 절로 보존
   if (trace.length > 0) {
-    lines.push('## 조회 기록');
+    lines.push('### 조회 기록');
     lines.push('');
     for (const t of trace) {
       if (!t) continue;
@@ -117,7 +172,7 @@ export function buildPlanningMarkdown(bigPicture) {
       const st = t.status || '';
       const cnt = t.count != null ? String(t.count) : '';
       const el = t.elapsedMs != null ? `${t.elapsedMs}ms` : '';
-      lines.push(`- ${q} (${ch}) — 상태: ${st}, 결과: ${cnt}, 소요: ${el}`);
+      lines.push(`- ${escapeMd(q)} (${escapeMd(ch)}) — 상태: ${st}, 결과: ${cnt}, 소요: ${el}`);
     }
     lines.push('');
   }
@@ -127,7 +182,7 @@ export function buildPlanningMarkdown(bigPicture) {
     lines.push('## 한계');
     lines.push('');
     for (const w of warnings) {
-      if (w) lines.push(`- ${w}`);
+      if (w) lines.push(`- ${escapeMd(w)}`);
     }
     lines.push('');
   }
