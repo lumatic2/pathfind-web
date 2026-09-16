@@ -81,6 +81,7 @@ export default function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [footerAlert, setFooterAlert] = useState<string | null>(null)
+  const [saveNotice, setSaveNotice] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newDialogOpen, setNewDialogOpen] = useState(false)
   const [leftPanelKey, setLeftPanelKey] = useState(0)
@@ -104,38 +105,22 @@ export default function App() {
     [patch],
   )
 
-  const quotaBadge = (
-    <span
-      className="app-quota-badge"
-      title={QUOTA_TOOLTIP}
-      aria-label={`남은 횟수 ${quota.remaining}회`}
-    >
-      남은 횟수 {quota.remaining}회
-    </span>
-  )
-
-  const researchActiveApp = session.phase === "researching" && session.stages.length > 0
-
-  const degradedChip =
-    researchActiveApp && session.degraded
-      ? (
-        <span className="research-degraded-chip">순차 조사로 전환됨</span>
-      )
-      : null
-
-  const homeLink = (
-    <a href="/" aria-label="홈" data-app-logo className="flex shrink-0 items-center gap-2">
-      <img src="/pathfinder-mark.png" alt="" aria-hidden width={28} height={28} />
-      <img src="/pathfinder-wordmark.png" alt="Pathfinder" aria-hidden width={16} height={16} />
-    </a>
-  )
-
-  const topStatusSlot = (
-    <span className="center-top-status">
-      {quotaBadge}
-      {degradedChip}
-    </span>
-  )
+  const topStatusSlot =
+    <>
+      {session.degraded && (
+        <span className="rounded-full border border-border px-3 py-1 text-sm text-muted-foreground">순차 조사로 전환됨</span>
+      )}
+      {saveNotice && (
+        <span data-roadmap-save-notice className="rounded-full border border-border px-3 py-1 text-sm text-destructive">{saveNotice}</span>
+      )}
+      <span
+        data-quota-badge
+        title="패스 하나를 만들 때마다 몇 분 동안 웹을 조사합니다. 이 브라우저에서 2번까지 해 보실 수 있어요."
+        className="rounded-full border border-border px-3 py-1 text-sm text-muted-foreground"
+      >
+        남은 횟수 {quota.remaining}회
+      </span>
+    </>
 
   const handleRoadmapDownload = useCallback(() => {
     setPreviewDialogOpen(true)
@@ -221,13 +206,13 @@ export default function App() {
 
     const result = saveRoadmap(current, id)
     if (!result.ok) {
-      setFooterAlert(
+      setSaveNotice(
         '이 패스를 보관하지 못했습니다. 브라우저 저장 공간이 찼습니다.'
       )
       return
     }
 
-    setFooterAlert(null)
+    setSaveNotice(null)
     if (current.id == null) {
       patch({ id: result.id })
     }
@@ -252,14 +237,28 @@ export default function App() {
 
   const topbar = (
     <div className="flex w-full items-center gap-3 pl-4">
-      {homeLink}
+      {/* 랜딩에서 넘어온 사람이 같은 자리에서 같은 로고를 만난다 — 크롬은 이 요소를 이어서 움직인다
+          (`[data-app-logo]` ↔ 랜딩 `.nav__logo`, 이름 `pathfinder-logo`). 누르면 랜딩으로 돌아간다. */}
+      <a href="/" aria-label="Pathfinder 홈" data-app-logo className="flex shrink-0 items-center gap-2">
+        <img src="/pathfinder-mark.png" alt="" aria-hidden className="h-7 w-auto" />
+        <img src="/pathfinder-wordmark.png" alt="Pathfinder" className="h-4 w-auto" />
+      </a>
       <NotebookTopbar
+        className="min-w-0 flex-1 pl-0"
         title={topTitle}
         onTitleChange={handleTitleChange}
+        titleFallback="제목 없는 패스"
         actions={[
-          { id: 'new-roadmap', label: '새 패스', icon: <Plus aria-hidden />, onClick: handleNewRoadmapAsk },
-          { id: 'library', label: '목록', icon: <Library aria-hidden />, onClick: () => { loadArchive(); setDialogOpen(true) } },
-          { id: 'path', label: session.exportState.busy ? '만드는 중' : 'PATH.md', icon: <Download aria-hidden />, primary: true, onClick: handlePreviewOpen, disabled: session.phase !== 'ready' || session.stages.filter((s) => s.status === 'done').length === 0 || session.busy },
+          { id: "new", label: "새 패스", icon: <Plus aria-hidden />, onClick: handleNewRoadmapAsk },
+          { id: "roadmaps", label: "목록", icon: <Library aria-hidden />, onClick: () => { loadArchive(); setDialogOpen(true) } },
+          {
+            id: "roadmap-md",
+            label: session.exportState.busy ? "만드는 중…" : "PATH.md",
+            icon: <Download aria-hidden />,
+            primary: true,
+            onClick: handlePreviewOpen,
+            disabled: session.phase !== "ready" || session.stages.filter((s) => s.status === "done").length === 0 || session.busy,
+          },
         ]}
         statusSlot={topStatusSlot}
       />
