@@ -1,7 +1,7 @@
 // /api/source-card — 자료 한 건을 설명 양식으로 채우는 함수
 // 명세: roadmap/M05-조사결과패널/M05-스텝7.md
 // 계약 값: docs/api-contract.md §1~§6 (finding 스키마, verdict 4종, solar-pro4, 키 process.env)
-import { callSolar, SOLAR_MODEL, DEFAULT_MAX_TOKENS } from './_lib/solar.js';
+import { callSolar, SOLAR_MODEL } from './_lib/solar.js';
 import { logCall, sendError } from './_lib/http.js';
 
 const SYSTEM_PROMPT = `당신은 조사에서 찾은 자료 1건을 프로젝트 팀이 바로 쓸 수 있는 카드로 정리하는 안내자입니다.
@@ -10,9 +10,9 @@ const SYSTEM_PROMPT = `당신은 조사에서 찾은 자료 1건을 프로젝트
 다섯 항목을 한국어로 채웁니다:
 - oneLiner: 이 자료가 무엇인지 한 문장(40자 안팎).
 - what: 무엇인가 — 이 자료가 하는 일과 성격 2~3문장. 핵심 어구는 **굵게**.
-- use: 이 패스에서 어떻게 쓰나 — 프로젝트 요약과 이 단계의 할 일에 이어서, 무엇을 가져다 쓰고 무엇을 손봐야 하는지 \- ` 목록 2~4줄.
-- avoid: 이럴 땐 피한다 — 이 자료가 맞지 않는 상황 \- ` 목록 1~3줄.
-- constraints: 제약·주의 — 라이선스·비용·범위·의존성처럼 쓰기 전에 알아야 할 것 \- ` 목록 1~3줄(사실에 없으면 "- 확인 불가" 한 줄).
+- use: 이 패스에서 어떻게 쓰나 — 프로젝트 요약과 이 단계의 할 일에 이어서, 무엇을 가져다 쓰고 무엇을 손봐야 하는지 글머리표 목록 2~4줄.
+- avoid: 이럴 땐 피한다 — 이 자료가 맞지 않는 상황 글머리표 목록 1~3줄.
+- constraints: 제약·주의 — 라이선스·비용·범위·의존성처럼 쓰기 전에 알아야 할 것 글머리표 목록 1~3줄(사실에 없으면 "- 확인 불가" 한 줄).
 
 출력 형식 (JSON만, 다른 텍스트 없이):
 { "oneLiner": "...", "what": "...", "use": "- ...", "avoid": "- ...", "constraints": "- ..." }`;
