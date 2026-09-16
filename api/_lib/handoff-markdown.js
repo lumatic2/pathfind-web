@@ -12,12 +12,12 @@ const VERDICT_LINES = {
 };
 
 const CHANNEL_LABELS = {
-  web: '웹 검색',
-  oss: '오픈소스 GitHub',
-  public_data: '공공데이터포털',
-  stats: '국가통계 KOSIS',
-  law: '국가법령정보',
-  web_review: '블로그·카페 후기',
+  web: '웹 문서',
+  oss: '오픈소스',
+  public_data: '공공데이터',
+  stats: '국가통계',
+  law: '국가법령',
+  web_review: '후기',
 };
 
 function dateKorean() {
@@ -56,14 +56,22 @@ function stageVerdictParagraph(stage) {
 function findingLine(f) {
   const name = f.name || '자료';
   const url = f.url && f.url.trim() ? f.url.trim() : null;
-  const grade = f.grade ? ` · ${f.grade}` : '';
-  const channel = f.channel && CHANNEL_LABELS[f.channel] ? CHANNEL_LABELS[f.channel] : (f.channel || '');
-  const channelPart = channel ? ` · ${channel}` : '';
-  const note = f.note && f.note.trim() ? ` — ${f.note.trim()}` : '';
-  if (url) {
-    return `- [${name}](${url})${grade}${channelPart}${note}`;
+  const kind = f.kind || '';
+  const channelLabel = f.channel && CHANNEL_LABELS[f.channel]
+    ? CHANNEL_LABELS[f.channel]
+    : (f.channel || '');
+  const grade = f.grade || '';
+  const parts = [kind, channelLabel, grade].filter(Boolean);
+  const middle = parts.length > 0 ? ` · ${parts.join(' · ')}` : '';
+  const note = f.note && f.note.trim() ? f.note.trim() : '';
+  const head = url
+    ? `- [${name}](${url})`
+    : `- ${name}`;
+  if (note) {
+    return `${head}${middle}
+  - ${note}`;
   }
-  return `- ${name}${grade}${channelPart}${note}`;
+  return `${head}${middle}`;
 }
 
 /**
@@ -134,34 +142,53 @@ export function buildPathMarkdown(bigPicture, stages, summary) {
         lines.push('');
       }
 
+      // 참고한 자료 — 세 번째 수준 headings, 항상 출력
+      lines.push('### 참고한 자료');
+      lines.push('');
       const findings = s.findings || [];
       if (findings.length > 0) {
-        lines.push('**찾은 자료:**');
         for (const f of findings) lines.push(findingLine(f));
-        lines.push('');
+      } else {
+        lines.push('이 단계에서는 참고할 자료를 찾지 못했습니다.');
       }
+      lines.push('');
 
-      const choices = s.choices || [];
-      if (choices.length > 0) {
-        lines.push('**선택지:**');
-        choices.forEach((c, i) => { if (c) lines.push(`${i + 1}. ${c}`); });
-        lines.push('');
-      }
-
+      // 할 일 — tasks와 todos를 병합, 중복 없이, 체크상자와 owner·note 부착
       const todos = s.todos || [];
       const tasks = s.tasks || [];
-      if (todos.length > 0 || tasks.length > 0) {
+      const byTask = new Map();
+      for (const t of tasks) {
+        if (!t || !t.task) continue;
+        byTask.set(t.task, { task: t.task, owner: '직접 함', note: '' });
+      }
+      for (const t of todos) {
+        if (!t || !t.task) continue;
+        const note = t.note && t.note.trim() ? t.note.trim() : '';
+        const owner = t.owner === '가져다 씀' ? '가져다 씀' : '직접 함';
+        if (byTask.has(t.task)) {
+          const existing = byTask.get(t.task);
+          existing.owner = owner;
+          if (note) existing.note = note;
+        } else {
+          byTask.set(t.task, { task: t.task, owner, note });
+        }
+      }
+      const orderedTasks = [...byTask.values()];
+      if (orderedTasks.length > 0) {
         lines.push('**할 일:**');
-        for (const t of todos) {
-          if (t) {
-            const owner = t.owner === '가져다 씀' ? '[가져다 씀]' : '[직접 함]';
-            const note = t.note && t.note.trim() ? ` (${t.note.trim()})` : '';
-            lines.push(`- ${owner} ${t.task}${note}`);
-          }
+        for (const t of orderedTasks) {
+          const notePart = t.note ? ` (${t.note})` : '';
+          lines.push(`- [ ] ${t.task} [${t.owner}]${notePart}`);
         }
-        for (const t of tasks) {
-          if (t) lines.push(`- [할 일] ${t.task}`);
-        }
+        lines.push('');
+      }
+
+      // 선택지 — options를 우선하고, options가 없으면 choices(옛)만 있는 경우도 보존
+      const options = s.options || s.choices || [];
+      const nonempty = options.filter(c => c && c.trim());
+      if (nonempty.length > 0) {
+        lines.push('**선택지:**');
+        nonempty.forEach((c, i) => { lines.push(`${i + 1}. ${c.trim()}`); });
         lines.push('');
       }
     }
