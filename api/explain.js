@@ -342,6 +342,44 @@ function renumber(body, titles, ids) {
   return { body: newBody, citationTitles: rearrangedTitles, citationIds: rearrangedIds };
 }
 
+// ---------- 목표화면 기준코드 server/explain.mjs 에서 옮긴 인용 보정 ----------
+// 자료 목록({n, i, name, stageNo})을 만든다 — 문서 id는 만들지 않고, 인용 보정 함수에서 docIdFromNodeId 로 채운다.
+function stageDocsForMark(stage) {
+  const list = Array.isArray(stage?.findings) ? stage.findings : [];
+  return list.map((f, i) => ({
+    n: i + 1,
+    i,
+    name: String(f?.name ?? `자료 ${i + 1}`),
+    stageNo: stage?.no,
+  }));
+}
+
+// 본문의 `[n]`(자료 목록 번호)을 등장 순서로 1..k 로 다시 매기고, 본문에 없는 `cited` 는 꼬리에 붙인다 — chat.mjs `ground` 와 같은 규칙.
+// 패널은 `[n]` 마커가 있을 때만 배지를 그린다(노드 설명에 마커가 없어 배지가 0 이던 결함을 여기서 닫는다).
+// 반환되는 citationIds는 결선 docIdFromNodeId(nodeId, stageNo)가 만드는 id를 쓴다(목표화면의 stageDocs id 대신).
+function markCitations(text, cited, docs) {
+  const byN = new Map(docs.map((d) => [d.n, d]));
+  const order = [];
+  for (const m of String(text).matchAll(/\[(\d+)\]/g)) {
+    const n = Number(m[1]);
+    if (byN.has(n) && !order.includes(n)) order.push(n);
+  }
+  for (const n of cited) if (byN.has(n) && !order.includes(n)) order.push(n);
+  const local = new Map(order.map((n, i) => [n, i + 1]));
+  let out = String(text).replace(/\[(\d+)\]/g, (whole, d) => (local.has(Number(d)) ? `[${local.get(Number(d))}]` : whole));
+  const tail = order.filter((n) => !new RegExp(`\\[${local.get(n)}\\]`).test(out)).map((n) => `[${local.get(n)}]`);
+  if (tail.length) out = `${out} ${tail.join('')}`;
+  return {
+    text: out,
+    citationTitles: order.map((n) => byN.get(n).name),
+    citationIds: order.map((n) => {
+      const d = byN.get(n);
+      if (d == null || d.stageNo == null) return '';
+      return docIdFromNodeId(`s${d.stageNo}-finding-${d.i}`, d.stageNo);
+    }),
+  };
+}
+
 // ---------- 후속 질문 ----------
 
 function followups(node, modelOut) {
