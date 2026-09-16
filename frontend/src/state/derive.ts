@@ -597,7 +597,7 @@ export function mindmapTree(session: Session): MindmapNode {
 
   const root: MindmapNode = {
     id: "root",
-    label: rootLabel,
+    label: shortLabel(rootLabel, LABEL_MAX + 8),
     hint: rootLabel,
     data: { full: rootLabel },
     children: session.bigPicture != null ? session.stages.map((slot) => stageNode(session, slot)) : [],
@@ -665,7 +665,7 @@ function buildTopicNode(
   if (topic.items.length === 0) return null
 
   const id = `s${no}-t${topicIndex}`
-  const label = shortLabel(topic.title, 18)
+  const label = nodeLabel(topic.title)
   const hint = topic.title
 
   const depth = countDepth(topic)
@@ -681,7 +681,7 @@ function buildTopicNode(
         const sub = topic.topics[j]
         if (sub.items.length === 0) continue
         const subId = `${id}-${j}`
-        const subLabel = shortLabel(sub.title, 18)
+        const subLabel = nodeLabel(sub.title)
         const subChildren = topicItemsToMindmap(session, slot, no, stage, sub.items, placed)
         if (subChildren.length > 0) {
           children.push({
