@@ -257,6 +257,7 @@ export function useFlow() {
       }
       if (current.turnCount === 0 && current.pending == null) {
         body.question = text
+        body.history = []
       } else {
         body.answer = text
       }
@@ -323,6 +324,7 @@ export function useFlow() {
                   suggestions: approvalSuggestions,
                 },
               ],
+              history: requestHistory,
               summary: res.summary ?? "",
               phase: "confirm",
               busy: false,
