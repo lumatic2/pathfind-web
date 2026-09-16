@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { AppDialogContent } from './AppDialogContent'
 import { cn } from '@/lib/utils'
 import { downloadText } from '../lib/api'
 
@@ -32,7 +33,7 @@ export function PathPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl data-path-dialog">
+      <AppDialogContent className="max-w-2xl" data-path-dialog showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>PATH.md 미리보기</DialogTitle>
           <DialogDescription>
@@ -87,7 +88,7 @@ export function PathPreviewDialog({
             </DialogFooter>
           </>
         )}
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   )
 }

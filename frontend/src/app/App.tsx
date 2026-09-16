@@ -36,7 +36,9 @@ import {
   DialogClose,
 } from '@/components/ui/dialog'
 import { EditableText } from '@/components/editable-text'
+import { AppDialogContent } from './AppDialogContent'
 import { PathPreviewDialog } from './PathPreviewDialog'
+
 
 type AppChatMessage = ChatMessage & { kind?: ChatEntry['kind'] }
 
@@ -138,15 +140,41 @@ export default function App() {
   }, [])
 
   const handlePreviewOpen = useCallback(() => {
+    setPreviewDialogOpen(true)
     const md = session.exportState.roadmapMarkdown
     if (md != null && md.trim().length > 0) {
       setPreviewText(md)
+      setPreviewBusy(false)
+      setPreviewError(null)
       return
     }
     if (previewBuildingRef.current) return
     previewBuildingRef.current = true
     setPreviewBusy(true)
-  }, [session.exportState.roadmapMarkdown])
+    setPreviewError(null)
+    buildRoadmap()
+  }, [session.exportState.roadmapMarkdown, buildRoadmap])
+
+  useEffect(() => {
+    if (!previewDialogOpen) return
+    const es = session.exportState
+    if (es.busy) {
+      setPreviewBusy(true)
+      setPreviewError(null)
+      return
+    }
+    if (previewBuildingRef.current) {
+      previewBuildingRef.current = false
+      if (es.roadmapMarkdown != null && es.roadmapMarkdown.trim().length > 0) {
+        setPreviewText(es.roadmapMarkdown)
+        setPreviewBusy(false)
+        setPreviewError(null)
+      } else {
+        setPreviewBusy(false)
+        setPreviewError('PATH.md를 만들지 못했습니다. 다시 시도해 주세요.')
+      }
+    }
+  }, [session.exportState, previewDialogOpen])
 
   const handlePreviewDownload = useCallback(() => {
     const md = previewText
@@ -165,9 +193,11 @@ export default function App() {
 
   const handlePreviewRetry = useCallback(() => {
     setPreviewError(null)
+    setPreviewText(null)
     previewBuildingRef.current = true
     setPreviewBusy(true)
-  }, [])
+    buildRoadmap()
+  }, [buildRoadmap])
 
   const archiveCurrent = useCallback(() => {
     const current = sessionRef.current
@@ -362,7 +392,10 @@ export default function App() {
       />
       <PathPreviewDialog
         open={previewDialogOpen}
-        onOpenChange={setPreviewDialogOpen}
+        onOpenChange={(v) => {
+          if (!v) handlePreviewClose()
+          else setPreviewDialogOpen(true)
+        }}
         text={previewText}
         busy={previewBusy}
         error={previewError}
@@ -1180,7 +1213,7 @@ function CitationBadge({ citation, doc, bodyNode, open, onOpenChange, onOpen }: 
             }, 220)
           }
         }}
-        className="flex w-auto flex-col overflow-hidden rounded-lg border-0 bg-popover p-0 text-foreground shadow-md"
+        className="flex w-auto flex-col overflow-hidden rounded-lg border-0 bg-popover p-0 text-foreground shadow-md data-[state=open]:fade-in-80 data-[state=closed]:fade-out-80 data-[state=open]:duration-[140ms] data-[state=closed]:duration-[140ms]"
         style={{ width: constraint.width, height: constraint.height }}
       >
         <div
@@ -1256,7 +1289,7 @@ function CitationBadge({ citation, doc, bodyNode, open, onOpenChange, onOpen }: 
 function NewPathDialog({ open, onOpenChange, onConfirm }: { open: boolean; onOpenChange: (v: boolean) => void; onConfirm: () => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" data-new-dialog>
+      <AppDialogContent className="max-w-md" data-new-dialog showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>새 패스를 열시겠어요?</DialogTitle>
           <DialogDescription>
@@ -1282,7 +1315,7 @@ function NewPathDialog({ open, onOpenChange, onConfirm }: { open: boolean; onOpe
             </button>
           </DialogClose>
         </DialogFooter>
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   )
 }
@@ -1302,7 +1335,7 @@ function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" data-archive-dialog>
+      <AppDialogContent className="max-w-md" data-archive-dialog showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>내 패스 목록</DialogTitle>
           <DialogDescription className="sr-only">
@@ -1383,7 +1416,7 @@ function ArchiveDialog({ open, onOpenChange, items, currentSessionId, onItemOpen
             ))}
           </ul>
         )}
-      </DialogContent>
+      </AppDialogContent>
     </Dialog>
   )
 }
