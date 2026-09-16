@@ -25,6 +25,8 @@ export function sanitizeForRestore(session: Session): Session {
 
   // phase 규칙
   let phase = session.phase
+  const interrupted =
+    session.planningAttempt?.status === "pending" || phase === "skeleton"
   if (phase === "skeleton") {
     phase = "confirm"
   } else if (phase === "ready") {
@@ -32,13 +34,24 @@ export function sanitizeForRestore(session: Session): Session {
     if (anyNotDone) phase = "researching"
   }
 
+  // 계획 설계가 중단됐으면 확인 화면으로 돌리고 중단 안내를 남긴다
+  if (interrupted) {
+    phase = "confirm"
+  }
+
   // 재접속용 값 정리
   return {
     ...session,
     phase,
     busy: false,
-    error: null,
+    error: interrupted
+      ? "저장 당시 진행 중이던 계획 설계를 이어서 할 수 있습니다. 승인 화면에서 다시 선택하면 계획 설계를 다시 시도합니다."
+      : null,
     selectedId: null,
+    planningAttempt:
+      interrupted && session.planningAttempt != null
+        ? { ...session.planningAttempt, status: "failed" as const }
+        : session.planningAttempt,
     exportState: { ...session.exportState, busy: false },
     // runId, runCursor, runStatus는 그대로 둠
   }
