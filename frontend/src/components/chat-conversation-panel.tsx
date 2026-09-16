@@ -305,7 +305,7 @@ function renderInlineParts(text: string, ctx: InlineCtx, keyPrefix: string, star
       const url = safeUrl(raw)
       out.push(
         url ? (
-          <a key={key} href={url} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 hover:text-foreground">
+          <a key={key} href={url} target="_blank" rel="noreferrer noopener" className="break-all underline underline-offset-2 hover:text-foreground">
             {raw}
           </a>
         ) : (
