@@ -239,12 +239,23 @@ export function useFlow() {
         error: null,
       })
 
-      // 2) api.grill 호출
+      // 2) 요청용 이력: pending이 있으면 이번 답변을 붙여 하나를 만들고, 없으면 기존 이력을 그대로 쓴다.
+      const requestHistory: typeof current.history =
+        current.pending
+          ? [...current.history, {
+              questionTitle: current.pending.questionTitle,
+              questionBody: current.pending.questionBody,
+              suggestion: current.pending.suggestion,
+              exampleButtons: current.pending.exampleButtons,
+              answer: text,
+            }]
+          : current.history
+
       const body: Parameters<typeof grill>[0] = {
-        history: current.history.map(questionMeta),
+        history: requestHistory,
         turnCount: current.turnCount,
       }
-      if (current.turnCount === 0) {
+      if (current.turnCount === 0 && current.pending == null) {
         body.question = text
       } else {
         body.answer = text
@@ -253,23 +264,6 @@ export function useFlow() {
       grill(body)
         .then((res: GrillResponse) => {
           if (!res.done) {
-            // 이전 pending + 이번 answer 로 한 줄 완성
-            const completed: GrillTurn = current.pending
-              ? {
-                  questionTitle: current.pending.questionTitle,
-                  questionBody: current.pending.questionBody,
-                  suggestion: current.pending.suggestion,
-                  exampleButtons: current.pending.exampleButtons,
-                  answer: text,
-                }
-              : {
-                  questionTitle: res.questionTitle,
-                  questionBody: res.questionBody,
-                  suggestion: res.suggestion,
-                  exampleButtons: res.exampleButtons,
-                  answer: text,
-                }
-
             const questionText = [
               res.questionTitle,
               res.questionBody,
@@ -288,7 +282,7 @@ export function useFlow() {
                   suggestions: res.exampleButtons ?? [],
                 },
               ],
-              history: [...latest.history, completed],
+              history: requestHistory,
               pending: res,
               turnCount: res.turnCount,
               busy: false,
