@@ -87,11 +87,11 @@ export function verdictLabel(v: Verdict): string {
 
 export const channelLabel: Record<string, string> = {
   web: "웹 검색",
-  oss: "오픈소스 GitHub",
+  oss: "오픈소스(GitHub)",
   public_data: "공공데이터포털",
-  stats: "국가통계 KOSIS",
+  stats: "국가통계(KOSIS)",
   law: "국가법령정보",
-  web_review: "블로그 카페 후기",
+  web_review: "블로그·카페 후기",
 }
 
 /** findings의 kind를 자료 행 부제(7종)로 정리 */
@@ -197,114 +197,48 @@ function summaryMarkdown(stage: StageSlot["stage"], status: StageRunStatus): str
   }
 
   if (stage.verdict != null) {
-    lines.push(`**${verdictLabel(stage.verdict)}**`)
+    lines.push(`**판정** — ${verdictLabel(stage.verdict)}`)
     if (stage.verdictReason != null && stage.verdictReason.trim().length > 0) {
       lines.push(stage.verdictReason)
     }
-    lines.push("")
   }
-
   if (stage.scope != null) {
-    const channelNames = stage.scope.channels
-      .map((c) => channelLabel[c] ?? c)
-      .join(", ")
-    const plannedLine =
-      stage.scope.planned && stage.scope.planned.length > 0
-        ? ` · 규칙으로 미리 돌린 채널: ${stage.scope.planned.map((p) => channelLabel[p] ?? p).join(", ")}`
-        : ""
-    lines.push(`조사 범위: ${stage.scope.claimType} · ${channelNames} · ${stage.scope.calls}회 호출${plannedLine}`)
-    lines.push("")
+    const channels = (stage.scope.channels ?? []).map((c) => channelLabel[c] ?? c)
+    const planned = (stage.scope.planned ?? []).map((c) => channelLabel[c] ?? c)
+    lines.push("", `**조사 범위** — ${stage.scope.claimType || "확인 불가"} · 채널 ${channels.length ? channels.join(" · ") : "없음"} · 호출 ${stage.scope.calls ?? 0}회${planned.length ? ` · 규칙으로 미리 돌린 채널 ${planned.join(" · ")}` : ""}`)
   }
-
-  const tasks = stage.tasks ?? []
-  if (tasks.length > 0) {
-    lines.push("## 할 일")
-    lines.push("")
-    for (const t of tasks) {
-      lines.push(`- ${t.task}`)
-    }
-    lines.push("")
-  }
-
   const findings = stage.findings ?? []
-  if (findings.length > 0) {
-    lines.push("## 찾은 자료")
-    lines.push("")
-    for (const f of findings) {
-      const grade = f.grade ? ` · ${f.grade}` : ""
-      lines.push(`- ${f.name}${grade}`)
-      if (f.channel != null) {
-        lines.push(`  - ${channelLabel[f.channel] ?? f.channel}`)
-      }
-      lines.push(`  - ${f.evidence}`)
-      if (f.query.trim().length > 0) {
-        lines.push(`  - 검색어: ${f.query}`)
-      }
-    }
-    lines.push("")
-  }
-
   const todos = stage.todos ?? []
-  if (todos.length > 0) {
-    lines.push("## 역할 나눔")
-    lines.push("")
-    for (const t of todos) {
-      lines.push(`- ${t.task} — 역할 나눔: ${t.owner}`)
-      if (t.note.trim().length > 0) {
-        lines.push(`  - ${t.note}`)
-      }
+  if (findings.length) {
+    lines.push("", "## 찾은 자료", "")
+    for (const f of findings) {
+      lines.push(`- **${f.name}** (${f.kind})`)
+      if (f.evidence) lines.push(`  - ${f.evidence}`)
+      if (f.url) lines.push(`  - ${f.url}`)
     }
-    lines.push("")
   }
-
-  const choices = stage.choices ?? []
-  if (choices.length > 0) {
-    lines.push("## 갈림길")
-    lines.push("")
-    for (const c of choices) {
-      lines.push(`- ${c}`)
-    }
-    lines.push("")
+  if (todos.length) {
+    lines.push("", "## 이미 있는 것 / 직접 해야 하는 것", "")
+    for (const t of todos) lines.push(`- [${t.owner}] ${t.task}${t.note ? ` — ${t.note}` : ""}`)
   }
-
   return lines.join("\n")
 }
 
-function findingDoc(stageNo: number, idx: number, f: Finding): SourceDoc {
-  const lines: string[] = []
-  lines.push(`# ${f.name}`)
-  lines.push("")
-  if (f.grade) {
-    lines.push(`**근거 등급**: ${f.grade}`)
-    lines.push("")
-  }
-  const chLabel = f.channel != null ? (channelLabel[f.channel] ?? f.channel) : "—"
-  lines.push(`종류: ${f.kind} · 단계: ${stageNo} · 출처: ${chLabel}`)
-  lines.push("")
-  if (f.grade != null) {
-    const parts: string[] = []
-    parts.push(`근거 등급: ${f.grade}`)
-    if (f.channel != null) parts.push(`채널: ${chLabel}`)
-    lines.push(parts.join(", "))
-    lines.push("")
-  }
-  lines.push("## 근거")
-  lines.push("")
-  lines.push(f.evidence)
-  if (f.query.trim().length > 0) {
-    lines.push("")
-    lines.push(`검색어: ${f.query}`)
-  }
-  lines.push("")
-  lines.push("## 제약 주의")
-  lines.push("")
-  lines.push(f.note)
+function findingDoc(stage: Stage, idx: number, f: Finding): SourceDoc {
+  const lines: string[] = [`# ${f.name}`, ""]
+  lines.push(`**종류** — ${f.kind || "자료"} · **단계** — ${stage.no}. ${stage.title}${f.url ? ` · **출처** — ${f.url}` : ""}`)
+  if (f.grade || f.channel) lines.push(`**근거 등급** — ${f.grade || "확인 불가"}${f.channel ? ` · **채널** — ${channelLabel[f.channel] ?? f.channel}` : ""}`)
+  lines.push("", "## 근거")
+  if (f.evidence) lines.push(`- ${f.evidence}`)
+  if (f.query) lines.push(`- 찾은 검색어 — ${f.query}`)
+  if (!f.evidence && !f.query) lines.push("- 확인 불가")
+  if (f.note) lines.push("", "## 제약·주의", `- ${f.note}`)
   return {
-    id: `${STAGEPREFIX}${stageNo}-finding-${idx}`,
+    id: `stage-${stage.no}-finding-${idx}`,
     kind: "finding",
-    stageNo,
+    stageNo: stage.no,
     title: f.name,
-    subtitle: f.kind,
+    subtitle: f.kind || "자료",
     url: f.url,
     evidence: f.evidence,
     markdown: lines.join("\n"),
@@ -312,41 +246,38 @@ function findingDoc(stageNo: number, idx: number, f: Finding): SourceDoc {
   }
 }
 
-function taskDoc(stageNo: number, idx: number, t: Task): SourceDoc {
-  const lines: string[] = []
-  lines.push(`# ${t.task}`)
-  lines.push("")
-  lines.push(`단계: ${stageNo}`)
-  lines.push("")
-  lines.push(`**왜**: ${t.why}`)
-  lines.push("")
-  lines.push(`순서: ${t.order}`)
+function taskDoc(stage: Stage, idx: number, t: Task): SourceDoc {
+  const task = t.task
+  const lines: string[] = [`# ${task}`, ""]
+  const why = t.why
+  lines.push(`**종류** — 할 일 · **단계** — ${stage.no}. ${stage.title}`, "", "## 무엇을", `- ${task}`, "", "## 왜", `- ${why || "확인 불가"}`)
+  const related = (stage.findings ?? []).slice(0, 3).map((f) => f.name).filter(Boolean)
+  if (related.length) lines.push("", "## 관련", `- 같은 단계 자료 — ${related.join(" · ")}`)
   return {
-    id: `${STAGEPREFIX}${stageNo}-task-${idx}`,
+    id: `stage-${stage.no}-task-${idx}`,
     kind: "item",
-    stageNo,
-    title: t.task,
+    stageNo: stage.no,
+    title: task,
     subtitle: "할 일",
     markdown: lines.join("\n"),
     status: "done",
   }
 }
 
-function todoDoc(stageNo: number, idx: number, t: Todo): SourceDoc {
-  const lines: string[] = []
-  lines.push(`# ${t.task}`)
-  lines.push("")
-  lines.push(`**누가**: ${t.owner}`)
-  lines.push("")
-  if (t.note.trim().length > 0) {
-    lines.push(`**메모**: ${t.note}`)
-  }
+function todoDoc(stage: Stage, idx: number, t: Todo): SourceDoc {
+  const task = t.task
+  const lines: string[] = [`# ${task}`, ""]
+  const owner = t.owner
+  lines.push(`**종류** — 역할 나눔 · **누가** — ${owner || "확인 불가"} · **단계** — ${stage.no}. ${stage.title}`, "", "## 무엇을", `- ${task}`)
+  if (t.note) lines.push("", "## 메모", `- ${t.note}`)
+  const related = (stage.findings ?? []).slice(0, 3).map((f) => f.name).filter(Boolean)
+  if (related.length) lines.push("", "## 관련", `- 같은 단계 자료 — ${related.join(" · ")}`)
   return {
-    id: `${STAGEPREFIX}${stageNo}-todo-${idx}`,
+    id: `stage-${stage.no}-todo-${idx}`,
     kind: "item",
-    stageNo,
-    title: t.task,
-    subtitle: `역할 나눔 ${t.owner}`,
+    stageNo: stage.no,
+    title: task,
+    subtitle: `역할 나눔 · ${owner || "확인 불가"}`,
     markdown: lines.join("\n"),
     status: "done",
   }
@@ -369,7 +300,9 @@ export function sourceTree(session: Session): SourceDoc[] {
   if (!session.bigPicture) return []
 
   const stages = session.stages
-  const stageDocs = stages.map((slot) => buildStage(slot)) as SourceDoc[]
+  const stageDocs = stages
+    .filter((slot) => slot.status !== "pending")
+    .map((slot) => buildStage(slot)) as SourceDoc[]
 
   const planningDoc = buildPlanningDoc(session.bigPicture)
   if (planningDoc) {
@@ -423,16 +356,16 @@ function buildStage(slot: StageSlot): SourceDoc {
 
   const orphans: SourceDoc[] = [
     ...orphanFindings.flatMap((f, i) =>
-      placedFindingIds.has(`finding-${i}`) ? [] : [findingDoc(stageNo, i, f)]
+      placedFindingIds.has(`finding-${i}`) ? [] : [findingDoc(stage, i, f)]
     ),
     ...orphanTodos.flatMap((t, i) =>
-      placedTodoIds.has(`todo-${i}`) ? [] : t.owner === "가져다 씀" ? [todoDoc(stageNo, i, t)] : []
+      placedTodoIds.has(`todo-${i}`) ? [] : t.owner === "가져다 씀" ? [todoDoc(stage, i, t)] : []
     ),
     ...orphanTasks.flatMap((t, i) =>
-      placedTaskIds.has(`task-${i}`) ? [] : [taskDoc(stageNo, i, t)]
+      placedTaskIds.has(`task-${i}`) ? [] : [taskDoc(stage, i, t)]
     ),
     ...orphanTodos.flatMap((t, i) =>
-      placedTodoIds.has(`todo-${i}`) ? [] : t.owner === "직접 함" ? [todoDoc(stageNo, i, t)] : []
+      placedTodoIds.has(`todo-${i}`) ? [] : t.owner === "직접 함" ? [todoDoc(stage, i, t)] : []
     ),
   ]
 
@@ -476,7 +409,7 @@ function buildTopicFolder(
 
   if (depth === 0) {
     // 평평한 소주제 폴더
-    const children = topicItemsToDocs(stageNo, stage, topic.items, outlineItems, status)
+    const children = topicItemsToDocs(stage, topic.items, outlineItems, status)
     return {
       ...buildFolder(stageNo, `-t${topicIndex}`, children, status),
       id: folderId,
@@ -489,7 +422,7 @@ function buildTopicFolder(
     for (let j = 0; j < topic.topics.length; j++) {
       const subtopic = topic.topics[j]
       if (subtopic.items.length === 0) continue
-      const subChildren = topicItemsToDocs(stageNo, stage, subtopic.items, outlineItems, status)
+      const subChildren = topicItemsToDocs(stage, subtopic.items, outlineItems, status)
       const subFolder: SourceDoc = {
         id: `${folderId}-${j}`,
         kind: "folder",
@@ -520,7 +453,6 @@ function countDepth(topic: OutlineTopic): number {
 }
 
 function topicItemsToDocs(
-  stageNo: number,
   stage: StageSlot["stage"],
   refs: string[],
   _outlineItems: OutlineItem[],
@@ -536,11 +468,11 @@ function topicItemsToDocs(
     const idx = parseInt(idxStr, 10)
     if (!kind || isNaN(idx)) continue
     if (kind === "finding" && idx >= 0 && idx < findings.length) {
-      docs.push(findingDoc(stageNo, idx, findings[idx]))
+      docs.push(findingDoc(stage, idx, findings[idx]))
     } else if (kind === "task" && idx >= 0 && idx < tasks.length) {
-      docs.push(taskDoc(stageNo, idx, tasks[idx]))
+      docs.push(taskDoc(stage, idx, tasks[idx]))
     } else if (kind === "todo" && idx >= 0 && idx < todos.length) {
-      docs.push(todoDoc(stageNo, idx, todos[idx]))
+      docs.push(todoDoc(stage, idx, todos[idx]))
     }
   }
   return docs
