@@ -1207,3 +1207,31 @@ function walkForCitations(
     }
   }
 }
+
+const CITATION_MODE = import.meta.env?.VITE_CITATION_MODE === "tail" ? "tail" : "model"
+
+/** 이름 비교용 정규화 — 공백·문장부호를 걷고 소문자로. `chat.mjs` 의 `normName` 과 같은 뜻이다. */
+function normCiteName(s: unknown): string {
+  return String(s ?? "").toLowerCase().replace(/[\s·,.()[\]{}「」『』"'`_\-–—]/g, "")
+}
+/** 느슨하게 맞춰 본다 — 한쪽이 비면 통과(맞춰 볼 거리가 없다), 포함 관계나 앞머리 4자 이상 일치면 같은 것으로 본다. */
+function citeNameMatches(name: unknown, docName: unknown): boolean {
+  const a = normCiteName(name)
+  const b = normCiteName(docName)
+  if (!a || !b) return true
+  if (a === b || a.includes(b) || b.includes(a)) return true
+  const head = Math.min(a.length, b.length, 8)
+  return head >= 4 && a.slice(0, head) === b.slice(0, head)
+}
+
+export type GroundedStage = {
+  /** 본문 마커가 **최종 번호로 다시 매겨진** 문장들 */
+  verdictLine: string
+  verdictReason: string
+  /** `[n]` 의 n-1 이 가리키는 자료의 **원래 `findings` 인덱스**. 배지 id·제목이 이 순서를 따른다. */
+  order: number[]
+  /** 이름이 안 맞거나 없는 번호라서 버린 마커 수 — 지어내기 지표로 센다(step-16) */
+  dropped: number
+  /** `order` 중 **본문에 실제로 달린** 개수. 나머지(꼬리)는 결과 줄 끝의 마커가 받는다. */
+  citedInBody: number
+}
