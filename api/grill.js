@@ -1,113 +1,120 @@
 import { sendError, logCall } from './_lib/http.js';
 
-const SYSTEM_PROMPT = `당신은 사용자의 아이디어를 명료화하는 인터뷰어입니다.
-막연한 생각을 구체적인 계획으로 정리하도록 돕습니다.
+const MAX_TURNS = 5;
+const DIRECT_INPUT_LABEL = '직접 입력';
 
-산출물:
-- 매 턴 하나의 질문을 JSON 한 덩어리로만 내놓습니다. 코드펜스(마커)나 앞뒤 설명 문장은 넣지 않습니다.
-- questionTitle: 한 줄 질문 제목, 24자 이내.
-- questionBody: 선택지를 고르는 기준 한두 문장.
-- suggestion: 추천 방향 한 줄.
-- exampleButtons: 객체 배열. 각 객체는 { label, why, recommended }를 가집니다.
-  - label: 서로 다른 방향 2~3개를 각각 25자 안팎 완결된 구.
-  - why: 그 버튼을 고르면 좋은 점을 한 줄로. "도록", "라서", "기 때문에", "니까" 중 하나로 끝나는 까닭 문구.
-  - recommended: 정확히 하나만 true. 가장 추천하는 방향 하나에 true, 나머지는 false.
-  - 마지막 항목은 항상 label이 "직접 입력"이고 why는 빈 문자열(""), recommended는 false.
-  - 모델이 exampleButtons를 문자열 배열로 답하면, 각 문자열을 { label: 문자열, why: "", recommended: false }로 감싼 것으로 간주합니다.
-- opening: 주제에 맞는 조사 시작 한 줄. 단계마다 무엇을 먼저 찾을지 방향을 잡는 문장.
-- 진행 중이면 done은 false.
-- 종료면 done true, summary는 3~5문장 요약 문단 뒤에 빈 줄, "### 정한 것", 빈 줄, 목록(-)이 오는 마크다운 뼈대.
-  - opening이 비어 있으면 서버가 기본 문구 "이제 단계마다 자료를 찾겠습니다"를 넣습니다.
+function systemPrompt(turnNo) {
+  return `당신은 사용자의 아이디어를 구체적인 계획으로 정리하는 인터뷰어입니다. 한 턴에 핵심 질문 하나만 합니다.
+인터뷰는 최대 ${MAX_TURNS}턴이고 지금은 ${turnNo}번째 턴입니다.${turnNo >= MAX_TURNS ? ' 이번이 마지막 질문입니다.' : ''}
 
-종료 규칙:
-- 요청의 turnCount가 5 이상이면 질문을 만들지 말고, 지금까지 대화로 3~5문장 요약을 done true, summary로만 내놓습니다.
-- 그래도 summary가 비면 history의 답들을 이어 붙인 요약을 대신 씁니다.
+questionBody 는 마크다운으로 이 뼈대로 내놓습니다:
+  · 배경 2문장 — 왜 지금 이 질문이 필요한지, 앞 답변에서 무엇이 정해졌는지.
+  · 고를 것 1문장 — 어떤 기준으로 고르면 되는지. 기준이 둘 이상이면 \`- \` 목록으로 한 줄씩.
+  · 핵심 어구는 **굵게**.
+선택지 문장은 exampleButtons 가 들고, questionBody 는 선택지를 고르는 기준을 말합니다.
+exampleButtons 는 서로 다른 방향 2~3개이고 각 선택지는 셋을 함께 냅니다:
+  · label — 선택지 문장, 25자 안팎의 완결된 구.
+  · why — **그 선택지를 고르면 무엇이 좋아지는지**를 완결된 한 문장으로 적습니다(40자 안팎). 읽는 사람에게 말하듯 높임말로 맺습니다.
+    ⚠ 아래 보기는 **문장의 모양만** 보여 줍니다. 주제가 전혀 달라 그대로 옮겨 쓸 수 없습니다 — 모양만 따르고 **내용은 그 선택지에서 끌어옵니다.**
+      · (주말 사진 모임 예) 「장비가 없어도 휴대폰만 들고 바로 따라올 수 있습니다.」
+      · (온라인 독서 모임 예) 「사는 곳이 달라도 같은 시간에 모이기가 수월해집니다.」
+      · (동네 반찬 가게 예) 「재료가 겹쳐서 남는 양을 크게 줄일 수 있어요.」
+      · (중고 자전거 수리 예) 「한 대씩 손보는 만큼 값을 받기가 명확해집니다.」
+    보기마다 **맺는 말이 서로 다릅니다**(~습니다 · ~집니다 · ~어요). 선택지마다 **그 내용에 맞는 말**로 끝내고, 같은 문장을 두 번 쓰지 않습니다.
+    label 이 말한 것을 why 가 되풀이하지 않습니다 — label 은 **무엇을** 하는지, why 는 **그래서 무엇이 좋아지는지**입니다. **선택지마다 다 적습니다.**
+  · recommended — 지금 상황에 가장 권할 하나만 true, 나머지는 false.
+suggestion 은 추천 방향 한 문장입니다(추천한 선택지와 같은 방향으로 적습니다).
 
-언어: 한국어. 쌍따옴표는 반각만 사용합니다.`;
-
-function buildHistoryMessages(history) {
-  return history.flatMap((h) => {
-    const buttons = Array.isArray(h.exampleButtons)
-      ? h.exampleButtons.map((b, i) => {
-          if (typeof b === 'string') return `${i + 1}. ${b}`;
-          const label = typeof b.label === 'string' ? b.label : '';
-          const why = typeof b.why === 'string' && b.why.trim() ? ` (${b.why})` : '';
-          const mark = b.recommended === true ? ' ★' : '';
-          return `${i + 1}. ${label}${why}${mark}`;
-        }).join('\n')
-      : '';
-    return [
-      {
-        role: 'assistant',
-        content: JSON.stringify({ questionTitle: h.questionTitle, questionBody: h.questionBody, suggestion: h.suggestion, exampleButtons: h.exampleButtons }),
-      },
-      { role: 'user', content: `내 답변: ${h.answer}` },
-    ];
-  });
+출력 형식 (JSON만, 다른 텍스트 없이):
+{
+  "questionTitle": "한 줄 질문 제목 (24자 이내)",
+  "questionBody": "위 뼈대를 따른 마크다운",
+  "suggestion": "추천 방향",
+  "exampleButtons": [{"label": "선택지1", "why": "고르면 좋은 점", "recommended": true}, {"label": "선택지2", "why": "고르면 좋은 점", "recommended": false}],
+  "done": false
 }
 
-function normalizeExampleButtons(buttons, done) {
-  if (done) return [];
+사용자가 충분히 구체화됐다고 판단되면:
+{ "done": true, "summary": "아래 뼈대를 따른 마크다운 정리", "opening": "이제 무엇부터 알아볼지 말하는 한 줄" }
 
-  if (!Array.isArray(buttons) || buttons.length === 0) {
-    return [{ label: '직접 입력', why: '', recommended: true }];
-  }
+opening 은 승인 직후 조사를 시작하며 사람에게 건네는 한 줄입니다(40자 안팎). 이 아이디어에서 **무엇부터 알아볼지**를 말합니다.
+보기: 「먼저 목공 클래스를 여는 데 필요한 준비와 절차부터 알아봅니다.」
 
-  const parsed = buttons
-    .map((b) => {
-      if (typeof b === 'string') {
-        return { label: b.trim(), why: '', recommended: false };
-      }
-      if (typeof b === 'object' && b !== null) {
-        const label = typeof b.label === 'string' ? b.label.trim() : '';
-        const why = typeof b.why === 'string' ? b.why.trim() : '';
-        const recommended = b.recommended === true;
-        return { label, why, recommended };
-      }
-      return null;
-    })
-    .filter((b) => b && typeof b.label === 'string' && b.label);
+summary 는 마크다운으로 이 뼈대로 내놓습니다:
+  · 첫 문단 1~2문장 — 무엇을 만드는지 한눈에.
+  · \`### 정한 것\` 소제목 아래 \`- \` 목록 3~5줄 — 인터뷰에서 정해진 것을 한 줄씩. 각 줄은 **굵은 머리말 뒤에 콜론**을 두고 한 구.
+문단·\`- \` 목록·\`### \` 소제목·**굵게** 네 가지만 써서 내놓습니다(표·링크·이미지는 화면이 그리지 않습니다).
 
-  if (parsed.length === 0) {
-    return [{ label: '직접 입력', why: '', recommended: true }];
-  }
+따옴표는 반각(")만 씁니다.`;
+}
 
-  const last = parsed[parsed.length - 1];
-  if (last.label !== '직접 입력') {
-    parsed.push({ label: '직접 입력', why: '', recommended: false });
-  } else {
-    last.why = '';
-    last.recommended = false;
-  }
+function historyMessages(history) {
+  return (Array.isArray(history) ? history : []).flatMap((h) => [
+    {
+      role: 'assistant',
+      content: JSON.stringify({ questionTitle: h.questionTitle, questionBody: h.questionBody, suggestion: h.suggestion, exampleButtons: h.exampleButtons }),
+    },
+    { role: 'user', content: `내 답변: ${h.answer}` },
+  ]);
+}
 
-  if (!parsed.some((b) => b.recommended === true)) {
-    parsed[0].recommended = true;
-  }
+// ── 결정론 보정 ──────────────────────────────────────────────────────────────
+/** 본문 안의 선택지 열거 신호 — 원문자(①②③)·알파벳·숫자 열거, 괄호 예시, 인라인 불릿을 잘라 낸다. */
+const ENUM_LINE = /^\s*(?:[①-⑳]|[A-Da-d][.)]|\d{1,2}[.)])\s*/;
+const INLINE_CIRCLED = /\s*[①-⑳][^①-⑳\n]*/g;
+const PAREN_EXAMPLE = /\s*[(（]\s*예\s*[:：][^)）]*[)）]/g;
+const EXAMPLE_TAIL = /\s*예\s*[:：].*$/;
+const INLINE_BULLET = /\s*[•·▪]\s+.*$/;
 
-  let found = false;
-  for (const b of parsed) {
-    if (b.recommended === true) {
-      if (found) {
-        b.recommended = false;
-      } else {
-        found = true;
+/**
+ * 본문에서 선택지 열거를 잘라 낸다. 남는 게 없으면 원문을 돌려준다(빈 본문이 더 나쁘다).
+ * 칩 문장이 본문에 축자로 들어 있으면 그 문장을 뺀다(문장 단위 — 마침표·물음표·개행으로 자른다).
+ */
+function stripChoiceEnumeration(body, buttons = []) {
+  const src = String(body ?? '');
+  const lines = src.split(/\r?\n/);
+  const kept = [];
+  for (const raw of lines) {
+    let line = raw;
+    if (ENUM_LINE.test(line)) continue;
+    line = line.replace(PAREN_EXAMPLE, '');
+    line = line.replace(INLINE_CIRCLED, '');
+    line = line.replace(EXAMPLE_TAIL, '');
+    line = line.replace(INLINE_BULLET, '');
+    for (const b of buttons) {
+      const t = String(b ?? '').trim();
+      if (t.length >= 4 && line.includes(t)) {
+        line = line
+          .split(/(?<=[.?!。])\s+/)
+          .filter((s) => !s.includes(t))
+          .join(' ');
       }
     }
+    kept.push(line.trimEnd());
   }
+  const out = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return out.length ? out : src.trim();
+}
 
-  if (parsed.length > 4) {
-    const withoutDirect = parsed.filter((b) => b.label !== '직접 입력');
-    if (withoutDirect.length > 3) {
-      withoutDirect.length = 3;
-      const kept = [...withoutDirect, { label: '직접 입력', why: '', recommended: false }];
-      if (!kept.some((b) => b.recommended === true)) {
-        kept[0].recommended = true;
-      }
-      return kept;
-    }
+function withDirectInput(buttons) {
+  const seen = new Set();
+  const out = [];
+  for (const b of Array.isArray(buttons) ? buttons : []) {
+    const obj = b && typeof b === 'object';
+    const label = String((obj ? b.label ?? b.text ?? b.title : b) ?? '').trim();
+    if (!label || label === DIRECT_INPUT_LABEL || seen.has(label)) continue;
+    seen.add(label);
+    out.push({ label, why: String((obj ? b.why ?? b.reason : '') ?? '').trim(), recommended: Boolean(obj && b.recommended) });
+    if (out.length >= 4) break;
   }
-
-  return parsed;
+  if (out.length === 0) {
+    out.push({ label: DIRECT_INPUT_LABEL, why: '', recommended: true });
+    return out;
+  }
+  const first = out.findIndex((c) => c.recommended);
+  out.forEach((c, i) => { c.recommended = i === (first === -1 ? 0 : first); });
+  out.push({ label: DIRECT_INPUT_LABEL, why: '', recommended: false });
+  return out;
 }
 
 function polish(content) {
@@ -229,8 +236,8 @@ export async function POST(request) {
     // 강제 종료 분기: 요청 turnCount >= 5
     if (turnCount >= 5) {
       const summaryMessages = [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...buildHistoryMessages(history),
+        { role: 'system', content: systemPrompt(Math.min(turnCount + 1, MAX_TURNS)) },
+        ...historyMessages(history),
         {
           role: 'user',
           content:
@@ -289,8 +296,8 @@ export async function POST(request) {
 
     // messages 구성
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...buildHistoryMessages(history),
+      { role: 'system', content: systemPrompt(Math.min(turnCount + 1, MAX_TURNS)) },
+      ...historyMessages(history),
     ];
 
     if (turnCount === 0 && question) {
@@ -347,7 +354,8 @@ export async function POST(request) {
     }
 
     const isEnd = parsed.done === true || turnCount >= 5;
-    const buttons = normalizeExampleButtons(parsed.exampleButtons, isEnd);
+    const buttons = isEnd ? [] : withDirectInput(parsed.exampleButtons);
+    const questionBody = isEnd ? '' : stripChoiceEnumeration(parsed.questionBody || '', buttons);
     const summary = parsed.summary || '';
     const opening =
       typeof parsed.opening === 'string' && parsed.opening.trim() ? parsed.opening.trim() : DEFAULT_OPENING;
@@ -355,7 +363,7 @@ export async function POST(request) {
     return new Response(
       JSON.stringify({
         questionTitle: parsed.questionTitle || '',
-        questionBody: parsed.questionBody || '',
+        questionBody,
         suggestion: parsed.suggestion || '',
         exampleButtons: buttons,
         done: isEnd,
