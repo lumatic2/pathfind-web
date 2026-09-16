@@ -38,9 +38,9 @@ export function validatePlanningResponse(raw: unknown): Planning {
     throw new PlanningResponseError(422, 'bigPicture.stages가 배열이 아닙니다');
   }
 
-  const planning = r.planning;
+  const planning = (bp as Record<string, unknown>).planning;
   if (planning === undefined || planning === null || typeof planning !== 'object') {
-    throw new PlanningResponseError(422, 'planning 필드가 없습니다');
+    throw new PlanningResponseError(422, 'bigPicture.planning이 없습니다');
   }
 
   const p = planning as Record<string, unknown>;
