@@ -326,13 +326,13 @@ export default function App() {
 
   return (
     <div
-      className="app-shell"
+      className="app-shell h-full min-h-0"
       data-phase={session.phase}
       data-stage-count={session.stages.length}
       data-notebook-shell
     >
       <NotebookWorkspaceShell
-        ratios={[22, 43, 35]}
+        ratios={[25, 42, 33]}
         left={<LeftPanel key={leftPanelKey} ref={leftPanelRef} collapsed={leftCollapsed} onCollapsedChange={setLeftCollapsed} />}
         center={<CenterPanel renderCitation={renderCitation} onPreviewOpen={handlePreviewOpen} />}
         right={<RightPanel />}
@@ -1000,7 +1000,10 @@ function CenterPanel({ renderCitation, onPreviewOpen }: { renderCitation?: (cita
 function RightPanel() {
   const { session, patch } = useSession()
   const { explainNode } = useFlow()
-  const root = useMemo(() => mindmapTree(session), [session])
+  const root = useMemo(
+    () => (session.bigPicture != null ? mindmapTree(session) : null),
+    [session],
+  )
 
   const expandedIds = session.expandedIds?.length > 0 ? session.expandedIds : ['root']
 
