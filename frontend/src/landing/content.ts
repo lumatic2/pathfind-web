@@ -43,8 +43,8 @@ export const content = {
     links: [{ label: '누구에게 필요한가요', href: '#team' }],
     /** 오른쪽 끝 — 두 번째만 밑줄 강조 */
     end: [
-      /* 로그인은 없앴다 — 서버도 계정도 없는 소개용 데모다(M18 2026-09-20). */
-      { label: '데모 열기', href: '/app.html', marked: true },
+      { label: '로그인', href: '#cta', marked: false },
+      { label: '시작하기', href: '/app.html', marked: true },
     ],
   },
 
@@ -54,9 +54,8 @@ export const content = {
     lede: [
       '모든 걸 처음부터 만들 필요는 없죠.',
       '패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
-      'MABC 2026 결선에 낸 작품이고, 지금 보시는 것은 실제 조사를 녹화한 데모입니다.',
     ],
-    cta: { label: '데모 열기', href: '/app.html' },
+    cta: { label: '시작하기', href: '/app.html' },
     /**
      * 패럴랙스 풍경 3판 — 원경 → 중경 → 근경.
      * 셋 다 **같은 캔버스**(1920×1440, 4:3)를 쓰는 전체 장면이다 — 비율은 여기가 아니라
@@ -197,7 +196,7 @@ export const content = {
       '모든 걸 처음부터 만들 필요는 없죠.',
       '패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
     ],
-    button: { label: '데모 열기', href: '/app.html' },
+    button: { label: '시작하기', href: '/app.html' },
     /** 오른쪽에 서는 인물 — 세로로 긴 투명 PNG, 아래를 물린다 */
     figure: { src: '/cta-figure.png', ratio: '760 / 1000' },
   },
@@ -224,7 +223,7 @@ export const content = {
         title: '서비스',
         href: '#compare',
         links: [
-          { label: '데모 열기', href: '/app.html' },
+          { label: '시작하기', href: '/app.html' },
           { label: '무엇을 해 주나요', href: '#compare' },
           { label: '누구에게 필요한가요', href: '#team' },
         ],
