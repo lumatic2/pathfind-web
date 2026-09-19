@@ -1,14 +1,30 @@
-# pathfind-web
+# pathfind-web — Pathfinder
 
-만들려는 일을 한 문단 받아 → 짧은 정렬 인터뷰로 생각을 정리한 뒤 → 승인하면 선행 조사(모델 호출로 검색어 생성 → 네이버 웹 검색 6회 → 다시 모델 호출로 단계 설계)로 큰 그림과 단계 골격을 잡고 → 단계마다 채널 5종(웹·GitHub·법령·공공데이터·통계) 규칙으로 자료를 찾아 → 왼쪽 문서에 planning 문서와 단계별 폴더·파일 트리를 쌓고 → 단계 조사 뒤 PATH.md를 내려받는 서비스.
+하려는 일을 한 문단 적으면, 짧은 인터뷰로 생각을 정리하고 → 웹·오픈소스·법령·공공데이터·통계
+다섯 곳을 뒤져 → 단계마다 **이미 있어서 가져다 쓸 것**과 **직접 만들 것**을 갈라 → 로드맵(마인드맵)과
+PATH.md 로 내놓는 서비스입니다. **MABC 2026 결선 출품작**(예선 당선 스킬 `pathfind` 의 웹 서비스판)입니다.
 
-**공개 URL**: https://pathfind.askewly.com  
-**배포본**: 배포 전. 첫 Vercel 배포 후 여기에 커밋 해시를 채운다. 현재는 비어 있음. (예: 배포 후 `deploy: <commit hash>` 형태로 채움)
+**공개 URL**: https://pathfind.askewly.com
 
-MABC 2026 결선 산출물 전용 공개 웹 서비스 MVP. 예선 당선 스킬 `pathfind`를 계정 없이 URL로 접속해 쓰는 웹 서비스로 만든 것이다.
+## 지금 이 사이트는 데모입니다 (2026-09-20)
 
-- **모델**: Solar Pro 4 (Upstage) — 서버 측(`/api`)에서만 호출
-- **개발 도구**: Hermes Agent
+대회 심사가 끝나(2026-09-19 발표회) 이 사이트는 제출물이 아니라 **프로젝트 소개**로 서 있습니다.
+그래서 실 API 배선을 걷어냈습니다 — 서버리스 함수 0, 환경변수 0, 외부 호출 0.
+
+- 앱에서 예시 주제 3개 중 하나를 고르면, **실제로 한 번 돌린 조사를 녹화한 것**을 그대로 재생합니다
+  (인터뷰 → 조사 6단계 → 마인드맵 → 노드 설명 → PATH.md 내려받기까지 완주합니다)
+- 녹화 재생이라 자유 입력은 잠겨 있습니다
+- 재생 코드: `frontend/src/lib/demo-player.ts` · 녹화 데이터: `public/demo/`
+
+**심사에 낸 그 형상은 태그로 남아 있습니다** — `submission-2026-09-16`(2026-09-16 23:57 배포본).
+그때는 `api/` 6함수가 Solar Pro 4 를 서버에서 호출했습니다.
+
+```bash
+git show submission-2026-09-16:api/pathfind.js   # 제출 시점 서버 코드
+```
+
+- **모델**(제출 당시): Solar Pro 4 (Upstage) — 서버 측(`/api`)에서만 호출
+- **개발 도구**(제출 당시): Hermes Agent
 
 ---
 
@@ -22,23 +38,21 @@ cd pathfind-web
 # 2) 종속성 설치
 npm install
 
-# 3) 비밀 설정 (서버 측만 — .env.local, gitignore 처리됨, 커밋 금지)
-#    아래 환경변수 이름 목록의 키를 .env.local 에 넣는다. 값은 적지 않는다.
-
-# 4) Vercel 개발 서버 (로컬 실행)
-vercel dev
-#    포트 3000. http://localhost:3000 에서 확인.
+# 3) 개발 서버 (키 불요 — 데모 재생이라 서버가 없다)
+npm run dev
+#    http://localhost:5173
 ```
 
-- `npm run dev`는 Vite만 띄운다. 화면은 뜨지만 `/api`가 404이므로 서버 기능은 확인할 수 없다. 반드시 `vercel dev`를 쓴다.
+- 빌드 결과 확인은 `npm run build && npm run preview`(http://localhost:5199).
 - 빌드: `npm run build`
 - 배포: `npm run deploy`
 
 ---
 
-## 환경변수 (이름만)
+## 환경변수 (이름만 — 제출 당시)
 
-서버(`/api`)가 `process.env`에서 읽는 변수다. 값은 `.env.local`(gitignore·vercelignore)에 넣고 절대 커밋하지 않는다.
+⚠ **지금은 하나도 쓰지 않는다**(서버가 없다). 아래는 `submission-2026-09-16` 시점의 목록이다.
+서버(`/api`)가 `process.env`에서 읽던 변수다. 값은 `.env.local`(gitignore·vercelignore)에 넣고 절대 커밋하지 않는다.
 
 | 이름 | 용도 |
 | --- | --- |
@@ -63,27 +77,14 @@ vercel dev
 index.html            랜딩 화면 — 시작하기를 누르면 app.html 로 이동
 app.html              앱 화면 — 세 패널(왼쪽 조사 결과 / 가운데 대화·중계 / 오른쪽 로드맵 마인드맵)
 
-api/                  Vercel 서버리스 함수 — 파일 하나 = 엔드포인트 하나
-  grill.js            정렬 인터뷰 1턴
-  pathfind.js         승인 후 큰 그림(stages) + 선행 조사 계획(planning) — handoffMarkdown은 빈 값
-  stage.js            단계 1개 검색 리서치
-  handoff.js          handoff 마크다운 최종본
-  explain.js          노드 설명
-  chat.js             조사 후 대화
-  outline.js          개요
-  source-card.js      출처 카드
-  _lib/               서버 공용 코드 (예: solar.js)
-  _channels/           조사 채널 — 외부 검색·데이터 공급자를 추상화 (모듈이라 밑줄: 주소로 부르는 곳이 아니라 stage가 불러 쓰는 모듈)
-    naver.js          네이버 검색
-    github.js         GitHub
-    public-data.js    공공데이터포털
-    kosis.js          KOSIS
-    law.js           국가법령정보센터
+public/demo/          데모 녹화 — manifest.json + 시나리오 3벌(woodwork·lease·indie)
+                      ⚠ api/ 는 없다. 제출 시점 서버 코드는 submission-2026-09-16 태그에 있다
 
 frontend/src/
   app/                앱 진입·셸
   state/              타입·저장·흐름·파생 상태
-  lib/api.ts          서버 호출
+  lib/api.ts          데이터 진입점 — 데모 빌드에서는 재생기로 간다
+  lib/demo-player.ts  녹화 재생기 (순서·키 매칭)
   landing/            랜딩 진입 (디자인 시스템 레포 examples/glide-landing 복사본)
 
 frontend/src/components/   https://ui.askewly.com 레지스트리 설치본 — 손으로 고치지 않는다
