@@ -22,7 +22,7 @@ import { deleteRoadmap, getRoadmap, listRoadmaps, newRoadmapId, renameRoadmap, s
 import { GroundedSourcePanel, type GroundedSource } from "@/components/grounded-source-panel"
 import { ChatConversationPanel, renderMarkdown, type ChatCitation, type ChatMessage, type ChatStatus } from "@/components/chat-conversation-panel"
 import * as api from "@/lib/api"
-import { DEMO, loadScenarios, selectScenarioByOpening, type DemoScenario } from "@/lib/demo-player"
+import { DEMO, allowedChoices, loadScenarios, selectScenarioByOpening, type DemoScenario } from "@/lib/demo-player"
 import type { MindmapNode } from "@/components/mindmap-spine-tree"
 import { useSession } from "@/state/store"
 import { APPROVE_LABEL, REVISE_LABEL, useFlow } from "@/state/flow"
@@ -809,6 +809,16 @@ export default function App() {
     return undefined
   }, [session.busy, session.phase, session.pending, session.messages, session.planningAttempt, interviewChoices, demoStarters])
 
+  /* 데모 빌드(M18 · 사용자 지시 2026-09-20): **녹화가 밟은 갈래만 눌린다.**
+     나머지 칩은 보이되 회색으로 죽인다 — 누르면 같은 응답이 나와 묻는 말과 답이 어긋나기 때문이다.
+     화면이 스스로 처리하는 칩(승인·내려받기·다시 시작)은 서버를 안 타므로 언제나 허용한다. */
+  const disabledSuggestions = useMemo(() => {
+    if (!DEMO || !suggestions?.length) return undefined
+    const selfHandled = new Set([APPROVE_LABEL, DOWNLOAD_LABEL, "조사 다시 시작", ...demoStarters])
+    const allowed = new Set(allowedChoices())
+    return suggestions.filter((s) => !selfHandled.has(s) && !allowed.has(s))
+  }, [suggestions, demoStarters, session.messages])
+
   const handleSend = (text: string) => {
     setDraft("")
     /* 데모 빌드(M18): 첫 발화가 시나리오 선택이다 — 카드 라벨이 곧 녹화의 첫 답이라 이것으로 갈린다.
@@ -1277,8 +1287,9 @@ export default function App() {
           title="대화"
           showHeaderActions={false}
           // 이 화면은 문서 Q&A 가 아니라 「무엇을 만들지」를 같이 정하는 자리다 — 문구 정본 `docs/app-ux-copy.md`
-          composerPlaceholder={DEMO ? "데모입니다 — 아래 예시 가운데 하나를 눌러 주세요" : "시작하려는 일을 한 문단으로 적어 주세요"}
+          composerPlaceholder={DEMO ? "데모입니다. 위 버튼으로 체험해보세요!" : "시작하려는 일을 한 문단으로 적어 주세요"}
           composerLocked={DEMO}
+          disabledSuggestions={disabledSuggestions}
           renderCitation={(citation) => { const d = resolveCitation(citation); return <CitationBadge citation={citation} doc={d} cardText={d ? session.sourceCards?.[d.id] : undefined} onOpen={openSourceDoc} /> }}
           // 「얘와 나누는 대화」로 읽히게 — 연속한 답변 구간의 **마지막 줄 아래**에 붙고(부품이 판단한다),
           // 생각 중에는 스피너 자리에 「지금 하는 일」과 함께 선다. 28px(3차 step-4 — 22px 는 작다는 피드백 A3).

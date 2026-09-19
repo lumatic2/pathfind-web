@@ -20,7 +20,7 @@ export type DemoScenario = {
 }
 
 type Call = { key: string | null; ms: number; response: unknown }
-type Bundle = DemoScenario & { calls: Record<string, Call[]> }
+type Bundle = DemoScenario & { allowed?: string[]; calls: Record<string, Call[]> }
 
 export const DEMO = import.meta.env.VITE_DEMO === "1"
 
@@ -71,6 +71,16 @@ export function activeScenario(): DemoScenario | null {
   return bundle
 }
 
+/**
+ * 녹화가 실제로 밟은 선택지. 화면은 **이 목록에 없는 칩을 눌리지 않게 죽인다**
+ * (2026-09-20 사용자 지시) — 데모는 이 길 하나만 재생할 수 있어서, 다른 칩을 누르면
+ * 같은 응답이 나오고 묻는 말과 답이 어긋난다.
+ * 화면이 스스로 처리하는 칩(승인·내려받기·다시 시작)은 여기 없고 호출 측이 따로 허용한다.
+ */
+export function allowedChoices(): string[] {
+  return bundle?.allowed ?? []
+}
+
 export function resetScenario(): void {
   bundle = null
   for (const k of Object.keys(cursor)) delete cursor[k]
@@ -115,6 +125,18 @@ export async function playback<T>(path: string, body: unknown): Promise<T> {
 
   const key = keyOf(endpoint, body)
   let hit = key != null ? calls.find((c) => c.key === key) : undefined
+  if (!hit && key != null && endpoint === "explain") {
+    /* 노드 설명은 **아무거나 돌려주면 안 된다** — 키가 안 맞는데 첫 응답을 주면 5단계를 눌렀는데
+       1단계 설명이 나온다(2026-09-20 실측). 없으면 없다고 말한다. */
+    await wait(MIN_MS)
+    return {
+      explanation: "이 단계 설명은 데모 녹화에 담겨 있지 않습니다. 설명이 담긴 단계를 눌러 보세요.",
+      citationTitles: [],
+      citationIds: [],
+      followups: [],
+      degraded: true,
+    } as T
+  }
   if (!hit) {
     const n = cursor[endpoint] ?? 0
     hit = calls[Math.min(n, calls.length - 1)]

@@ -1,5 +1,5 @@
 import { Fragment, cloneElement, isValidElement, useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react"
-import { AlertCircleIcon, ArrowRightIcon, BrainIcon, ChevronDownIcon, CopyIcon, FileSearchIcon, HandIcon, MoreVerticalIcon, PinIcon, SlidersHorizontalIcon, SparkleIcon, ThumbsDownIcon, ThumbsUpIcon } from "lucide-react"
+import { AlertCircleIcon, ArrowRightIcon, LockIcon, BrainIcon, ChevronDownIcon, CopyIcon, FileSearchIcon, HandIcon, MoreVerticalIcon, PinIcon, SlidersHorizontalIcon, SparkleIcon, ThumbsDownIcon, ThumbsUpIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -98,6 +98,8 @@ type ChatConversationPanelProps = {
    * 데모는 미리 녹화한 시나리오를 재생하므로 자유 입력에 답할 응답이 없다.
    */
   composerLocked?: boolean
+  /** 눌리지 않게 죽일 칩 목록(M18 데모) */
+  disabledSuggestions?: string[]
   /**
    * 어시스턴트 마크(M5 확장 2차 step-4 → 3차 step-4 — 참조 구현 국소 추가, 상류 등재 대상).
    * **연속한 어시스턴트 줄에는 마지막 줄 아래에만 그린다**(사용자 재확인 2026-09-13 — 「답변 아래로」). 줄마다 반복하면
@@ -605,6 +607,7 @@ function Suggestions({
   reasons,
   recommended,
   directInputLabel,
+  disabled,
 }: {
   items: string[]
   onPick?: (s: string) => void
@@ -612,26 +615,33 @@ function Suggestions({
   reasons?: Record<string, string>
   recommended?: string
   directInputLabel?: string
+  /** 눌리지 않는 칩(M18 데모) — 보이되 회색으로 죽인다. 녹화에 없는 갈래를 누르면 내용이 어긋난다. */
+  disabled?: string[]
 }) {
   return (
     <div data-chat-suggestions className={cn("flex flex-col items-start gap-2 origin-bottom-left", ENTER_IN)}>
       {items.map((s) => {
         const why = reasons?.[s]
         const isRecommended = recommended === s && s !== directInputLabel
+        const isDisabled = disabled?.includes(s) ?? false
         return (
           <button
             key={s}
             type="button"
             data-chat-suggestion={s}
             data-chat-suggestion-recommended={isRecommended ? "" : undefined}
+            data-chat-suggestion-disabled={isDisabled ? "" : undefined}
             data-direct-input={directInputLabel && s === directInputLabel ? "" : undefined}
             onClick={() => onPick?.(s)}
+            disabled={isDisabled}
+            title={isDisabled ? "데모에는 이 갈래가 담겨 있지 않습니다" : undefined}
             className={cn(
               "inline-flex max-w-full flex-col items-start justify-center border border-border px-5 text-left text-sm leading-6 outline-none ring-ring ring-offset-2 ring-offset-background focus-visible:ring-2",
               // 한 줄짜리는 종전 그대로 알약, 이유가 붙어 두 줄이 되면 둥근 사각이 된다(알약은 두 줄에서 양 끝이 뭉개진다)
               why ? "gap-0.5 rounded-2xl py-2" : "rounded-full",
               isRecommended && "border-foreground",
-              STATE_LAYER,
+              // 죽은 칩 — 보이되 눌리지 않는다(M18 데모). 상태 레이어(hover)도 빼야 눌릴 것처럼 안 보인다.
+              isDisabled ? "cursor-not-allowed border-border/50 text-muted-foreground/60 opacity-60" : STATE_LAYER,
             )}
             style={{ minHeight: CHIP_PX }}
           >
@@ -671,7 +681,7 @@ function Suggestions({
  * M117 보강(옵트인 — 기본 렌더 무변경): `reasoning`·`citations` + `renderCitation` 슬롯 · `suggestions` 세로 칩 ·
  * `scopeLabel` 근거 범위 · `draft` 제어 · `variant="grounded"`. 관측 근거 `evidence/m117/…observation.md` §3.
  */
-export function ChatConversationPanel({ messages, status, onSend, onRetry, errorMessage = "The assistant could not respond. Your message was not lost.", retryLabel = "Retry", emptyHint, variant = "default", renderCitation, suggestions, onSuggestion, scopeLabel, draft: draftProp, onDraftChange, title, showHeaderActions = true, emptyTitle, emptyIcon, suggestionsPrompt, onSaveNote, onCopy, onFeedback, saveNoteLabel = "메모에 저장", composerPlaceholder = "소스에 대해 물어보세요", composerLocked = false, renderAssistantMark, waitingLabel, directInputLabel, suggestionNotes, suggestionReasons, recommendedSuggestion, className }: ChatConversationPanelProps) {
+export function ChatConversationPanel({ messages, status, onSend, onRetry, errorMessage = "The assistant could not respond. Your message was not lost.", retryLabel = "Retry", emptyHint, variant = "default", renderCitation, suggestions, onSuggestion, scopeLabel, draft: draftProp, onDraftChange, title, showHeaderActions = true, emptyTitle, emptyIcon, suggestionsPrompt, onSaveNote, onCopy, onFeedback, saveNoteLabel = "메모에 저장", composerPlaceholder = "소스에 대해 물어보세요", composerLocked = false, disabledSuggestions, renderAssistantMark, waitingLabel, directInputLabel, suggestionNotes, suggestionReasons, recommendedSuggestion, className }: ChatConversationPanelProps) {
   const waitingSeconds = useElapsedSeconds(status === "waiting")
   const [draftState, setDraftState] = useState("")
   const composerRef = useRef<HTMLTextAreaElement>(null)
@@ -746,7 +756,7 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, error
             {suggestions?.length ? (
               <>
                 {suggestionsPrompt ? <p className="text-sm font-medium leading-6">{suggestionsPrompt}</p> : null}
-                <Suggestions items={suggestions} onPick={pick} notes={suggestionNotes} reasons={suggestionReasons} recommended={recommendedSuggestion} directInputLabel={directInputLabel} />
+                <Suggestions items={suggestions} onPick={pick} notes={suggestionNotes} reasons={suggestionReasons} recommended={recommendedSuggestion} directInputLabel={directInputLabel} disabled={disabledSuggestions} />
               </>
             ) : null}
           </div>
@@ -881,11 +891,20 @@ export function ChatConversationPanel({ messages, status, onSend, onRetry, error
         {showTrailingSuggestions ? (
           <>
             {suggestionsPrompt ? <p className="text-sm font-medium leading-6">{suggestionsPrompt}</p> : null}
-            <Suggestions items={suggestions!} onPick={pick} notes={suggestionNotes} reasons={suggestionReasons} recommended={recommendedSuggestion} directInputLabel={directInputLabel} />
+            <Suggestions items={suggestions!} onPick={pick} notes={suggestionNotes} reasons={suggestionReasons} recommended={recommendedSuggestion} directInputLabel={directInputLabel} disabled={disabledSuggestions} />
           </>
         ) : null}
       </div>
-      {grounded ? (
+      {grounded && composerLocked ? (
+        /* 잠긴 입력창(M18 데모) — 타자 대신 **왜 못 치는지**를 한 줄로 세운다.
+           빈 입력창을 회색으로 두면 「고장났나」로 읽히고, 없애 버리면 칩만 뜬 화면이 어색하다. */
+        <div data-chat-composer data-chat-composer-locked className="shrink-0 px-4 pb-4 pt-2">
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            <LockIcon size={18} aria-hidden className="shrink-0" />
+            <span>{composerPlaceholder}</span>
+          </div>
+        </div>
+      ) : grounded ? (
         // 원본 §3 입력창 — r16 · 패딩 16 · 선은 무대보다 진하다(입력창만 선이 어둡다) · 우측 「소스 N개」 + 전송 원 40(빈 입력 = 먹 8% 비활성, 채우면 먹 채움)
         <form
           data-chat-composer
