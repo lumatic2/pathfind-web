@@ -1,0 +1,110 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* 다크 모드는 범위 밖(사용자 확정 2026-09-13). Tailwind v4 의 `dark:` 기본값은
+   prefers-color-scheme 이라, 이걸 안 덮으면 레지스트리 자산의 `dark:*` 규칙이
+   OS 설정만으로 켜져 라이트 팔레트를 반쯤 덮는다(실측 — 무대가 카드와 같은 흰색이 됐다).
+   `.dark` 클래스에만 걸리게 바꾼다 — 우리는 그 클래스를 붙이지 않으므로 전부 꺼진다. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 랜딩(`index.html`)에서 넘어올 때 두 화면을 겹쳐 넘긴다 — 랜딩 `base.css` 에도 같은 줄이 있다.
+   한쪽만 켜면 성립하지 않는다. 지원 안 하는 브라우저는 지금처럼 즉시 바뀐다. */
+@view-transition { navigation: auto; }
+/* 상단 바 로고 — 랜딩 내비 로고(`.nav__logo`)와 같은 이름이라 그 사이를 이어서 움직인다 */
+[data-app-logo] { view-transition-name: pathfinder-logo; }
+
+/* 룩의 소유자는 이 프로젝트다(pathfind DESIGN.md). Askewly 토큰을 주입하지 않는다.
+   값의 정본: C:\Users\yusun\projects\pathfind-web\DESIGN.md — tokens.css 는 그 표의 이식본. */
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  /* 인용 팝오버 바탕 — 이 줄이 없어 `bg-popover` 가 CSS 로 안 나와 카드가 투명했다(3차 사람 판정 1번, 2차부터의 결함). */
+  --color-popover: var(--popover);
+  --color-destructive: var(--destructive);
+  /* 랜딩 블록이 쓰는 유틸리티 이름(bg-secondary·text-card-foreground 등) — 2026-09-14 랜딩 이식. */
+  --color-card-foreground: var(--card-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+}
+
+@theme {
+  --color-verdict-bring:  var(--verdict-existing);
+  --color-verdict-mix:    var(--verdict-mix);
+  --color-verdict-direct: var(--verdict-need);
+  --color-verdict-none:   var(--verdict-none);
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: "Noto Sans KR", system-ui, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  word-break: keep-all;
+}
+
+/* ── 클릭 가능한 것에는 손가락 커서 (M5 확장 6차 step-3, 사용자 피드백 A) ──────
+   Tailwind v4 의 preflight 는 버튼의 기본 커서를 되돌리지 않는다 — 브라우저 기본이 `default` 라
+   누를 수 있게 생긴 것이 누를 수 있어 보이지 않는다. 참조 앱의 `<button>` 50개 중 `cursor-pointer`
+   가 붙어 있던 것은 4곳뿐이었다(사용자 지적: 「여기 칩들 말고도, 다른 버튼들이나 눌러야 하는 부분들에도 적용 필요」).
+
+   개별 클래스 46곳을 고치지 않고 **규칙 하나**로 닫는다. 새로 만드는 버튼도 자동으로 걸린다.
+   `@layer base` 라 유틸리티(`cursor-default`·`cursor-not-allowed`)가 언제나 이긴다 — 예외를 두고 싶은
+   자리는 종전처럼 클래스로 덮으면 된다.
+
+   ⚠ 비활성 배제가 두 갈래인 이유: shadcn 버튼은 `disabled:pointer-events-none` 이라 `:disabled` 는
+   애초에 커서가 안 바뀐다(그것만 보면 검사가 늘 통과해 판별력이 없다). 실제로 새는 자리는
+   **`aria-disabled` 를 쓰는 링크**다 — 그쪽은 포인터 이벤트가 살아 있어 명시 배제가 필요하다. */
+@layer base {
+  button:not(:disabled),
+  summary,
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  a[href]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  /* ⚠ 위의 `:not()` 만으로는 링크를 못 막는다 — **브라우저 UA 스타일시트가 `a:link` 에 이미
+     `cursor: pointer` 를 준다.** 선택자에서 빼는 것은 「더하지 않는다」일 뿐이라 UA 기본값이 그대로 남는다
+     (6차 step-3 Failure probe 가 이것을 잡았다: `aria-disabled="true"` 링크의 computed cursor 가 `pointer` 였다).
+     그래서 되돌리는 규칙을 따로 둔다. */
+  [aria-disabled="true"] {
+    cursor: default;
+  }
+}
+
+/* ── 대화 등장 애니메이션 (M5 확장 3차 step-5) ─────────────────────────────
+   `chat-message-in` 은 부품 3곳이 이름만 부르고 정의가 없었다(2차부터 한 번도 안 돌았다 — 검증자 실측).
+   블록 fade-in 은 답변 안의 문단·목록·제목이 **좌→우로 차례차례** 뜨게 한다(사용자 피드백 A6).
+   지연은 블록마다 `--block-delay`(부품이 i×80ms, 상한 있음). 움직임을 줄인 환경에서는 둘 다 즉시 표시. */
+@keyframes chat-message-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes chat-block-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+.chat-block-in {
+  animation: chat-block-in 0.32s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  animation-delay: var(--block-delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-block-in { animation: none; }
+}

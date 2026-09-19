@@ -1,4 +1,15 @@
-/* GENERATED from tokens/askewly.tokens.json — do not edit by hand. Regenerate: node scripts/generate-tokens.mjs */
+/*
+ * 랜딩 디자인 토큰 — **손으로 고친다.**
+ *
+ * ⚠ 이 파일 머리말은 8차 step-5 전까지 「GENERATED from tokens/askewly.tokens.json …
+ *   Regenerate: node scripts/generate-tokens.mjs」였다. **그 생성기도 `tokens/` 도 이 레포에 없다** —
+ *   다음 사람이 손으로 고치기를 주저하거나 없는 명령을 찾게 만드는 거짓말이라 사실에 맞게 고쳤다(8차 검증자 권고 8).
+ *
+ * ⚠ 보라는 `--primary`·`--ring`·`--path-violet` 셋이 **같은 값 #6F2DBD** 다 — 어긋나면 화면에서 두 가지 보라가 선다.
+ *   다크의 `--ring: #B298DC` 는 대비 때문에 일부러 다른 값이다(어둠 위에서 #6F2DBD 는 안 보인다).
+ * ⚠ 색 이름 앞가지가 `--path-` 인 이유: **이 제품은 어스큐리 제품이 아니라 Pathfinder 다**(2026-09-15 사용자).
+ *   `BRAND.md` 는 이 제품의 상위 규약이 아니다.
+ */
 :root {
   --radius: 0.5rem;
   --background: oklch(0.985 0 0);
@@ -38,17 +49,11 @@
   --danger-foreground: oklch(0.586 0.253 17.585);
   --danger-solid: oklch(0.586 0.253 17.585);
   --danger-solid-hover: oklch(0.645 0.246 16.439);
-
   --path-violet: #6F2DBD;
   --path-orchid: #A663CC;
   --path-lavender: #B298DC;
   --path-sky: #B8D0EB;
   --path-mint: #B9FAF8;
-  --askewly-violet: var(--path-violet);
-  --askewly-orchid: var(--path-orchid);
-  --askewly-lavender: var(--path-lavender);
-  --askewly-sky: var(--path-sky);
-  --askewly-mint: var(--path-mint);
   --space-1: 4px;
   --space-2: 8px;
   --space-4: 16px;

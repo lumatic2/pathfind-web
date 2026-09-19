@@ -1,229 +1,101 @@
-import { sanitizeForRestore } from "./store"
-import { STORAGE_KEYS, Session } from "./types"
+/**
+ * 완주한 로드맵 보관 목록(4차 보강 2 step-18, 사용자 H14 「한 싸이클 돌면 저장은 어디에 돼? 다른 로드맵 돌리면 원래 했던 거 돌아와서 볼 수 있음?」).
+ *
+ * 세션 저장소(`pathfind.session.v5`)는 **지금 보는 로드맵 하나**만 든다 — 「새 로드맵」이 그 키를 지우면 되돌아올 길이 없었다.
+ * 그래서 별도 키에 목록을 둔다. 보관 시점은 셋 — ① 조사가 끝나 `ready` 가 되는 순간 ② 「새 로드맵」을 누르는 순간(완주 전이라도
+ * 큰 그림이 있으면) ③ 「내 로드맵」에서 다른 것을 여는 순간(지금 것을 먼저). 같은 세션은 `id` 로 덮어쓴다(upsert).
+ *
+ * ⚠ 브라우저 저장소(대개 5MB)라 세션 1건 ≈ 60~120KB 기준 수십 건이 한계 — 40건을 넘으면 오래된 것부터 버린다.
+ * 남은 횟수(`pathfind.quota.v1`)는 여기와 무관하다 — 열기는 조사가 아니다.
+ */
+import type { Session } from "./types"
+import { restoreSession } from "./store"
+
+export const ROADMAPS_KEY = "pathfind.roadmaps.v1"
+export const ROADMAPS_MAX = 40
 
 export type SavedRoadmap = {
   id: string
   title: string
+  /** ISO 시각 — 마지막으로 보관한 때 */
   savedAt: string
   stageCount: number
   findingCount: number
-  session: string
+  session: Session
 }
 
-export const ROADMAPS_MAX = 40
-
-type Stored = {
-  id: string
-  title: string
-  savedAt: string
-  stageCount: number
-  findingCount: number
-  session: string
-}
-
-function loadAll(): Stored[] {
+function read(): SavedRoadmap[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.roadmaps)
-    if (raw == null) return []
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (it): it is Stored =>
-        typeof it === "object" &&
-        it != null &&
-        typeof it.id === "string" &&
-        typeof it.title === "string" &&
-        typeof it.savedAt === "string" &&
-        typeof it.stageCount === "number" &&
-        typeof it.findingCount === "number" &&
-        typeof it.session === "string",
-    )
+    const raw = localStorage.getItem(ROADMAPS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as { items?: SavedRoadmap[] }
+    return Array.isArray(parsed?.items) ? parsed.items.filter((r) => r && typeof r.id === "string" && r.session?.version === 5) : []
   } catch {
     return []
   }
 }
 
-function persist(items: Stored[]): void {
+function write(items: SavedRoadmap[]): boolean {
   try {
-    localStorage.setItem(STORAGE_KEYS.roadmaps, JSON.stringify(items))
+    localStorage.setItem(ROADMAPS_KEY, JSON.stringify({ items }))
+    return true
   } catch {
-    // quota exceeded 등
+    // 용량 초과 — 보관만 못 할 뿐 화면은 계속 돈다. 호출자가 한 줄로 알린다.
+    return false
   }
 }
 
-function parseStoredSession(raw: string): Session | null {
-  try {
-    const parsed = JSON.parse(raw)
-    if (parsed == null || typeof parsed !== "object") return null
-    if ((parsed as Record<string, unknown>).version !== 5) return null
-    return parsed as Session
-  } catch {
-    return null
-  }
-}
-
-function titleOf(session: unknown): string {
-  if (session == null) return "제목 없는 로드맵"
-  if (typeof session !== "object") return "제목 없는 로드맵"
-  const mapTitle =
-    (session as Record<string, unknown>).mapTitle
-  if (typeof mapTitle === "string" && mapTitle.length > 0) return mapTitle
-
-  const bp = (session as Record<string, unknown>).bigPicture
-  if (bp && typeof bp === "object") {
-    const bpTitle = (bp as Record<string, unknown>).title
-    if (typeof bpTitle === "string" && bpTitle.length > 0) return bpTitle
-  }
-
-  return "제목 없는 로드맵"
-}
-
-function stageCountOf(session: unknown): number {
-  if (session == null) return 0
-  if (typeof session !== "object") return 0
-  const bp = (session as Record<string, unknown>).bigPicture
-  if (!bp || typeof bp !== "object") return 0
-  const stages = (bp as Record<string, unknown>).stages
-  if (!Array.isArray(stages)) return 0
-  return stages.length
-}
-
-function findingCountOf(session: unknown): number {
-  if (session == null) return 0
-  if (typeof session !== "object") return 0
-  const bp = (session as Record<string, unknown>).bigPicture
-  if (!bp || typeof bp !== "object") return 0
-  const stages = (bp as Record<string, unknown>).stages
-  if (!Array.isArray(stages)) return 0
-  let sum = 0
-  for (const stage of stages) {
-    if (stage && typeof stage === "object") {
-      const findings = (stage as Record<string, unknown>).findings
-      if (Array.isArray(findings)) sum += findings.length
-    }
-  }
-  return sum
-}
-
+/** 최신 것이 앞에 오는 목록 */
 export function listRoadmaps(): SavedRoadmap[] {
-  const all = loadAll()
-  const valid = all.filter((it) => parseStoredSession(it.session) != null)
-  const sorted = valid.slice().sort(
-    (a, b) =>
-      (b.savedAt < a.savedAt ? -1 : b.savedAt > a.savedAt ? 1 : 0) ||
-      (b.id < a.id ? -1 : b.id > a.id ? 1 : 0),
-  )
-  return sorted as SavedRoadmap[]
-}
-
-export function saveRoadmap(
-  session: unknown,
-  id?: string,
-): { id: string; ok: boolean } {
-  const all = loadAll()
-  const now = new Date().toISOString()
-  const entry: Stored = {
-    id: id ?? (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-    title: titleOf(session),
-    savedAt: now,
-    stageCount: stageCountOf(session),
-    findingCount: findingCountOf(session),
-    session: typeof session === "object" && session != null
-      ? JSON.stringify(session)
-      : "",
-  }
-
-  if (id != null) {
-    const idx = all.findIndex((it) => it.id === id)
-    if (idx >= 0) {
-      all[idx] = { ...entry, savedAt: now }
-    } else {
-      all.push(entry)
-    }
-  } else {
-    all.push(entry)
-  }
-
-  if (all.length > ROADMAPS_MAX) {
-    all.sort(
-      (a, b) =>
-        (a.savedAt < b.savedAt ? -1 : a.savedAt > b.savedAt ? 1 : 0) ||
-        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    )
-    all.splice(0, all.length - ROADMAPS_MAX)
-  }
-
-  try {
-    persist(all)
-    return { id: entry.id, ok: true }
-  } catch {
-    return { id: entry.id, ok: false }
-  }
-}
-
-export function getRoadmap(id: string): SavedRoadmap | null {
-  const all = loadAll()
-  const found = all.find((it) => it.id === id)
-  return found ? (found as SavedRoadmap) : null
+  return read().sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1))
 }
 
 export function newRoadmapId(): string {
-  return crypto.randomUUID ? crypto.randomUUID() : String(Date.now())
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * 세션 하나를 보관한다(upsert). 큰 그림이 없는 세션(인터뷰 중)은 보관하지 않는다 — 되돌아가 볼 것이 없다.
+ * `session.id` 가 없으면 만들어서 쓴다 — 호출자는 돌려받은 id 를 세션에 patch 해야 다음 보관이 덮어쓴다.
+ * 돌려주는 값: 보관된 id, 저장에 실패하면 `null`.
+ */
+export function saveRoadmap(session: Session): string | null {
+  if (!session.bigPicture) return null
+  const id = session.id ?? newRoadmapId()
+  const stored: Session = { ...session, id, busy: false, error: null, selectedId: null, exportState: { ...session.exportState, busy: false } }
+  const entry: SavedRoadmap = {
+    id,
+    title: session.mapTitle ?? session.bigPicture.title ?? "제목 없는 패스",
+    savedAt: new Date().toISOString(),
+    stageCount: session.stages.length,
+    findingCount: session.stages.reduce((a, x) => a + (x.stage.findings?.length ?? 0), 0),
+    session: stored,
+  }
+  const rest = read().filter((r) => r.id !== id)
+  const items = [entry, ...rest].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1)).slice(0, ROADMAPS_MAX)
+  return write(items) ? id : null
+}
+
+/** 보관본 하나를 지운다(2026-09-14 — 4차 finding 큐 「내 로드맵 삭제·이름 바꾸기」). 지금 보는 세션은 건드리지 않는다 — 보관본만 빠진다. */
 export function deleteRoadmap(id: string): boolean {
-  const all = loadAll()
-  const before = all.length
-  const next = all.filter((it) => it.id !== id)
-  if (next.length === before) return false
-  persist(next)
-  return true
+  const items = read().filter((r) => r.id !== id)
+  return write(items)
 }
 
+/** 보관본 제목을 바꾼다. 빈 제목은 무시한다(기존 제목 유지). 세션 안의 `mapTitle` 도 같이 바꿔 다시 열 때 그 제목이 뜬다. */
 export function renameRoadmap(id: string, title: string): boolean {
-  if (title === "") return false
-  const all = loadAll()
-  const idx = all.findIndex((it) => it.id === id)
-  if (idx < 0) return false
-  const item = all[idx]
-  item.title = title
-  const parsed = parseStoredSession(item.session)
-  if (parsed != null) {
-    parsed.mapTitle = title
-    item.session = JSON.stringify(parsed)
-  }
-  persist(all)
-  return true
+  const next = title.trim()
+  if (!next) return false
+  const items = read().map((r) => (r.id === id ? { ...r, title: next, session: { ...r.session, mapTitle: next } } : r))
+  return write(items)
 }
 
-export function toCurrentSession(item: SavedRoadmap): Session {
-  const parsed = parseStoredSession(item.session)
-  if (parsed != null) {
-    return sanitizeForRestore({ ...parsed, id: item.id })
-  }
-  return {
-    version: 5,
-    phase: "interview",
-    turnCount: 0,
-    history: [],
-    pending: null,
-    summary: "",
-    bigPicture: null,
-    stages: [],
-    messages: [],
-    mapTitle: "제목 없는 패스",
-    expandedIds: [],
-    selectedId: null,
-    runId: null,
-    runStatus: null,
-    runCursor: 0,
-    runActivity: null,
-    researchPath: null,
-    reinforcing: false,
-    degraded: false,
-    error: null,
-    busy: false,
-    exportState: { roadmapMarkdown: null, title: null, busy: false },
-    id: item.id,
-  }
+export function getRoadmap(id: string): SavedRoadmap | null {
+  return read().find((r) => r.id === id) ?? null
+}
+
+/** 보관본을 현재 세션으로 되살릴 때의 정리 — `store.load()` 와 같은 규칙(진행 중 표시·선택·오류는 되살리지 않는다) */
+export function toCurrentSession(saved: SavedRoadmap): Session {
+  const s = saved.session
+  return restoreSession({ ...s, id: saved.id })
 }

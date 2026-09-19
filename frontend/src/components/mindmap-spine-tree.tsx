@@ -1,3 +1,25 @@
+/**
+ * Mindmap Spine Tree — 두 레이아웃.
+ *
+ *   `roadmap`(기본) — **뿌리(최종 목표) 아래 단계 노드가 한 줄로 좌→우 서는 위→아래 트리.** 단계 사이 가로선은 없고
+ *     뿌리의 `⌄` 에서 단계로 세로 S 곡선이 갈라진다(사용자 확정 2026-09-13). 각 단계는 다시 **위→아래 계층 트리의 루트**다:
+ *     `⌄` 를 누르면 자식이 부모 아래 한 줄에 가로로 펼쳐지고 부모는 자식 묶음의 가운데에 앉는다(고전 tidy tree —
+ *     같은 깊이 = 같은 줄, 토글은 노드 아래 가운데, 연결선은 토글 원 중심에서 자식 상단 중앙으로 세로 S 곡선).
+ *     사용자 확정 구조(2026-09-12, 3차).
+ *   `fan` — Google Gemini Notebook(구 NotebookLM) 마인드맵 관측에서 이식한 부챗살 트리: 루트에서 오른쪽으로
+ *     갈라지는 후위순회 트리 + 부모 접힘 버튼 한 점에서 나는 베지어 + `<`/`>` 방향 어포던스.
+ *
+ * 공통 (원본 실조작 관측 — `evidence/m116/2026-09-12-mindmap-screenshot-observation.md` §11, 회수일 2026-09-12):
+ *   - 깊이별 **색상(hue) 램프** — 노드 바탕·그 노드의 어포던스 원·그 노드로 들어오는 선이 같은 깊이 색.
+ *     원본 팔레트는 가져오지 않고 우리 semantic 토큰(primary → emphasis → info → accent → success)으로 잇는다.
+ *   - **생성·소멸 애니메이션** — 펼치면 자식이 부모 위치에서 생겨나 제자리로 이동하고, 접으면 부모 위치로 되돌아가며
+ *     사라진다. 형제·조상은 동시에 재배치된다.
+ *   - **카메라** — 토글을 누르면 **그 노드(와 드러난 자식)가 뷰포트 중앙**에 오도록 팬이 노드 이동과 **동시에** 움직인다.
+ *     배율은 가독 배율(1×) 아래로 내려가지 않고, 한 번 올라간 배율은 유지한다(사용자 결정 2026-09-12 — 원본은 이동 뒤
+ *     전체 맞춤이었으나 깊게 펼칠수록 줌아웃되어 기각). 첫 표시만 전체 맞춤(≤1×).
+ * 좌표계 3겹 분리 (`cookbook/layouts/horizontal-tree-layout.md`): 1) 트리 좌표(줌을 모른다) → 2) 컨테이너 하나의
+ * `translate(pan) scale(zoom)` → 3) DOM(`transform: translate(x, y)` + svg path 하나).
+ */
 import {
   useCallback,
   useEffect,
@@ -30,19 +52,19 @@ export type MindmapNode = {
    */
   status?: MindmapNodeStatus
   /**
-   * 호버 설명(M122 — 실소비자 승격).
-   * 「부가 정보를 라벨에 이어 붙이지 않는다」는 `status`(M121)와 같은 계열의 규칙이다.
+   * 호버 설명(M5 확장 2차 step-2 — 참조 구현 국소 추가, 상류 등재 대상).
    * 라벨에 이어 붙이면 폭 측정 예산을 먹는 부가 정보(수량 등)를 여기로 뺀다.
    * 네이티브 `title` 로 나가므로 키보드 포커스로는 뜨지 않는다 — 라벨만으로 뜻이 서야 한다.
    */
   hint?: string
   /**
-   * 라벨 앞 색 점(M122 — 실소비자 승격).
+   * 라벨 앞 색 점(M5 확장 2차 step-3 — 참조 구현 국소 추가, 상류 등재 대상).
    * 라벨 꼬리에 판정을 산문으로 이어 붙이는 대신 한 글자 크기의 신호로 낸다.
    * `title` 이 그 뜻을 말하므로 **색만으로 뜻이 서야 한다고 가정하지 않는다**.
    * `hollow` 는 아직 판정이 없다는 뜻 — 채운 점과 섞이면 거짓 판정으로 읽힌다.
-   *
-   * `split`(0~1, M122) — 두 색 분할 점: 시계 방향으로 `color` 가 `split` 비율만큼, 나머지는 `color2`.
+   */
+  /**
+   * `split`(0~1, 참조 구현 국소 추가 M5 4차 보강 3) — 두 색 분할 점: 시계 방향으로 `color` 가 `split` 비율만큼, 나머지는 `color2`.
    * 단계처럼 「항목의 합」인 노드가 항목 색 두 개로 비율을 보인다. 없으면 한 색 점.
    */
   dot?: { verdict: string; color: string; title: string; hollow?: boolean; split?: number; color2?: string }
@@ -87,7 +109,7 @@ export type MindmapSpineTreeProps = {
   /** 우하단 조작 스택 아래의 빈 자리 — 소비자 액션. */
   controlsSlot?: ReactNode
   /**
-   * 우하단 조작 스택 **왼쪽** 범례 자리(M122 — 「점 색의 뜻을 바로 읽게」). 부품은 자리만 준다 —
+   * 우하단 조작 스택 **왼쪽** 범례 자리(M5 4차 보강 2 step-17 — 「점 색의 뜻을 바로 읽게」). 부품은 자리만 준다 —
    * 점이 무엇을 뜻하는지는 소비자가 안다(데이터 그래프의 범례처럼 상시). 캔버스 끌기를 막지 않게 포인터를 통과시킨다.
    */
   legendSlot?: ReactNode
@@ -114,7 +136,7 @@ const AFF_HIT = 44 // 히트 영역 (dimension.size.touch-target-min)
 const AFF_OFFSET = 8
 const AFF_SPAN = AFF_OFFSET + AFF_D
 const PAD_X = 14
-/** 판정 점 지름과 라벨까지의 간격 (M122). 폭 산출(`estimateWidth`)·측정판·SVG 내보내기가 **같은 값**을 쓴다. */
+/** 판정 점 지름과 라벨까지의 간격. 폭 산출(`estimateWidth`)·측정판·SVG 내보내기가 **같은 값**을 쓴다. */
 const DOT_D = 8
 const DOT_GAP = 7
 const DOT_SPAN = DOT_D + DOT_GAP
@@ -526,7 +548,7 @@ export function MindmapSpineTree({
   const allIds = useMemo(() => collectIds(fanRoot, Infinity), [fanRoot])
   const allOpen = useMemo(() => allIds.length > 0 && allIds.every((id) => expanded.has(id)), [allIds, expanded])
   // 접은 상태 = 뿌리 + 단계 줄(단계가 로드맵의 정체라 그 아래로는 안 접는다 — 사용자 규칙 2026-09-13) · 펼친 상태 = 전부.
-  // ⚠ 두 레이아웃 공통이다(M122) — 원본은 fan 에서 빈 집합(뿌리만)으로 접어 단계 줄이 사라졌다.
+  // ⚠ 두 레이아웃 공통이다(참조 구현 국소 수정 4차 step-4, 상류 등재 대상) — 원본은 fan 에서 빈 집합(뿌리만)으로 접어 단계 줄이 사라졌다.
   const toggleAll = () => {
     focusRef.current = "all"
     commitExpanded(allOpen ? new Set([fanRoot.id]) : new Set(allIds))
@@ -738,7 +760,7 @@ export function MindmapSpineTree({
       <div ref={measureRef} aria-hidden className="pointer-events-none invisible absolute -left-[9999px] top-0 whitespace-nowrap text-sm font-medium">
         {everyNode.map((n) => (
           <span key={n.id} data-measure={n.id} className="inline-flex items-center px-3.5">
-            {/* M122 — 점도 폭을 먹는다 — 측정판에 없으면 라벨이 상자를 넘어 잘린다(PNG 내보내기까지 따라 깨진다). */}
+            {/* 점도 폭을 먹는다 — 측정판에 없으면 라벨이 상자를 넘어 잘린다(PNG 내보내기까지 따라 깨진다). */}
             {n.dot && <span className="inline-block shrink-0" style={{ width: DOT_D, height: DOT_D, marginRight: DOT_GAP }} />}
             {n.label}
           </span>
@@ -1034,7 +1056,7 @@ export function exportSvg(viewport: HTMLElement | null, lay: Layout, layout: Min
     const fill = el ? getComputedStyle(el).backgroundColor : "currentColor"
     const color = cs(el, "color", "currentColor")
     out.push(`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${NODE_H}" rx="8" fill="${fill}"/>`)
-    // M122 판정 점 — 화면 렌더와 **같은 치수**로 그리고 텍스트를 그만큼 민다. 안 밀면 라벨이 상자를 넘는다.
+    // 판정 점 — 화면 렌더와 **같은 치수**로 그리고 텍스트를 그만큼 민다. 안 밀면 라벨이 상자를 넘는다.
     const dot = p.node.dot
     if (dot) {
       const dcx = p.x + PAD_X + DOT_D / 2

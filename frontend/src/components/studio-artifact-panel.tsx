@@ -1,3 +1,19 @@
+/**
+ * Studio Artifact Panel — 생성물 패널. 위에는 「무엇을 만들 수 있나」(타일 격자 3×3), 아래에는 「무엇을 만들었나」(생성물 목록),
+ * 하단에 항상 닿는 1차 액션(메모 추가). 생성물을 열면 같은 패널이 **상세 모드**로 바뀌고 셸이 그 열을 넓힌다.
+ *
+ * 관측 원천: Google Gemini Notebook 스튜디오 패널 — `evidence/m117/2026-09-12-notebook-shell-live-observation.md` §4·§4-1·§1-1·§5.
+ * 장부 `research/2026-09-12-m117-shell-ledger.md` M117-030~036·054 (자산 명세 §3).
+ *   - 타일 격자 `grid-cols-3 gap-8` · 타일 196×56 `r 12` 패딩 8 8 8 12 · 좌 세로(아이콘 16 위 / 라벨 12/16 500 아래) 우 chevron 20
+ *   - tint 는 **묶음**을 가르고 아이콘·라벨이 개체를 가른다(원본 9타일에 bg 6색, 3쌍 같은 색 — M117-031). tone 6종(원본과 같은
+ *     6 hue: indigo·amber·green·plum·red·sky)을 semantic foreground 씨앗에서 `color-mix` 로 **파생**한다 — bg = 씨앗 12% + 카드,
+ *     fg = 씨앗 60% + 먹. 라이트에선 파스텔 바탕 + 어두운 탁한 글자, 다크에선 카드가 어둡고 먹이 밝아 저절로 「hue 유지 + 명도 강등,
+ *     fg 파스텔 반전」이 된다(관측 §5). amber·plum 은 테마에 씨앗이 없어 danger/emphasis 의 hue 만 돌린 값(상대 색 문법)
+ *   - 생성물 행 64h `r 16` 패딩 8 · 아이콘 32 + 제목 14/16 500 + 부제 12/16(「소스 N개 · M시간 전」= 근거 수 + 신선도) · 피치 72
+ *   - 하단 고정 「메모 추가」 검은 pill 40h(`bg-foreground text-background`, 다크에서 반전) · 접힘 = 56 레일에 kind 9 × 40 원(tint 유지)
+ *   - 상세 = 브레드크럼 `스튜디오 › 앱` + 닫기 · 제목 22/36 + 아이콘 슬롯 · 「프롬프트 및 소스 N개 보기」 32h pill · children · 피드백 쌍 40h pill
+ * 형태는 원본을 따른다(pill — 2026-09-12 사용자 취향 판정: rounded-md 재색칠이 원본과 멀었다). 생성·열기·메모·피드백은 **콜백만**.
+ */
 import { useId, useState, type CSSProperties, type ReactNode } from "react"
 import { ChartColumn, ChevronRight, CircleHelp, FileText, Headphones, Layers, MoreVertical, Network, PanelRightClose, PanelRightOpen, Presentation, Shrink, StickyNote, Table, ThumbsDown, ThumbsUp, Video, WandSparkles, X } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"

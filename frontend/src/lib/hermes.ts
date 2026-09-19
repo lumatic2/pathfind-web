@@ -1,4 +1,5 @@
-/** Hermes run 생애주기 클라이언트. 브라우저는 **같은 출처의 `/api/hermes/*` 만** 부른다 —
+/**
+ * Hermes run 생애주기 클라이언트. 브라우저는 **같은 출처의 `/api/hermes/*` 만** 부른다 —
  * 게이트웨이 주소도 키도 이쪽에 없다(릴레이가 소유한다: `server/hermes.mjs`).
  *
  * 새로고침 복원이 성립하는 이유: 게이트웨이 SSE 는 1회용 단일 구독이지만, 릴레이가 그 하나를
@@ -6,7 +7,7 @@
  * 계약 정본 → `research/2026-09-13-hermes-gateway-contract.md`
  */
 
-/// <reference types="vite/client" />
+import { DEMO } from "@/lib/demo-player"
 
 export type HermesEvent = {
   event: string
@@ -71,6 +72,11 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 
 /** 게이트웨이가 지금 쓸 수 있나. 이 한 번의 판정이 Hermes 경로와 4함수 경로를 가른다. */
 export async function health(): Promise<HermesHealth> {
+  /* 데모 빌드에서는 게이트웨이가 없다 — **네트워크를 타지 않고** 꺼진 값을 즉시 돌려준다(M18).
+     이 함수는 `lib/api.ts` 의 `post()` 를 거치지 않고 `fetch` 를 직접 쓰며, 조사가 끝날 때마다
+     `state/flow.ts` 가 무조건 부른다. 안 막으면 정적 배포에서 `/api/hermes/health` 404 가
+     매번 한 건씩 나간다(화면은 멀쩡해 보여서 더 늦게 들킨다). */
+  if (DEMO) return { enabled: false, reason: "demo" }
   try {
     return await json<HermesHealth>("/api/hermes/health")
   } catch {
@@ -123,10 +129,6 @@ export function streamEvents(
     onClose?: (reason: "done" | "aborted" | "error") => void
   },
 ): StreamHandle {
-  if (import.meta.env.PROD) {
-    return pollEvents(runId, opts)
-  }
-
   let cursor = opts.cursor ?? 0
   let closed = false
   let retries = 0
@@ -208,193 +210,6 @@ export function streamEvents(
       } catch {
         /* 아래에서 재접속 */
       }
-    }
-  }
-
-  void pump()
-  return handle
-}
-
-export type PollEventsOptions = {
-  cursor?: number
-  onEvent: (event: HermesEvent, index: number) => void
-  onClose?: (reason: "done" | "aborted" | "error") => void
-}
-
-export function pollEvents(
-  runId: string,
-  { cursor: start, onEvent, onClose }: PollEventsOptions,
-): StreamHandle {
-  let cursor = start ?? 0
-  let closed = false
-  let onCloseCalled = false
-  let retries = 0
-  let currentController: AbortController | null = null
-  let fetchTimeout: ReturnType<typeof setTimeout> | null = null
-  let timer: ReturnType<typeof setTimeout> | null = null
-
-  const cancelTimers = () => {
-    if (fetchTimeout) clearTimeout(fetchTimeout)
-    if (timer) clearTimeout(timer)
-    fetchTimeout = null
-    timer = null
-  }
-
-  const wait = (ms: number) =>
-    new Promise<void>((r) => {
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => { timer = null; r() }, ms)
-    })
-
-  const handle: StreamHandle = {
-    get cursor() {
-      return cursor
-    },
-    close: () => {
-      if (closed) return
-      closed = true
-      currentController?.abort()
-      cancelTimers()
-      if (!onCloseCalled) {
-        onCloseCalled = true
-        onClose?.("aborted")
-      }
-    },
-  }
-
-  const closeWith = (reason: "done" | "error") => {
-    if (closed) return
-    closed = true
-    currentController?.abort()
-    cancelTimers()
-    if (!onCloseCalled) {
-      onCloseCalled = true
-      onClose?.(reason)
-    }
-  }
-
-  const pump = async () => {
-    while (!closed) {
-      let res: Response
-      try {
-        const controller = new AbortController()
-        currentController = controller
-        fetchTimeout = setTimeout(
-          () => controller.abort(),
-          10_000,
-        )
-        res = await fetch(
-          `/api/hermes/runs/${encodeURIComponent(runId)}/events.json?cursor=${cursor}`,
-          { signal: controller.signal },
-        )
-      } catch (err) {
-        if (fetchTimeout) {
-          clearTimeout(fetchTimeout)
-          fetchTimeout = null
-        }
-        currentController = null
-        if (closed) return
-        if (err instanceof GatewayBusy) return void closeWith("error")
-        if (++retries > 3) return void closeWith("error")
-        await wait(1000 * retries)
-        continue
-      }
-
-      if (!res.ok) {
-        if (fetchTimeout) {
-          clearTimeout(fetchTimeout)
-          fetchTimeout = null
-        }
-        currentController = null
-        if (res.status === 429) return void closeWith("error")
-        if (++retries > 3) return void closeWith("error")
-        await wait(1000 * retries)
-        continue
-      }
-
-      let body:
-        | {
-            runId?: string
-            status?: string
-            done?: boolean
-            cursor?: number
-            events?: unknown[]
-          }
-        | null = null
-      try {
-        body = JSON.parse(await res.text())
-        if (fetchTimeout) {
-          clearTimeout(fetchTimeout)
-          fetchTimeout = null
-        }
-        currentController = null
-      } catch {
-        if (closed) return
-        if (++retries > 3) return void closeWith("error")
-        await wait(1000 * retries)
-        continue
-      }
-
-      if (!body || typeof body !== "object") {
-        if (fetchTimeout) {
-          clearTimeout(fetchTimeout)
-          fetchTimeout = null
-        }
-        currentController = null
-        if (++retries > 3) return void closeWith("error")
-        await wait(1000 * retries)
-        continue
-      }
-
-      if (!Array.isArray(body.events)) {
-        return void closeWith("error")
-      }
-      if (typeof body.cursor !== "number" || body.cursor < 0 || !Number.isInteger(body.cursor)) {
-        return void closeWith("error")
-      }
-      if (typeof body.done !== "boolean") {
-        return void closeWith("error")
-      }
-      const events = body.events
-      const nextCursor = body.cursor
-      const done = body.done
-
-      if (nextCursor < cursor) {
-        if (fetchTimeout) {
-          clearTimeout(fetchTimeout)
-          fetchTimeout = null
-        }
-        currentController = null
-        return void closeWith("error")
-      }
-      if (nextCursor - cursor !== events.length) {
-        if (fetchTimeout) {
-          clearTimeout(fetchTimeout)
-          fetchTimeout = null
-        }
-        currentController = null
-        return void closeWith("error")
-      }
-
-      retries = 0
-
-      for (let i = 0; i < events.length; i += 1) {
-        if (closed) break
-        try {
-          const event = events[i] as HermesEvent
-          cursor += 1
-          onEvent(event, cursor)
-        } catch {
-          return void closeWith("error")
-        }
-      }
-
-      if (done) {
-        return void closeWith("done")
-      }
-
-      cursor = nextCursor
-      await wait(2000)
     }
   }
 

@@ -1,56 +1,58 @@
-// 브라우저당 로드맵 실행 횟수 제한. 세션과 다른 키라 새 로드맵을 시작해도 줄어든다.
-import { STORAGE_KEYS } from "./types"
-import { useEffect, useState } from "react"
+/**
+ * 남은 로드맵 횟수. **세션과 별도로** 보관한다 — 「새 로드맵」이 세션을 지워도 횟수는 남아야 한다.
+ *
+ * ⚠ 이것은 강제가 아니라 제한이다. 브라우저에 기록하므로 시크릿 창·데이터 삭제로 초기화된다.
+ * 신원을 아는 척하는 문구를 쓰지 않는 이유가 여기 있다(`docs/app-ux-copy.md` §1).
+ * 로그인이 붙는 날 이 파일은 서버 쿼터 조회로 바뀐다.
+ */
+import { useCallback, useEffect, useState } from "react"
 
+/**
+ * **무제한** (2026-09-17 사용자 지시). 참조 구현이고 현장에서 몇 번이고 다시 보여 줘야 하므로
+ * 횟수 제한이 의미가 없다 — 시연 도중 2회를 다 쓰면 그대로 막힌다.
+ * 아래 상한과 소비 기록은 지우지 않고 남겨 둔다. 공개 서비스로 돌아갈 때 이 플래그만 끄면 된다.
+ */
+export const QUOTA_UNLIMITED = true
 export const QUOTA_TOTAL = 2
-
-type QuotaRead = { used: number; remaining: number }
+const QUOTA_KEY = "pathfind.quota.v1"
 
 function readUsed(): number {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.quota)
-    if (raw == null) return 0
-    const parsed = JSON.parse(raw)
-    if (typeof parsed?.used !== "number" || !Number.isFinite(parsed.used)) return 0
-    return Math.max(0, Math.floor(parsed.used))
+    const raw = localStorage.getItem(QUOTA_KEY)
+    if (!raw) return 0
+    const n = JSON.parse(raw)?.used
+    return Number.isInteger(n) && n >= 0 ? Math.min(n, QUOTA_TOTAL) : 0
   } catch {
     return 0
   }
 }
 
-export function readQuota(): QuotaRead {
-  const used = readUsed()
-  const remaining = Math.max(0, QUOTA_TOTAL - used)
-  return { used, remaining }
-}
+export function useQuota() {
+  const [used, setUsed] = useState(readUsed)
 
-export function consumeQuota(): QuotaRead {
-  const prev = readUsed()
-  const next = Math.min(QUOTA_TOTAL, prev + 1)
-  try {
-    localStorage.setItem(
-      STORAGE_KEYS.quota,
-      JSON.stringify({ used: next, updatedAt: new Date().toISOString() }),
-    )
-  } catch {
-    // 저장 실패해도 반환값은 계산된 값으로 둔다
-  }
-  const remaining = Math.max(0, QUOTA_TOTAL - next)
-  return { used: next, remaining }
-}
-
-export function useQuota(): QuotaRead {
-  const [quota, setQuota] = useState(readQuota)
-
+  // 다른 탭에서 한 번 쓰면 이 탭의 배지도 따라간다
   useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEYS.quota) return
-      // 같은 탭에서 바꾼 저장은 이벤트를 타지 않거나, 타도 재확인만 한다
-      setQuota(readQuota())
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === QUOTA_KEY) setUsed(readUsed())
     }
-    window.addEventListener("storage", handler)
-    return () => window.removeEventListener("storage", handler)
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
   }, [])
 
-  return quota
+  /** 승인 시점에 한 번 부른다(`docs/app-ux-copy.md` §3-2 — 줄어드는 순간을 누르기 전에 알린다). */
+  const consume = useCallback(() => {
+    setUsed((cur) => {
+      const next = Math.min(cur + 1, QUOTA_TOTAL)
+      try {
+        localStorage.setItem(QUOTA_KEY, JSON.stringify({ used: next }))
+      } catch {
+        /* 저장만 못 할 뿐 화면은 계속 돈다 */
+      }
+      return next
+    })
+  }, [])
+
+  const remaining = Math.max(0, QUOTA_TOTAL - used)
+  // 무제한이면 소진 판정을 하지 않는다 — 소비 기록은 그대로 쌓이되 아무것도 막지 않는다.
+  return { remaining, total: QUOTA_TOTAL, unlimited: QUOTA_UNLIMITED, exhausted: QUOTA_UNLIMITED ? false : remaining === 0, consume }
 }

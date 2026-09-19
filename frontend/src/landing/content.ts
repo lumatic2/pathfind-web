@@ -1,58 +1,21 @@
-/** 랜딩의 **교체 가능한 것 전부**가 여기 산다 — 카피·이미지 경로·이미지 배치.
+/**
+ * 랜딩의 **교체 가능한 것 전부**가 여기 산다 — 카피·이미지 경로·이미지 배치.
  *
- * 이 파일만 고치면 다른 제품의 랜딩이 된다. 컴포넌트(`components/*.tsx`)는 구조와 안무만 알고
- * 여기서 값을 받는다. CSS 는 이미지 경로를 모른다 — 컴포넌트가 `--img: url(...)` 로 넘긴다.
+ * 원본은 ui-dictionary `examples/glide-landing/src/content.ts`(Deskwork 영어 mock). Pathfinder(서비스 표기, 도메인·스킬명은 pathfind) 용으로 이 파일만 바꿨다 —
+ * 컴포넌트(`components/*.tsx`)는 구조와 안무만 알고 여기서 값을 받는다. CSS 는 이미지 경로를 모른다(컴포넌트가 `--img: url(...)` 로 넘긴다).
  *
  * 규칙
- * - 이미지는 `public/` 아래 경로. 같은 이름으로 덮어써도 되고, 여기 경로를 바꿔도 된다.
- * - 치수(`ratio`)는 자산의 가로/세로 픽셀이다. 바꾼 그림의 비율로 갱신해야 판이 안 찌그러진다.
- * - 배치(`top`/`left`/`right`)는 부모 대비 %. 그림을 바꾸면 자리도 같이 손볼 것.
+ * - 이미지는 `public/` 아래 경로. 그림은 원본 것을 그대로 쓴다(풍경 3판·구름·아바타·타일·인물).
+ * - 치수(`ratio`)는 자산의 가로/세로 픽셀이다. 그림을 바꾸면 비율도 같이 갱신해야 판이 안 찌그러진다.
+ * - 배치(`top`/`left`/`right`)는 부모 대비 %.
  * - 안무 숫자(시각·길이·이징)는 여기 없다 — 그건 원본 실측이라 컴포넌트가 소유한다.
+ * - 문구: 존댓말, 느낌표·이모지 없음, 싸이클·세션·런 대신 「로드맵」(문구 정본 `docs/app-ux-copy.md`).
+ * - 후기 칸은 가짜 인물을 세우지 않는다 — 캡션 자리에 **로드맵의 주제**만 한 줄로 둔다.
  */
 
 export type Asset = { src: string; ratio: string };
 
-export type Quote = { idx: number; text: string; name: string; role?: string };
-
-export const content: {
-  brand: { name: string; wordmark: string };
-  nav: {
-    menus: Array<{ label: string; href: string; size: 'lg'; items: Array<{ label: string; href: string; desc: string }> }>;
-    links: Array<{ label: string; href: string }>;
-    end: Array<{ label: string; href: string; marked: boolean }>;
-  };
-  hero: {
-    title: string[];
-    lede: string[];
-    cta: { label: string; href: string };
-    layers: { far: { src: string }; mid: { src: string }; near: { src: string } };
-    lights: string[];
-    clouds: Array<Asset & { width: number; left?: number; right?: number; top: number }>;
-  };
-  trust: {
-    title: { before: string; number: string; after: string; line2: string[] };
-    avatars: { src: string; cols: number; rows: number };
-    nodes: Array<{ angle: number; r: number; size: number; idx: number; bubble?: 'a' | 'b' }>;
-    bubbles: { a: string; b: string };
-  };
-  quotes: Quote[];
-  compare: {
-    title: string[];
-    lede: string;
-    left: { heading: string; tiles: Array<{ label: string; icon: string; left: number; top: number }> };
-    right: { heading: string; hub: string; spokes: Array<{ label: string; icon: string; left: number; top: number }> };
-    cta: { label: string; href: string };
-  };
-  team: { title: string[]; items: Array<{ icon: string; lead: string; rest: string }> };
-  cta: { title: string[]; text: string[]; button: { label: string; href: string }; figure: Asset };
-  start: { title: string[]; map: { root: string; stages: Array<{ label: string; children: Array<{ label: string; children?: string[] }> }> }; links: Array<{ label: string[]; href: string; tone: 'solid' | 'quiet' }> };
-  footer: {
-    powered: { label: 'Powered by', alt: 'Upstage', href: 'https://www.upstage.ai' },
-    columns: Array<{ title: string; href?: string; links: Array<{ label: string; href: string }> }>;
-    copyright: string;
-    terms: Array<{ label: string }>;
-  };
-} = {
+export const content = {
   brand: {
     /** 접근성 라벨·저작권에 쓰는 이름 */
     name: 'Pathfinder',
@@ -68,6 +31,7 @@ export const content: {
         href: '#compare',
         size: 'lg' as const,
         items: [
+          /* 문구는 결선 레포(2026-09-15), 앵커는 실제로 가는 곳만(참조 결정) */
           { label: '인터뷰', href: '#start', desc: '하려는 일을 묻고 정리합니다' },
           { label: '조사', href: '#trust', desc: '이미 있는 것을 찾습니다' },
           { label: '판정', href: '#compare', desc: '가져다 쓸 것과 만들 것을 판단합니다' },
@@ -79,8 +43,8 @@ export const content: {
     links: [{ label: '누구에게 필요한가요', href: '#team' }],
     /** 오른쪽 끝 — 두 번째만 밑줄 강조 */
     end: [
-      { label: '로그인', href: '#cta', marked: false },
-      { label: '시작하기', href: '/app.html', marked: true },
+      /* 로그인은 없앴다 — 서버도 계정도 없는 소개용 데모다(M18 2026-09-20). */
+      { label: '데모 열기', href: '/app.html', marked: true },
     ],
   },
 
@@ -90,8 +54,9 @@ export const content: {
     lede: [
       '모든 걸 처음부터 만들 필요는 없죠.',
       '패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
+      'MABC 2026 결선에 낸 작품이고, 지금 보시는 것은 실제 조사를 녹화한 데모입니다.',
     ],
-    cta: { label: '시작하기', href: '/app.html' },
+    cta: { label: '데모 열기', href: '/app.html' },
     /**
      * 패럴랙스 풍경 3판 — 원경 → 중경 → 근경.
      * 셋 다 **같은 캔버스**(1920×1440, 4:3)를 쓰는 전체 장면이다 — 비율은 여기가 아니라
@@ -125,7 +90,14 @@ export const content: {
   },
 
   trust: {
-    /** "<b>4곳</b>에서 찾습니다" — 강조 숫자만 따로 */
+    /** "<b>다섯 곳</b>에서 찾습니다" — 강조 낱말만 따로, `line2` 는 작은 부제로 한 줄에 선다.
+     *  ⚠ 곳의 수와 이름은 **`server/stage.mjs` 의 `CHANNELS` 가 정본**이다. 채널을 늘리거나 줄이면 여기도 같이 고친다.
+     *  2026-09-15 정정: 넷이 아니라 다섯이고, 빠져 있던 하나가 하필 오픈소스(GitHub)였다 —
+     *  「가져다 쓸 것」이라는 주장을 가장 곧장 받치는 채널이다.
+     *  「단계마다」는 쓰지 않는다: 채널은 규칙에 걸린 단계에만 붙어 빈도 서술이 거짓이 된다(2026-09-14). */
+    /** `line2` 는 **묶음 배열**이다 — 넓은 화면은 한 줄로 이어 붙이고, 좁은 화면은 묶음마다 줄을 바꾼다.
+     *  한 문자열로 두면 좁은 화면에서 아무 데나 접혀 「·」 하나가 다음 줄 맨 앞에 남는다(2026-09-15).
+     *  묶음은 민간(웹·코드) / 나라(법령·통계·공공데이터)로 가른다. */
     title: { before: '', number: '다섯 곳', after: '에서 찾습니다', line2: ['웹 검색 · 오픈소스', '국가법령 · 국가통계 · 공공데이터'] },
     /** 아바타 시트 5열 × 2행. `idx` 0~9 로 칸을 고른다 */
     avatars: { src: '/avatars.png', cols: 5, rows: 2 },
@@ -149,7 +121,9 @@ export const content: {
     bubbles: { a: '이미 있네요', b: '이건 직접' },
   },
 
-  /** 후기 — 7초마다 다음 장. `idx` 는 아바타 시트 칸 */
+  /** 후기 — 7초마다 다음 장. `idx` 는 아바타 시트 칸.
+   *  캡션은 **주제 한 줄뿐**이다. 「예시 로드맵」이라는 라벨도, 「6단계 · 12자료」 같은 수치도
+   *  읽는 사람에게는 쓸모가 없다(2026-09-15 사용자 판정). */
   quotes: [
     {
       idx: 9,
@@ -223,7 +197,7 @@ export const content: {
       '모든 걸 처음부터 만들 필요는 없죠.',
       '패스파인더가 "진짜 해야 할 일"을 보여드립니다.',
     ],
-    button: { label: '시작하기', href: '/app.html' },
+    button: { label: '데모 열기', href: '/app.html' },
     /** 오른쪽에 서는 인물 — 세로로 긴 투명 PNG, 아래를 물린다 */
     figure: { src: '/cta-figure.png', ratio: '760 / 1000' },
   },
@@ -239,25 +213,27 @@ export const content: {
         { label: '만드는 순서', children: [{ label: '첫 시제품', children: ['화면 스케치', '2주 실험'] }, { label: '손님 테스트' }] },
       ] as { label: string; children: { label: string; children?: string[] }[] }[],
     },
-    links: [
-      { label: ['인터뷰 다섯 번으로', '정리한다는 것'], href: '/app.html', tone: 'solid' as const },
-      { label: ['결과가 이 브라우저에 남고', '파일로 내려받는다는 것'], href: '#cta', tone: 'quiet' as const },
-    ],
   },
 
   footer: {
+    /** 크레딧 — 「Powered by」 + 업스테이지 워드마크. 워드마크는 번들 자산이라 여기 없다(`Footer.tsx` 가 가져온다).
+     *  모델 이름은 아래 「쓴 것」이 들고 있다 — 대회 규정이 보는 것은 모델이라 어느 한쪽에는 남아 있어야 한다. */
     powered: { label: 'Powered by', alt: 'Upstage', href: 'https://www.upstage.ai' },
     columns: [
       {
         title: '서비스',
         href: '#compare',
         links: [
-          { label: '시작하기', href: '/app.html' },
+          { label: '데모 열기', href: '/app.html' },
           { label: '무엇을 해 주나요', href: '#compare' },
           { label: '누구에게 필요한가요', href: '#team' },
         ],
       },
+      /* 밖으로 나가는 묶음은 제목에 링크를 걸지 않는다 — 걸 곳이 없어 엉뚱한 앵커로 갔었다 */
       {
+        /* ⚠ 다섯과 그 순서는 신뢰 섹션 `trust.title.line2` 와 **같아야** 한다. 한쪽만 고치면
+           바로 위에서 「다섯 곳」이라 해 놓고 푸터가 넷이 된다(2026-09-15 적발).
+           링크는 API 를 받는 개발자 포털이 아니라 **자료가 사는 곳**으로 보낸다. */
         title: '조사하는 곳',
         links: [
           { label: '네이버 검색', href: 'https://search.naver.com' },
@@ -268,6 +244,9 @@ export const content: {
         ],
       },
       {
+        /* Upstage·Hermes·askewly 는 우리가 만든 게 아니라 **쓴** 것이다.
+           이름은 도메인이 아니라 그것이 무엇인지로 적는다 — `ui.askewly.com` 은 안 읽힌다.
+           회사 이름은 위 크레딧의 워드마크가 말하므로 여기서는 **모델 이름**을 둔다. */
         title: '쓴 것',
         links: [
           { label: 'Solar Pro 4', href: 'https://www.upstage.ai/solar-llms' },
@@ -276,7 +255,11 @@ export const content: {
         ],
       },
     ],
+    /* 만든 주체는 칸 하나를 채우지 못한다 — 아래 줄이 제자리다(한 줄짜리 열이 4열의 오른쪽을 비웠다) */
     copyright: '© 2026 askewly · Made by Luka',
+    /** 고지 문장 — 링크가 아니다. 「저작권은 각 출처에」는 두 군데서 틀린다(2026-09-15):
+     *  법령·고시는 저작권법 제7조로 보호 대상이 아니고, 공공데이터·KOSIS 는 저작권보다
+     *  공공누리 이용 조건이 실제로 지킬 것이다. 권리와 조건을 함께 가리킨다. */
     terms: [{ label: '자료의 권리와 이용 조건은 각 출처를 따릅니다.' }],
   },
 };

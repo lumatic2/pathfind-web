@@ -23,9 +23,10 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: 'Pretendard', 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  word-break: keep-all;
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
+  /* 한국어 줄바꿈 — 낱말 중간에서 접히지 않게(pathfind 국소 수정 2/2, 1/2 는 위 font-family) */
+  word-break: keep-all;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -150,10 +151,8 @@ body {
   --cta-figure-w: 30%;
   --fs-cta-title: clamp(1.5rem, 2.4vw, 2.1875rem);  /* 24 → 35 */
   --paper: 60px;
-  --start-card: 302px;       /* 원본 실측 302×253 */
   /* 시작 표제는 공통 h2(50px)보다 한 단 작다 — 우리 표제가 원본보다 단어가 많아
      같은 크기로는 열 폭 안에서 네 줄로 접힌다(진단 D9). */
-  --fs-start: clamp(1.5rem, 2.4vw, 2.125rem);  /* 24 → 34 — 36 은 둘째 줄이 420px 열에서 8px 넘친다 */
   --start-gap: var(--space-10);
 
   /* ── 세로 리듬 — 좁은 폭의 기본값. 위 스케일로 세운 단일 리듬이다. */
@@ -204,9 +203,11 @@ body {
     --pad-trust-t: 520px;   /* gl-radar  520 / 90 — 위 520 이 궤도가 사는 띠다 */
     --pad-trust-b:  90px;
     --pad-quote-t:   0px;   /* gl-feedback 0 / 0 — 카드가 자기 패딩을 쓴다 */
-    --pad-quote-b:   80px;   /* 원본은 0 이지만 그러면 후기 카드가 다음 보라 색면과 맞닿는다(2026-09-15) */
+    --pad-quote-b:  80px;   /* 원본은 0 이지만 그러면 후기 카드가 다음 보라 색면과 맞닿는다(2026-09-15) */
     --pad-band-t:  260px;   /* gl-package 260 / 0 */
     --pad-band-b:    0px;
+    /* 원본은 354 / 0 이지만 앞 카드의 돌출은 `.band` 안에서 끝난다 — 354 는 통째로 빈 띠였고,
+       아래는 0 이라 CTA 카드가 타일에 30px 까지 붙었다(2026-09-15 사용자 지적). 위아래를 맞춘다. */
     --pad-team-t:  200px;
     --pad-team-b:  160px;
     --pad-cta-t:     0px;   /* gl-cta      0 / 0 */

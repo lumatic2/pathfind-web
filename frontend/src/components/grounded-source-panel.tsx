@@ -1,3 +1,18 @@
+/**
+ * Grounded Source Panel — 근거 소스 패널. 답변이 어떤 소스 위에서 만들어지는지를 고르고(체크 = 근거 범위), 한 소스의
+ * 원문을 같은 패널 안에서 연다(목록 → 상세 교체). 인용 사다리의 3단(원문 하이라이트)이 여기로 착지한다.
+ *
+ * 관측 원천: Google Gemini Notebook 출처 패널 — `evidence/m117/2026-09-12-notebook-shell-live-observation.md` §2·§2-1·§1-1.
+ * 장부 `research/2026-09-12-m117-shell-ledger.md` M117-010~016·053 (자산 명세 §2).
+ *   - 소스 행 52h `r 8` 패딩 0 8 gap 4 · 파비콘 20(칸 24) · 제목 14/24 1줄 말줄임 · 체크 18(히트 32) · 행 간 0
+ *   - 행 hover = 무대색(`bg-muted`) + ⋮ 32 노출 · 정지 상태엔 메뉴 없음
+ *   - `+ 소스 추가` 전폭 32h outlined · 웹 검색 블록 `r 16` 패딩 8(드롭다운은 빈 슬롯) · 툴바 48(아이콘 2 | 모두 선택 + 체크)
+ *   - 상세 = 같은 패널 안 교체(폭 유지) · 헤더 좌 버튼이 「목록으로」 · 제목 22/36 + 새 탭 40 · 소스 가이드 `bg-muted r 16`
+ *     아코디언(머리 40h) + 키워드 칩 32h · 본문 16/24 문단 · 인용 하이라이트(`HighlightedPassage`)
+ *   - 접힘 = 56 레일: 접기 버튼 + `+` 32
+ * 형태는 원본을 따른다(pill·체크 회청 — 2026-09-12 사용자 취향 판정: rounded-md 재색칠이 원본과 멀었다). 파랑 브랜드색은 0.
+ * 소스 추가·검색·정렬·라벨은 **콜백만** — 다이얼로그·메뉴는 소비자 몫.
+ */
 import { useId, useState, type ReactNode } from "react"
 import { ArrowDownUp, ArrowLeft, ChevronDown, ChevronRight, ExternalLink, FileText, Folder, FolderOpen, Globe, MoreVertical, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Tag, BookOpen, Newspaper, Video, Link2 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -17,18 +32,18 @@ export type GroundedSource = {
   /** `passages` 대신 자유 본문 */
   body?: ReactNode
   /**
-   * 목록 행 부제(M122 — 실소비자 승격). 제목 아래 한 줄(12/16, 회색).
+   * 목록 행 부제(M5 확장 3차 step-3 — 참조 구현 국소 추가, 상류 등재 대상). 제목 아래 한 줄(12/16, 회색).
    * 원본은 제목 한 줄뿐이지만, 자료 종류(도구·서비스·글)처럼 제목이 말하지 않는 분류가 있을 때 쓴다.
    */
   subtitle?: string
   /**
-   * 그룹 행(M122 — 실소비자 승격). 이 소스 아래 들여쓴 자식 행들.
+   * 그룹 행(M5 확장 3차 step-3 → 4차 보강 step-14 재귀화 — 참조 구현 국소 추가, 상류 등재 대상). 이 소스 아래 들여쓴 자식 행들.
    * 원본은 평평한 목록만 그린다 — 단계 → 소주제 → 자료처럼 깊어지는 노트북에는 접고 펼치는 트리가 필요했다.
    * 어느 깊이든 받는다. 자식이 있는 행은 왼쪽 화살표로 접고 펼친다(`expandedIds`).
    */
   children?: GroundedSource[]
   /**
-   * 행의 성격(M122): `folder` 는 **문서가 없는 폴더** — 본문을 눌러도 상세가 열리지 않고 접기/펼치기만 한다.
+   * 행의 성격(4차 보강 step-14): `folder` 는 **문서가 없는 폴더** — 본문을 눌러도 상세가 열리지 않고 접기/펼치기만 한다.
    * 기본(`doc`)은 문서 — 본문 클릭이 상세다. 자식이 있는 문서(단계)는 「폴더이자 노트」로, 화살표는 접기·본문은 열기다.
    */
   kind?: "doc" | "folder"
@@ -82,9 +97,9 @@ export type GroundedSourcePanelProps = {
   selectedIds: string[]
   onSelectedChange: (ids: string[]) => void
   /**
-   * 행 체크박스와 「모두 선택」을 그릴지 (M122 보강 — 실소비자 승격). 기본값은 종전 동작(켬).
+   * 행 체크박스와 「모두 선택」을 그릴지 (M5 확장 2차 보강, 사용자 지시 2026-09-13).
    * 끄면 목록이 **읽는 문서 목록**이 된다 — 고른 것만 대화에 넣는 기능이 없는 소비자에게는
-   * 체크가 조작할 수 있다는 거짓 약속이다(껍데기 3건과 같은 성격).
+   * 체크가 조작할 수 있다는 거짓 약속이 된다. 기본값은 종전 동작(켬).
    */
   selectable?: boolean
   /** 상세로 열린 소스 — 주면 제어, 안 주면 내부 state */
@@ -100,7 +115,7 @@ export type GroundedSourcePanelProps = {
   onSort?: () => void
   onLabel?: () => void
   /**
-   * 펼쳐 둔 행(자식이 있는 행) id — 주면 제어, 안 주면 내부 state(기본: 최상위 그룹 펼침·그 아래 폴더 접힘). M122.
+   * 펼쳐 둔 행(자식이 있는 행) id — 주면 제어, 안 주면 내부 state(기본: 최상위 그룹 펼침·그 아래 폴더 접힘). 4차 보강 step-14.
    */
   expandedIds?: string[]
   onExpandedChange?: (ids: string[]) => void
@@ -115,7 +130,7 @@ export type GroundedSourcePanelProps = {
    */
   showAdd?: boolean
   showSearch?: boolean
-  /** 정렬·라벨 툴바 줄. 기능을 배선하지 않은 소비자는 끈다(M122) */
+  /** 정렬·라벨 툴바 줄. 기능을 배선하지 않은 소비자는 끈다(참조 구현 국소 추가 M5 4차 보강 3 — 상류 등재 대상) */
   showToolbar?: boolean
   /** 행 호버 「⋯」 메뉴(아이콘이 메뉴로 바뀌는 것 포함). `onSourceMenu` 를 배선하지 않으면 끈다 */
   showMenu?: boolean
@@ -138,7 +153,7 @@ export const FILTER_PILL_PX = 33
 const ICON_BUTTON_PX = 36
 const HIT_PX = 32
 const BIG_HIT_PX = 40
-/** 트리 행(M122) — 깊이당 들여쓰기·접기 화살표 칸 */
+/** 트리 행(4차 보강 step-14) — 깊이당 들여쓰기·접기 화살표 칸 */
 const INDENT_PX = 20
 const TOGGLE_PX = 24
 /** 체크박스 — 원본은 회청 2px 테두리, 체크 상태도 같은 회청 채움 + 먹 체크(파랑 0). 프리미티브의 primary 채움을 덮는다 */
@@ -390,7 +405,7 @@ export function GroundedSourcePanel({
           </div>
           )}
           {/* 행 높이는 min — 제목이 한 줄(말줄임)이면 정확히 52, 말줄임이 빠지면 행이 자라서 검사에 잡힌다.
-              트리(M122): 자식이 있는 행은 왼쪽 화살표로 접고 펼친다. 화살표 = 접기, 본문 = 열기(폴더는 본문도 접기/펼치기).
+              트리(4차 보강 step-14): 자식이 있는 행은 왼쪽 화살표로 접고 펼친다. 화살표 = 접기, 본문 = 열기(폴더는 본문도 접기/펼치기).
               깊이마다 20px 들여쓴다 — 3층이 280px 패널에 서야 한다. */}
           <ul data-source-rows className="pb-4">
             {rows.map(({ s, depth }) => {

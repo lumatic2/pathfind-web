@@ -25,3 +25,8 @@ SESSION_LOG_*.md
 
 # 제출용 아닌 문서
 DESIGN.md
+
+# 대회 기록·작업물 — 공개 배포 대상 아님 (M18 2026-09-20)
+roadmap/
+.vercel/
+node_modules/

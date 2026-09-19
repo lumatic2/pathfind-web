@@ -3,6 +3,7 @@
     "strict": true,
   "noImplicitAny": false,
     "jsx": "react-jsx",
+    "module": "esnext",
     "moduleResolution": "bundler",
     "target": "ES2022",
     "paths": {

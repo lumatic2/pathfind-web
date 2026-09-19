@@ -1,207 +1,93 @@
-import { useCallback, useSyncExternalStore } from "react"
+/**
+ * 세션 상태 + localStorage 복원. 새로고침해도 결과가 남고, 「다시 시작」이 지운다.
+ * 저장 키·스키마 버전은 로드맵 §상태 가 서술한다.
+ */
+import { useCallback, useEffect, useMemo, useReducer } from "react"
+import { INITIAL_SESSION, type ChatEntry, type Session, type StageSlot } from "./types"
 
-import type { Session } from "./types"
-import { INITIAL_SESSION, STORAGE_KEYS } from "./types"
+export const STORAGE_KEY = "pathfind.session.v5"
 
-// --- persistence -----------------------------------------------------------
+export type Action =
+  | { type: "restore"; session: Session }
+  | { type: "reset" }
+  | { type: "patch"; patch: Partial<Session> }
+  | { type: "addMessage"; message: ChatEntry }
+  | { type: "replaceMessage"; id: string; message: Partial<ChatEntry> }
+  | { type: "setStage"; index: number; slot: Partial<StageSlot> }
 
-function loadSession(): Session {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.session)
-    if (raw == null) return INITIAL_SESSION
-    const parsed = JSON.parse(raw) as Session
-    if (parsed == null || parsed.version !== 5) return INITIAL_SESSION
-    return parsed as Session
-  } catch {
-    return INITIAL_SESSION
-  }
-}
-
-export function sanitizeForRestore(session: Session): Session {
-  // stages: running → pending, runCursor 정규화
-  const stages = session.stages.map((slot) => {
-    const next = slot.status === "running"
-      ? { ...slot, status: "pending" as const }
-      : slot
-    if (
-      next.runCursor == null ||
-      !Number.isInteger(next.runCursor) ||
-      next.runCursor < 0
-    ) {
-      next.runCursor = 0
-    }
-    return next
-  })
-
-  // 보강 실행 복원: runId가 문자열이고 비어 있지 않은 슬롯이 있으면 true
-  const anyReinforcingSlot = stages.some(
-    (slot) => typeof slot.runId === "string" && slot.runId !== "",
-  )
-
-  // phase 규칙
-  let phase = session.phase
-  const interrupted =
-    session.planningAttempt?.status === "pending" || phase === "skeleton"
-  if (phase === "skeleton") {
-    phase = "confirm"
-  } else if (phase === "ready") {
-    // 끝난 단계의 보강만 남았으면 ready 유지, 실제 단계 조사가 미완이면 researching
-    const anyNotDone = stages.some(
-      (slot) =>
-        slot.status !== "done" &&
-        !(typeof slot.runId === "string" && slot.runId !== ""),
-    )
-    if (anyNotDone) phase = "researching"
-  }
-
-  // 계획 설계가 중단됐으면 확인 화면으로 돌리고 중단 안내를 남긴다
-  if (interrupted) {
-    phase = "confirm"
-  }
-
-  // 전역 runId만 있고 슬롯 실행 번호가 없는 예전 저장본은 전역 실행 값을 비움
-  let runId = session.runId
-  let runStatus = session.runStatus
-  let runCursor = session.runCursor
-  if (typeof runId === "string" && runId !== "" && !anyReinforcingSlot) {
-    runId = null
-    runStatus = null
-    runCursor = 0
-  }
-  if (!Number.isInteger(runCursor) || runCursor < 0) {
-    runCursor = 0
-  }
-
-  // 재접속용 값 정리
-  return {
-    ...session,
-    phase,
-    reinforcing: anyReinforcingSlot,
-    busy: false,
-    error: interrupted
-      ? "저장 당시 진행 중이던 계획 설계를 이어서 할 수 있습니다. 승인 화면에서 다시 선택하면 계획 설계를 다시 시도합니다."
-      : null,
-    selectedId: null,
-    planningAttempt:
-      interrupted && session.planningAttempt != null
-        ? { ...session.planningAttempt, status: "failed" as const }
-        : session.planningAttempt,
-    exportState: { ...session.exportState, busy: false },
-    runId,
-    runStatus,
-    runCursor,
-  }
-}
-
-// --- storage write ---------------------------------------------------------
-
-function saveSession(session: Session): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session))
-  } catch {
-    // quota exceeded 등 — 화면은 그대로 유지
-  }
-}
-
-// --- reducer ---------------------------------------------------------------
-
-type Action =
-  | { type: "PATCH"; payload: Partial<Session> }
-  | { type: "REPLACE"; payload: Session }
-  | { type: "RESET" }
-
-function reducer(state: Session, action: Action): Session {
-  let next: Session
+export function reducer(state: Session, action: Action): Session {
   switch (action.type) {
-    case "PATCH": {
-      const payload = action.payload
-      let sourceCards: Session['sourceCards']
-      if (payload.sourceCards != null) {
-        sourceCards = {
-          ...(state.sourceCards ?? {}),
-          ...payload.sourceCards,
-        }
+    case "restore":
+      return action.session
+    case "reset":
+      return { ...INITIAL_SESSION, messages: [] }
+    case "patch":
+      return { ...state, ...action.patch }
+    case "addMessage":
+      return { ...state, messages: [...state.messages, action.message] }
+    case "replaceMessage":
+      return {
+        ...state,
+        messages: state.messages.map((m) => (m.id === action.id ? { ...m, ...action.message } : m)),
       }
-      next = { ...state, ...payload, sourceCards }
-      break
+    case "setStage":
+      return {
+        ...state,
+        stages: state.stages.map((s, i) => (i === action.index ? { ...s, ...action.slot } : s)),
+      }
+    default:
+      return state
+  }
+}
+
+export function restoreSession(parsed: Session): Session {
+  const stages = (parsed.stages ?? []).map(s => s.status === "running" ? { ...s, status: "pending" as const } : s)
+  const interrupted = parsed.planningAttempt?.status === "pending"
+  return {
+    ...parsed, stages, busy: false, selectedId: null,
+    error: interrupted ? "단계를 정하던 요청이 중단됐습니다. 조사 다시 시작을 눌러 주세요." : parsed.planningAttempt?.status === "failed" ? parsed.error : null,
+    planningAttempt: interrupted ? { ...parsed.planningAttempt!, status: "failed" } : parsed.planningAttempt,
+    exportState: { ...parsed.exportState, busy: false },
+    phase: parsed.phase === "skeleton" || interrupted ? "confirm" : stages.some(s => s.status === "pending") && parsed.phase === "ready" ? "researching" : parsed.phase,
+  }
+}
+
+export function load(): Session | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Session
+    if (parsed?.version !== INITIAL_SESSION.version) return null
+    // ⚠ Hermes run 은 예외다 — 서버에서 계속 돌고 릴레이가 프레임을 쌓아 두므로
+    //    `runId`·`runCursor` 를 그대로 들고 나가 다시 붙는다(App 이 복원 시 재접속한다).
+    // 새로고침 시점에 날아간 진행 중 작업은 되살릴 수 없다 — 멈춘 자리로 되돌린다.
+    return restoreSession(parsed)
+  } catch {
+    return null
+  }
+}
+
+export function useSession() {
+  // ⚠ 복원은 **리듀서 초기화에서 동기로** 한다. effect 로 불러오면 첫 커밋의 저장 effect 가
+  //    빈 초기 상태를 먼저 써서 저장본을 지운다(실측 — 새로고침할 때마다 세션이 날아갔다).
+  const [session, dispatch] = useReducer(reducer, undefined, () => load() ?? INITIAL_SESSION)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+    } catch {
+      /* 용량 초과 — 저장만 못 할 뿐 화면은 계속 돈다 */
     }
-    case "REPLACE":
-      next = action.payload
-      break
-    case "RESET":
-      next = INITIAL_SESSION
-      break
-  }
-  saveSession(next)
-  return next
-}
-
-// --- hook -------------------------------------------------------------------
-
-const listeners = new Set<() => void>()
-
-function emit(): void {
-  for (const l of listeners) l()
-}
-
-let state: Session = sanitizeForRestore(loadSession())
-let epoch = 0
-let cached: Session & { sessionEpoch: number } | null = null
-
-function dispatch(action: Action): void {
-  if (action.type === "REPLACE" || action.type === "RESET") {
-    epoch++
-  }
-  state = reducer(state, action)
-  cached = Object.assign({}, state, { sessionEpoch: epoch })
-  emit()
-}
-
-function subscribe(_onStoreChange: () => void): () => void {
-  listeners.add(_onStoreChange)
-  return () => {
-    listeners.delete(_onStoreChange)
-  }
-}
-
-function snapshot(): Session & { sessionEpoch: number } {
-  if (cached != null) return cached
-  const s: Session & { sessionEpoch: number } = Object.assign({}, state, { sessionEpoch: epoch })
-  cached = s
-  return s
-}
-
-export function useSession(): {
-  session: Session
-  patch: (patch: Partial<Session>) => void
-  replace: (session: Session) => void
-  reset: () => void
-  sessionEpoch: number
-} {
-  const value = useSyncExternalStore(subscribe, snapshot, snapshot)
-
-  const patch = useCallback((patch: Partial<Session>) => {
-    dispatch({ type: "PATCH", payload: patch })
-  }, [])
-
-  const replace = useCallback((session: Session) => {
-    dispatch({ type: "REPLACE", payload: session })
-  }, [])
+  }, [session])
 
   const reset = useCallback(() => {
-    dispatch({ type: "RESET" })
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      /* 무시 */
+    }
+    dispatch({ type: "reset" })
   }, [])
 
-  return { session: value, patch, replace, reset, sessionEpoch: value.sessionEpoch }
-}
-
-// --- clear -----------------------------------------------------------------
-
-export function clearSession(): Session {
-  try {
-    localStorage.removeItem(STORAGE_KEYS.session)
-  } catch {
-    // 무시
-  }
-  return INITIAL_SESSION
+  return useMemo(() => ({ session, dispatch, reset }), [session, reset])
 }

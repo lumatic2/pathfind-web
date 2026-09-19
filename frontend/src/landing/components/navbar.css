@@ -27,8 +27,10 @@
   color: var(--primary);
   text-decoration: none;
   display: inline-flex;
-  view-transition-name: pathfinder-logo;
 }
+/* 두 문서에 같은 이름을 붙이면 크롬이 이 요소를 **이어서** 움직인다(앱 쪽은 `[data-app-logo]`).
+   이름은 문서 안에서 유일해야 한다 — 푸터 로고에는 붙이지 않는다. */
+.nav__logo { view-transition-name: pathfinder-logo; }
 .nav__logo:focus-visible {
   outline: var(--focus-ring-width) solid var(--ring);
   outline-offset: var(--focus-ring-offset);
@@ -210,6 +212,8 @@
 
 @media (max-width: 767px) {
   .nav__menu { display: none; }
+  /* pathfind 국소 수정(2026-09-14, M01 스텝8): 767 이하에서 오른쪽 묶음은 `-marked`(시작하기)만 남긴다.
+     「로그인」이 접히며 시작하기가 화면 밖으로 밀리던 것(390 실측). */
   .nav__end { gap: var(--space-4); }
   .nav__end > .nav__link:not(.-marked) { display: none; }
 }

@@ -1,3 +1,15 @@
+/**
+ * Citation Ladder — 인용 3단 사다리. 배지(있다는 신호) → 팝오버(무슨 근거인지) → 원문 하이라이트(어디서 왔는지).
+ *
+ * 관측 원천: Google Gemini Notebook 채팅 답변의 인용 — `evidence/m117/2026-09-12-notebook-shell-live-observation.md` §3
+ * (배지 22 원 · 11px · margin-left 4 · 줄높이 24 불변 · `aria-haspopup="dialog"` · hover 트리거) · §3 팝오버(420×420 고정 ·
+ * 머리 49h / 본문 내부 스크롤 / 발 「소스 보기」 · 배지 좌정렬 아래 8 · 화살표 0) · §2-1 원문 하이라이트(무대색 배경 + 700 ·
+ * 문단 단위 · 진입 시 첫 하이라이트가 스크롤 영역 상단 아래로 오도록 이동). 장부 `research/2026-09-12-m117-shell-ledger.md`
+ * M117-016·020·021·055.
+ *
+ * look 은 이 레포 토큰이다 — 원본 파랑 링크·회색 값·Material 그림자는 옮기지 않았다(`bg-muted`·`text-foreground` 밑줄·`shadow-md`).
+ * 원본이 못 보여 준 키보드 경로(focus·Enter)는 우리 규약으로 채웠다(M117-055).
+ */
 import { useEffect, useId, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"

@@ -66,6 +66,7 @@
 }
 /* 칸 제목에는 hover 밑줄을 두지 않는다 — 셋은 링크가 아닌 `<span>` 인데도 밑줄이 그어져
    누를 수 있는 것처럼 보였다(2026-09-15 사용자 지적). 실제 링크는 아래 `.tmfn__link` 다. */
+
 .tmfn__toggle {
   width: var(--touch-min);
   height: var(--touch-min);
@@ -163,6 +164,8 @@
   align-items: center;
   color: var(--primary-foreground);
 }
+/* 아이콘은 옆 글자에 맞춘다 — 20px 로 박아 두면 16px 글자 옆에서 혼자 크다(2026-09-15) */
+.ft__linkedin svg { width: 1.15em; height: 1.15em; }
 .ft__linkedin:hover {
   color: var(--primary-foreground);
   text-decoration: none;

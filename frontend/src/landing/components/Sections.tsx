@@ -228,6 +228,8 @@ export function Compare() {
             <div className="band__col">
               <p className="band__col-title"><span className="band__mood -high" aria-hidden="true" />{C.right.heading}</p>
               <div className="band__wheel">
+                {/* ⚠ 궤도는 판(6/5)이 아니라 그 안의 **정사각** 칸이다. 판에 파선 원을 늘려 그리면
+                    타원으로 찌그러진다(2026-09-15 사용자 지적). 스포크 좌표도 이 정사각 기준 %다. */}
                 <div className="band__orbit">
                   <svg className="band__threads" viewBox="0 0 400 400" aria-hidden="true" focusable="false">
                     <circle cx="200" cy="200" r="160" />
@@ -246,6 +248,8 @@ export function Compare() {
             </div>
           </div>
 
+          {/* 보라 버튼이 아니라 **스크롤 힌트**다 — 바로 아래 team 섹션으로 이어지는 자리라
+              클릭을 권하는 과녁으로 세우면 판정 도식보다 눈에 먼저 든다(2026-09-15 사용자 지적) */}
           <div className="band__action">
             <a className="band__next" href={C.cta.href}>
               {C.cta.label}
@@ -324,8 +328,9 @@ export function CtaCard() {
 
 /* ────────────────────────────────────────────────────────────
    StartHelp — 원본 `gl-start`
-   왼쪽 제목 / 오른쪽 정사각에 가까운 카드 2장. 화살표는 라벨 아래 줄에 따로 선다.
-   원본 타임라인: 제목 y50%→0 @0 · 링크 y30→0 stagger .05 @0
+   제목 아래 자라나는 로드맵 예시(`StartMap`) 한 장. 원본의 카드 2장(링크) 자리다 — 시작 CTA 는
+   히어로·CtaCard·푸터에 이미 있어 여기서는 「어떻게 되는지」를 보여 준다(사용자 결정 2026-09-15).
+   원본 타임라인: 제목 y50%→0 @0 · 지도는 절반 보이면 자라기 시작
    ──────────────────────────────────────────────────────────── */
 
 export function StartHelp() {

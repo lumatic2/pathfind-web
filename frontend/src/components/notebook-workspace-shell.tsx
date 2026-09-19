@@ -1,7 +1,21 @@
+/**
+ * Notebook Workspace Shell — 3열 **부동 카드** 셸. 무대 위에 카드 세 장(근거 · 대화 · 생성물)이 갭을 두고 뜨고, 좌·우 열은
+ * 각각 56px 아이콘 레일로 접히며, 우측 열은 생성물 상세에서 960 으로 넓어진다(나머지가 수축). 접힘은 200ms ease-in-out,
+ * 펼침은 즉시 — 비대칭이 관측값이다.
+ *
+ * 관측 원천: Google Gemini Notebook 노트북 화면 — `evidence/m117/2026-09-12-notebook-shell-live-observation.md` §1·§1-1·§4-1·§5.
+ * 장부 `research/2026-09-12-m117-shell-ledger.md` M117-001~005·007·040·052 (자산 명세 §1).
+ *   - 무대 bg-muted(다크 bg-background) · 상단 바 64 투명 · 컨테이너 `flex mx-4 gap-4` · 카드 `bg-card r 16 overflow hidden` 테두리·그림자 0
+ *   - 열 비율 `0 1 25% / 0 1 48% / 0 1 25%` → 2560 에서 632/1213/632 · 접힘 = inline-size 56 + 가운데 `1 1 0%` → 1808 · 양쪽 → 2384
+ *   - 전이: 접힘 200ms ease-in-out(rAF 실측) / 펼침 0ms · 가운데 열은 전이 없이 flex 로 동행 · reduced-motion 0
+ *   - 상세: 우측 `0 0 960px`, 좌·중앙은 basis 비로 초과분을 나눠 526/1010 (관측 526·1010·960 일치)
+ *   - 하단 면책 22 슬롯 12px 중앙(선택 — 데모는 사용자 판정으로 뺐다 2026-09-13)
+ *   - 열 사이 갭 16 = 리사이즈 손잡이: hover `col-resize` 커서, 드래그로 양옆 basis(%) 조절(최소 280), 더블클릭 복귀, 방향키 16px
+ * 셸은 폭·접힘 폭·전이·리사이즈만 갖는다. 레일 내용·헤더·접기 버튼은 각 패널이 그린다(`collapsed` 를 같은 state 로 묶는다).
+ */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { ChartNoAxesCombined, Copy, Grip, Maximize2, MoreVertical, Network, PanelRightClose, PanelRightOpen, Plus, Settings, Share2, Shrink } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import { AppDialogContent } from "@/app/AppDialogContent"
 import { EditableText } from "@/components/editable-text"
 import { cn } from "@/lib/utils"
 import { CitationBadge, type Citation } from "@/components/citation-ladder"
@@ -685,7 +699,7 @@ export type MindmapPanelProps = {
   onCollapsedChange?: (collapsed: boolean) => void
   /** 헤더 제목 오른쪽 자리 */
   headerSlot?: ReactNode
-  /** 지도 우하단 범례(조작 스택 왼쪽) — 패널·펼쳐보기 뷰어 **둘 다**에 선다. 점 색의 뜻을 상시로 보인다 (M122) */
+  /** 지도 우하단 범례(조작 스택 왼쪽) — 패널·펼쳐보기 모달 둘 다에 선다(M5 4차 보강 2 step-17) */
   legend?: ReactNode
   labels?: Partial<MindmapPanelLabels>
   className?: string
@@ -734,21 +748,20 @@ export function MindmapPanel({ root, layout = "roadmap", mapTitle, onMapTitleCha
   // 제목 우측 아이콘 3 — 공유 · 펼치기(⇄ 패널로 돌아가기) · 옵션 (원본 §4-1)
   const actions = (
     <div data-mindmap-panel-actions className="flex shrink-0 items-center" style={{ minHeight: MAP_ACTION_PX }}>
-      {/* 공유·옵션은 콜백을 준 소비자에게만 선다 (M122) — 배선하지 않은 아이콘은 끌 수 없는 껍데기이고,
-          「상태 없는 인터랙션 요소」는 시그니처 hard-fail 이다(M121 이 `NotebookTopbar` 에서 세운 규칙과 같다). */}
-      {onShare ? (
+      {/* 공유·옵션은 콜백을 준 소비자에게만 선다 — 기능 없는 버튼은 거짓 약속이다(참조 구현 국소 수정 M5 4차 보강 3, 상류 등재 대상) */}
+      {onShare && (
         <button type="button" aria-label={L.share} title={L.share} onClick={onShare} className={MAP_ICON_BUTTON} style={{ width: MAP_ACTION_PX, height: MAP_ACTION_PX }}>
           <Share2 size={20} aria-hidden />
         </button>
-      ) : null}
+      )}
       <button type="button" aria-label={fullscreen ? L.backToPanel : L.fullscreen} title={fullscreen ? L.backToPanel : L.fullscreen} data-mindmap-panel-fullscreen onClick={() => setFullscreen((v) => !v)} className={MAP_ICON_BUTTON} style={{ width: MAP_ACTION_PX, height: MAP_ACTION_PX }}>
         {fullscreen ? <Shrink size={20} aria-hidden /> : <Maximize2 size={20} aria-hidden />}
       </button>
-      {onMore ? (
+      {onMore && (
         <button type="button" aria-label={L.more} title={L.more} onClick={onMore} className={MAP_ICON_BUTTON} style={{ width: MAP_ACTION_PX, height: MAP_ACTION_PX }}>
           <MoreVertical size={20} aria-hidden />
         </button>
-      ) : null}
+      )}
     </div>
   )
   const titleBlock = (viewer: boolean) =>
@@ -810,25 +823,23 @@ export function MindmapPanel({ root, layout = "roadmap", mapTitle, onMapTitleCha
             {fullscreen ? null : map}
           </div>
           <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-            {/* 뷰어는 창 안쪽 16px 을 **세로로도** 꽉 채운다 (M122 — M121 F1 을 자산 쪽에서 닫는다).
-                종전은 `inset-4 … h-auto` 뿐이라 얕은 트리에서 화면 가운데 띠로 열렸다. 치수를 유틸 클래스에 맡기면
-                `inset-*` 과 `top-*`/`left-*` 가 같은 충돌군이라 병합 순서에 따라 bottom·right 가 조용히 사라진다 —
-                그래서 **인라인 style 로 못박는다**. shadcn 표준 프리미티브(`ui/dialog`)는 손대지 않는다. */}
-            <AppDialogContent
+            {/* 뷰어 = 화면 가장자리 16px 안쪽을 **세로로도 꽉** 채우는 모달(4차 보강 step-11, 사용자 H10).
+                바깥 고정 상자는 투명(오버레이가 뒤 앱을 반투명으로 비춘다), 바탕·둥근 모서리·그림자는 안쪽 상자에 두고
+                `h-full` 로 높이를 잡는다 — 안쪽에 높이가 없으면 지도 영역(`flex-1`)이 내용 높이로 접혀 가로로만 길어진다(실측). */}
+            <DialogContent
               showCloseButton={false}
               data-mindmap-panel-viewer
-              className="flex max-w-none flex-col gap-0 overflow-hidden p-0 text-foreground data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 sm:max-w-none"
+              className="items-stretch justify-stretch"
+              contentClassName="h-full max-h-none gap-0 overflow-hidden rounded-2xl border-0 bg-card p-0 text-foreground shadow-xl"
               style={{ inset: VIEWER_INSET_PX }}
             >
-              <div className="min-h-0 flex-1 flex flex-col overflow-hidden rounded-2xl border-0 bg-card p-0 shadow-xl">
-                {mapTitle == null && <DialogTitle className="sr-only">{L.title}</DialogTitle>}
-                <DialogDescription className="sr-only">{sourcesLabel ?? L.title}</DialogDescription>
-                {titleBlock(true)}
-                <div data-mindmap-panel-viewer-body className="mt-2 min-h-0 flex-1 px-4 pb-4">
-                  {fullscreen ? map : null}
-                </div>
+              {mapTitle == null && <DialogTitle className="sr-only">{L.title}</DialogTitle>}
+              <DialogDescription className="sr-only">{sourcesLabel ?? L.title}</DialogDescription>
+              {titleBlock(true)}
+              <div data-mindmap-panel-viewer-body className="mt-2 min-h-0 flex-1 px-4 pb-4">
+                {fullscreen ? map : null}
               </div>
-            </AppDialogContent>
+            </DialogContent>
           </Dialog>
         </>
       ) : (
@@ -872,10 +883,6 @@ export function NotebookMindmapShellDemo({ empty = false }: { empty?: boolean })
           selectedId={d.mindmapSelected}
           onSelectedChange={d.setMindmapSelected}
           onNodeSelect={(n) => d.setDraft((n.data as { query: string }).query)}
-          // 공유·옵션은 콜백이 있을 때만 선다(M122). 데모는 원본 관측의 아이콘 3행을 계속 보여야 해서 여기서 주입한다 —
-          // 데모 밖 소비자는 안 주면 안 선다(M121 이 `NotebookTopbar.actions` 를 데모에서 주입한 것과 같은 형태).
-          onShare={() => {}}
-          onMore={() => {}}
           collapsed={d.rightCollapsed}
           onCollapsedChange={d.setRightCollapsed}
         />

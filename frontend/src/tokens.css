@@ -1,0 +1,96 @@
+/* ================================================================
+ * tokens.css — 프로젝트 소유 디자인 토큰 정의
+ * 출처: DESIGN.md §컬러 표 (레포 루트 ./DESIGN.md)
+ *   - Light: surface/accent/accent-soft/text/text-secondary/border/on-accent
+ *     verdict-existing/verdict-need/verdict-mix/verdict-none
+ * 다크 팔레트는 DESIGN.md 에 있으나 이번 참조 구현에서는 쓰지 않는다(라이트 전용).
+ * 변수 이름은 레지스트리 6개 JSON + notebook-workspace-shell.json의
+ *   meta.requiredCssVars 합집합(24개)에서 가져온 이름.
+ * 값은 DESIGN.md 표에서만 가져옴. 명시적 값 없는 변수는 설계 판단으로 정의.
+ *
+ * ⚠ 참조 구현 로컬 예외 (2026-09-13, M5 확장 2차 step-1)
+ *   pathfind-web/DESIGN.md 는 `accent #4f4bcb` 하나를 고정하지만, 마인드맵
+ *   깊이 램프(`mindmap-spine-tree.tsx` DEPTH_HUES)가 깊이마다 **다른** semantic
+ *   토큰을 읽는다. 네 토큰이 전부 `--accent` 별칭이던 동안 깊이 0~3 이 한 색으로
+ *   몰렸고, 깊이 3(잎)은 `var(--accent)` 를 **원색 그대로** 칠해 먹 글자가 2.88:1
+ *   로 묻혔다. 그래서 이 파일에서만:
+ *     - `--primary`·`--ring` 는 **리터럴로 고정**(별칭 해제) — 버튼·CTA·포커스 링의 자리다.
+ *       ⚠ **값은 `#6F2DBD` 다**(2026-09-15 랜딩과 통일). 이 머리말이 한동안 `#4f4bcb` 라고
+ *       적고 있었는데 아래 실제 값과 어긋났다 — 6차 step-14 에서 실값으로 맞췄다.
+ *       ⚠ **사람이 정했다 — 보라는 `#6F2DBD` 하나다** (2026-09-15 사용자, 8차 결정 로그 3).
+ *         근거가 색 취향이 아니다: 「지금 만드는 건 어스큐리 제품이 아니라 pathfinder 제품」이라
+ *         `Askwely-company/BRAND.md` 는 **이 제품의 상위 규약이 아니다** — 그래서 랜딩 토큰 이름도 `--path-` 로 바꿨다(8차 step-5).
+ *         · 여기(참조 앱)·랜딩              `#6F2DBD`  — 같은 값
+ *         · 제출물 `pathfind-web/DESIGN.md`  `#4f4bcb`  — **아직 옛 값이다.** 옮기는 것은 제출본 세션 몫(8차 step-8 인계)
+ *     - `--emphasis-solid`·`--info-link`·`--accent` 는 마인드맵 전용 **연한 wash**
+ *       계열로 내린다(연보라 → 연파랑 → 연청 → 민트).
+ *   제출물(`pathfind-web/DESIGN.md`)의 색은 건드리지 않는다. 이 예외는 참조 구현
+ *   한정이며, 되돌리려면 이 파일 한 곳만 되돌리면 된다.
+ * ================================================================ */
+
+:root {
+  /* --- Light (기본) --- */
+  --surface:            #ffffff;
+  /* ⚠ 로컬 예외(머리말 참조): `--accent` 는 마인드맵 깊이 3(잎) 바탕을 **원색 그대로**
+     칠하는 자리라 연한 민트다. 브랜드 보라가 필요하면 `--primary` 를 쓴다. */
+  --accent:             #c7ecdb;
+  /* ⚠ 랜딩과 이어지는 색이다(2026-09-15). 종전 #f3f5ff 는 **푸른** 오프화이트라
+     랜딩(중성 오프화이트 + 보라)에서 넘어오는 순간 무대가 파랗게 틀어졌다.
+     같은 밝기의 **보라 쪽** 오프화이트로 옮긴다 — `--muted`(무대·사용자 말풍선)가 이걸 읽는다. */
+  --accent-soft:        #f4f1f8;
+  --text:               #0a0a0a;
+  --text-secondary:     #5a5a5a;
+  --border:             #e5e7eb;
+  --on-accent:          #ffffff;
+  --verdict-existing:   #10b981;
+  --verdict-need:       #f59e0b;
+  --verdict-mix:        #7c3aed;
+  --verdict-none:       #6b7280;
+
+  /* --- semantic (DESIGN.md 값 기반) --- */
+  --background:         var(--surface);
+  --foreground:         var(--text);
+  /* ⚠ --muted 는 **표면**이다(셸이 `bg-muted` 로 무대를 칠하고, 사용자 말풍선 바탕에도 쓴다).
+     글자색이 아니다 — 글자는 --muted-foreground 가 맡는다. 둘 다 text-secondary 로 두면
+     무대가 진회색이 되거나 카드와 구분이 사라진다(라이트 전환 때 실측).
+     값은 DESIGN.md 의 accent-soft(오프화이트 톤 — 헤더·pill 배경 용도). */
+  --muted:              var(--accent-soft);
+  --muted-foreground:   var(--text-secondary);
+  --card:               var(--surface);
+  /* 별칭 해제 — 브랜드 보라 리터럴. **랜딩 `--primary` 와 같은 값이어야 한다**(2026-09-15).
+     종전 #4f4bcb 는 남색 기운이라 헤더에서 랜딩 보라 로고와 부딪혔다(보라가 세 종류였다).
+     흰 글자 대비는 오히려 올라간다 — 7.54:1(종전 6.56:1). */
+  --primary:            #6F2DBD;
+  --primary-foreground: var(--on-accent);
+  --ring:               #6F2DBD;
+
+  /* --- DESIGN.md에 값 없는 변수는 설계 판단으로 정의 --- */
+  --radius:             6px;
+  --input:              #ffffff;
+  --popover:            var(--surface);
+  --destructive:        #b22222;
+  /* 랜딩 블록(marketing-landing)이 요구하는 shadcn 표준 이름 6개 — 2026-09-14 랜딩 이식 때 추가.
+     값은 전부 위 토큰의 별칭이다(새 색 없음). secondary 는 오프화이트 표면, *-foreground 는 먹. */
+  --card-foreground:    var(--text);
+  --popover-foreground: var(--text);
+  --secondary:          var(--accent-soft);
+  --secondary-foreground: var(--text);
+  --accent-foreground:  var(--text);
+  --destructive-foreground: #ffffff;
+  --info-foreground:    var(--text);
+  /* 로컬 예외: 마인드맵 깊이 2(묶음) 바탕의 재료. 앱에서 링크 글자색으로 쓰지 않는다. */
+  --info-link:          #1b9aaa;
+  --info-surface:       var(--accent-soft);
+  --success-foreground: #10b981;
+  --success-surface:    #f0fdf4;
+  --emphasis-foreground: var(--text);
+  --emphasis-surface:   var(--accent-soft);
+  /* 로컬 예외: 마인드맵 깊이 1(단계) 바탕의 재료. */
+  --emphasis-solid:     #2f6fd0;
+  --danger-foreground:  #b22222;
+  --tile-bg:            var(--surface);
+
+  /* 다크 모드는 이번 범위 밖(사용자 확정 2026-09-13). 브라우저·OS 가 다크여도
+     라이트로 고정한다 — color-scheme 을 안 박으면 폼 컨트롤·스크롤바만 다크로 남는다. */
+  color-scheme: light;
+}

@@ -1,12 +1,4 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "functions": {
-    "api/*.js": {
-      "maxDuration": 90
-    }
-  },
-  "rewrites": [
-    { "source": "/api/hermes/:route+", "destination": "/api/hermes?route=:route+" }
-  ]
+  "outputDirectory": "dist"
 }
