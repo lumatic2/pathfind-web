@@ -5,7 +5,11 @@
 import { useCallback, useEffect, useMemo, useReducer } from "react"
 import { INITIAL_SESSION, type ChatEntry, type Session, type StageSlot } from "./types"
 
-export const STORAGE_KEY = "pathfind.session.v5"
+/* 데모 빌드는 **저장 키를 분리한다**(M18 2026-09-20 리뷰 지적).
+   같은 도메인이라 결선 때 쓰던 옛 세션이 그대로 복원되는데, 데모에는 그 세션에 맞는 녹화가 없어
+   화면이 잠긴 채 막힌다(입력창은 자물쇠, 칩은 없음, 모든 동작이 「예시를 골라 주세요」로 떨어진다).
+   옛 세션에 `runId` 가 있으면 Hermes 재접속까지 시도한다. 키를 가르면 둘 다 끊긴다. */
+export const STORAGE_KEY = import.meta.env.VITE_DEMO === "1" ? "pathfind.demo.v5" : "pathfind.session.v5"
 
 export type Action =
   | { type: "restore"; session: Session }

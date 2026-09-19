@@ -22,7 +22,7 @@ import { deleteRoadmap, getRoadmap, listRoadmaps, newRoadmapId, renameRoadmap, s
 import { GroundedSourcePanel, type GroundedSource } from "@/components/grounded-source-panel"
 import { ChatConversationPanel, renderMarkdown, type ChatCitation, type ChatMessage, type ChatStatus } from "@/components/chat-conversation-panel"
 import * as api from "@/lib/api"
-import { DEMO, allowedChoices, loadScenarios, selectScenarioByOpening, type DemoScenario } from "@/lib/demo-player"
+import { DEMO, activeScenario, allowedChoices, loadScenarios, selectScenarioByOpening, type DemoScenario } from "@/lib/demo-player"
 import type { MindmapNode } from "@/components/mindmap-spine-tree"
 import { useSession } from "@/state/store"
 import { APPROVE_LABEL, REVISE_LABEL, useFlow } from "@/state/flow"
@@ -437,11 +437,24 @@ export default function App() {
   const [detailId, setDetailId] = useState<string | null>(null)
   /* 데모 빌드(M18) — 첫 화면 카드는 녹화된 시나리오 목록에서 온다. 실 빌드에서는 비어 있고 쓰이지 않는다. */
   const [demoScenarios, setDemoScenarios] = useState<DemoScenario[]>([])
+  /** 재생기가 어느 녹화를 물고 있는지 — 값이 바뀌면 칩 잠금 계산이 다시 돈다. */
+  const [demoBundleId, setDemoBundleId] = useState<string | null>(null)
   useEffect(() => {
     if (!DEMO) return
     void loadScenarios().then(setDemoScenarios).catch(() => setDemoScenarios([]))
   }, [])
   const demoStarters = useMemo(() => demoScenarios.map((s) => s.opening ?? s.label), [demoScenarios])
+  /* 새로고침 복원(M18 2026-09-20 리뷰 지적 B2) — 세션은 localStorage 에서 돌아오지만 재생기의
+     녹화(`bundle`)는 모듈 메모리에만 있어 함께 돌아오지 않는다. 그 상태에서는 모든 칩이 죽고
+     입력창도 잠겨 **되돌아갈 입구가 화면에 없다**. 복원된 첫 사용자 발화로 시나리오를 다시 고른다. */
+  useEffect(() => {
+    if (!DEMO || activeScenario()) return
+    const first = session.messages.find((m) => m.role === "user")
+    if (!first?.text) return
+    void selectScenarioByOpening(first.text).then((ok) => {
+      if (ok) setDemoBundleId(activeScenario()?.id ?? null)
+    })
+  }, [session.messages])
 
   // 새로고침으로 끊긴 조사를 한 번만 이어 받는다
   const resumed = useRef(false)
@@ -817,7 +830,7 @@ export default function App() {
     const selfHandled = new Set([APPROVE_LABEL, DOWNLOAD_LABEL, "조사 다시 시작", ...demoStarters])
     const allowed = new Set(allowedChoices())
     return suggestions.filter((s) => !selfHandled.has(s) && !allowed.has(s))
-  }, [suggestions, demoStarters, session.messages])
+  }, [suggestions, demoStarters, session.messages, demoBundleId])
 
   const handleSend = (text: string) => {
     setDraft("")
@@ -825,7 +838,9 @@ export default function App() {
        고른 뒤에야 재생기가 어느 녹화를 틀지 알 수 있으므로, 고르고 나서 흐름에 넘긴다. */
     if (DEMO && session.messages.length === 0) {
       void selectScenarioByOpening(text).then((ok) => {
-        if (ok) void flow.sendAnswer(text)
+        if (!ok) return
+        setDemoBundleId(activeScenario()?.id ?? null)
+        void flow.sendAnswer(text)
       })
       return
     }
@@ -849,7 +864,9 @@ export default function App() {
        여기에도 있어야 한다** — 칩은 이 함수로 들어오므로, 없으면 재생기가 어느 녹화인지 모른 채 불린다. */
     if (DEMO && session.messages.length === 0) {
       void selectScenarioByOpening(s).then((ok) => {
-        if (ok) void flow.sendAnswer(s)
+        if (!ok) return
+        setDemoBundleId(activeScenario()?.id ?? null)
+        void flow.sendAnswer(s)
       })
       return
     }

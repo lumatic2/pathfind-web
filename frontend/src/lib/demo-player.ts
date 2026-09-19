@@ -125,6 +125,13 @@ export async function playback<T>(path: string, body: unknown): Promise<T> {
 
   const key = keyOf(endpoint, body)
   let hit = key != null ? calls.find((c) => c.key === key) : undefined
+  if (!hit && key != null && endpoint === "source-card") {
+    /* 자료 카드도 **아무거나 돌려주면 안 된다** — 키가 안 맞는데 첫 응답을 주면 A 문서 자리에
+       B 문서 요약이 굳는다(M18 2026-09-20 리뷰 지적 B1). `degraded` 로 돌려주면 화면이
+       카드 대신 원래 사실 본문을 그대로 둔다(`lib/api.ts` 의 계약). */
+    await wait(MIN_MS)
+    return { markdown: "", degraded: true } as T
+  }
   if (!hit && key != null && endpoint === "explain") {
     /* 노드 설명은 **아무거나 돌려주면 안 된다** — 키가 안 맞는데 첫 응답을 주면 5단계를 눌렀는데
        1단계 설명이 나온다(2026-09-20 실측). 없으면 없다고 말한다. */
